@@ -17,13 +17,10 @@ namespace NLDB
         public Lexicon Child;
         public Lexicon Parent;
         readonly Dictionary<Word, int> words = new Dictionary<Word, int>();
+        readonly Dictionary<int, Word> iwords = new Dictionary<int, Word>();
         readonly Dictionary<string, int> alphabet = new Dictionary<string, int>();
+        readonly Dictionary<int, string> ialphabet = new Dictionary<int, string>();
 
-
-        public int Count
-        {
-            get { return this.words.Count; }
-        }
 
         public Lexicon(string splitter, Lexicon child = null, Lexicon parent = null)
         {
@@ -35,6 +32,11 @@ namespace NLDB
             this.Parent = parent;
             this.Splitter = splitter;
             this.parser = new Parser(this.Splitter);
+        }
+
+        public int Count
+        {
+            get { return this.words.Count; }
         }
 
         public int[] Codes
@@ -63,6 +65,14 @@ namespace NLDB
             }
         }
 
+        public string AsText(int i)
+        {
+            if (this.Rank == 0)
+                return this.ialphabet[i];
+            return this.iwords[i].childs.Aggregate("",
+                (c, n) => c + this.Child.AsText(n));
+        }
+
         /// <summary>
         /// Возвращает код слова, представленного строкой s
         /// </summary>
@@ -78,7 +88,7 @@ namespace NLDB
         public int[] TryAddMany(string text)
         {
             string normilizedText = this.parser.Normilize(text);
-            return 
+            return
                 this.parser.
                 Split(normilizedText).
                 Where(s => !string.IsNullOrEmpty(s)).
@@ -96,7 +106,7 @@ namespace NLDB
             int id = -1;
             if (this.Rank == 0)
             {
-                if ((id = this.AsCode(s)) == -1)
+                if ((id = this.Find(s)) == -1)
                     id = this.Add(s);
             }
             else
@@ -115,10 +125,7 @@ namespace NLDB
         /// <returns>возвращает код добавленного слова</returns>
         public int Add(string s)
         {
-            int id = this.words.Count;
-            this.words.Add(new Word(id, new int[0]), id);
-            this.alphabet.Add(s, id);
-            return id;
+            return this.Register(new Word(-1, new int[0]), s);
         }
 
         /// <summary>
@@ -128,8 +135,21 @@ namespace NLDB
         /// <returns>код добавленного слова</returns>
         public int Add(int[] subwords)
         {
+            return this.Register(new Word(-1, subwords));
+        }
+
+        private int Register(Word w, string s = "")
+        {
             int id = this.words.Count;
-            this.words.Add(new Word(id, subwords), id);
+            //Заменяем id слова w, на новый
+            w.id = id;
+            if (!string.IsNullOrEmpty(s))
+            {
+                this.alphabet.Add(s, id);
+                this.ialphabet.Add(id, s);
+            }
+            this.words.Add(w, w.id);
+            this.iwords.Add(w.id, w);
             return id;
         }
 
@@ -139,6 +159,14 @@ namespace NLDB
                 return id;
             return -1;
         }
+
+        public int Find(string s)
+        {
+            if (this.alphabet.TryGetValue(s, out int id))
+                return id;
+            return -1;
+        }
+
 
     }
 }

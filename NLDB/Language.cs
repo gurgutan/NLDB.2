@@ -9,16 +9,17 @@ namespace NLDB
 {
     public class Language
     {
-        private readonly int bufferSize = 1 << 25;
+        private readonly int bufferSize = 1 << 20;
         private readonly string Name;
         public int Rank;
 
         public List<Lexicon> Lexicons = new List<Lexicon>();
 
-        public Language(string name, int rank, string[] splitters)
+        public Language(string name, string[] splitters)
         {
             this.Name = name;
-            this.Init(rank, splitters);
+            this.Rank = splitters.Length - 1;
+            this.Init(splitters);
         }
 
         public Lexicon this[int r]
@@ -42,18 +43,15 @@ namespace NLDB
                     count = file.ReadBlock(buffer, 0, this.bufferSize);
                     total += count;
                     string text = new string(buffer);
-                    for (int i = 0; i <= this.Rank; i++)
-                    {
-                        this.Lexicons[i].TryAddMany(text);
-                    }
+                    this.Lexicons[this.Rank].TryAddMany(text);
                     Console.WriteLine($"Считано {total} байт");
                 }
             }
         }
 
-        private void Init(int rank, string[] splitters)
+        private void Init(string[] splitters)
         {
-            for (int i = 0; i <= rank; i++)
+            for (int i = 0; i < splitters.Length; i++)
                 this.Lexicons.Add(
                     new Lexicon(splitters[i], i > 0 ? this.Lexicons[i - 1] : null)
                     );
