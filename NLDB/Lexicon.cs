@@ -80,7 +80,8 @@ namespace NLDB
         /// <returns>код, идентифицирующий слово или -1, если слово с текстовым представлением s не найдено в словаре</returns>
         public int AsCode(string s)
         {
-            if (this.alphabet.TryGetValue(s, out int code))
+            int code;
+            if (this.alphabet.TryGetValue(s, out code))
                 return code;
             return -1;
         }
@@ -155,14 +156,16 @@ namespace NLDB
 
         public int Find(int[] subwords)
         {
-            if (this.words.TryGetValue(new Word(-1, subwords), out int id))
+            int id;
+            if (this.words.TryGetValue(new Word(-1, subwords), out id))
                 return id;
             return -1;
         }
 
         public int Find(string s)
         {
-            if (this.alphabet.TryGetValue(s, out int id))
+            int id;
+            if (this.alphabet.TryGetValue(s, out id))
                 return id;
             return -1;
         }
