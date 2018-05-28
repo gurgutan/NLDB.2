@@ -24,6 +24,24 @@ namespace NLDB
             this.childs = _childs;
         }
 
+        public int[][] AsSparseVector()
+        {
+            Dictionary<int, int> bitmap = new Dictionary<int, int>(childs.Length);
+            int i = 0;
+            foreach (var c in childs)
+            {
+                if (!bitmap.ContainsKey(c))
+                    bitmap[c] = (1 << i);
+                else
+                    bitmap[c] |= (1 << i);
+                i++;
+            }
+            int[][] vector = new int[2][];
+            vector[0] = bitmap.Values.ToArray();
+            vector[1] = bitmap.Keys.ToArray();
+            return vector;
+        }
+
         public override bool Equals(object obj)
         {
             Word w = (Word)obj;

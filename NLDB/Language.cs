@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
-    public class Language
+    public partial class Language
     {
         private readonly int bufferSize = 1 << 20;
         private readonly string Name;

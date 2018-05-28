@@ -28,9 +28,7 @@ namespace NLDB
 
         public string Normilize(string text)
         {
-            string result = text.ToLower();
-            result = this.removeRegex.Replace(text, "");
-            return result;
+            return this.removeRegex.Replace(text.ToLower(), "");
         }
     }
 }

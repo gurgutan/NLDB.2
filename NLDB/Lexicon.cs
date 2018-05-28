@@ -7,6 +7,29 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
+    public struct TripleInt
+    {
+        public int val;
+        public int row;
+        public int col;
+
+        public TripleInt(int v, int r, int c)
+        {
+            val = v;
+            row = r;
+            col = c;
+        }
+
+        public static int Compare(TripleInt a, TripleInt b)
+        {
+            if (a.row > b.row) return 1;
+            if (a.row < b.row) return -1;
+            if (a.col > b.col) return 1;
+            if (a.col < b.col) return -1;
+            return 0;
+        }
+    }
+
     public class Lexicon
     {
         private readonly Parser parser;
@@ -39,7 +62,10 @@ namespace NLDB
             get { return this.words.Count; }
         }
 
-        public int[] Codes
+        /// <summary>
+        /// Массив Id слов
+        /// </summary>
+        public IEnumerable<int> Codes
         {
             get
             {
@@ -47,21 +73,22 @@ namespace NLDB
             }
         }
 
-        public int[] ChildCodes
+        public IEnumerable<Word> Words
         {
             get
             {
-                if (this.Child == null)
-                    return null;
-                return this.Child.Codes;
+                return words.Keys;
             }
         }
 
-        public string[] Alphabet
+        /// <summary>
+        /// Массив базовых строковых представлений символов(букв) словаря. Имеет смысл только для словаря ранга 0, так как 
+        /// </summary>
+        public IEnumerable<string> Alphabet
         {
             get
             {
-                return this.alphabet.Keys.ToArray();
+                return this.alphabet.Keys;
             }
         }
 
@@ -139,21 +166,6 @@ namespace NLDB
             return this.Register(new Word(-1, subwords));
         }
 
-        private int Register(Word w, string s = "")
-        {
-            int id = this.words.Count;
-            //Заменяем id слова w, на новый
-            w.id = id;
-            if (!string.IsNullOrEmpty(s))
-            {
-                this.alphabet.Add(s, id);
-                this.ialphabet.Add(id, s);
-            }
-            this.words.Add(w, w.id);
-            this.iwords.Add(w.id, w);
-            return id;
-        }
-
         public int Find(int[] subwords)
         {
             int id;
@@ -168,6 +180,80 @@ namespace NLDB
             if (this.alphabet.TryGetValue(s, out id))
                 return id;
             return -1;
+        }
+
+        /// <summary>
+        /// Возвращает представление словаря ранга r, как матрицы размерности m x n, где m - размер дочернего словаря, а n - размер словаря r
+        /// </summary>
+        /// <param name="r">ранга словаря</param>
+        /// <returns></returns>
+        public int[,] AsDenseMatrix()
+        {
+            if (this.Rank == 0) throw new ArgumentOutOfRangeException("Для словаря нулевого ранга не существует матричного представления");
+            int[,] matrix = new int[this.Child.Count, this.Count];
+            int col = 0;
+            foreach (var w in words.Keys)
+            {
+                for (int i = 0; i < w.childs.Length; i++)
+                {
+                    matrix[w.childs[i], col] |= (1 << i);
+                }
+                col++;
+            }
+            return matrix;
+        }
+
+        /// <summary>
+        /// Метод формирует матрицу в координатном формате
+        /// </summary>
+        /// <returns>массив из трех массивов: [0] - значения, [1] - индексы строк, [2] - индексы колонок</returns>
+        public int[][] AsCOOMatrix()
+        {
+            if (this.Rank == 0) throw new ArgumentOutOfRangeException("Для словаря нулевого ранга не существует матричного представления");
+            List<TripleInt> values = new List<TripleInt>();
+            int col = 0;
+            foreach (var w in words.Keys)
+            {
+                //Составляем набор значений для записи в матрицу
+                Dictionary<int, int> bitmap = new Dictionary<int, int>(w.childs.Length);
+                int pos = 0;
+                foreach (var row in w.childs)
+                {
+                    if (!bitmap.ContainsKey(row))
+                        bitmap[row] = (1 << pos);
+                    else
+                        bitmap[row] |= (1 << pos);
+                    pos++;
+                }
+                //Добавляем значения в списки для COOMatrix
+                foreach(var v in bitmap)
+                {
+                    values.Add(new TripleInt(v.Value, v.Key, col));
+                }
+                col++;
+            }
+            values.Sort((a, b) => TripleInt.Compare(a, b));
+            int[][] matrix = new int[3][];
+            matrix[0] = values.Select(v => v.val).ToArray();
+            matrix[1] = values.Select(v => v.row).ToArray();
+            matrix[2] = values.Select(v => v.col).ToArray();
+            return matrix;
+        }
+
+
+        private int Register(Word w, string s = "")
+        {
+            int id = this.words.Count;
+            //Заменяем id слова w, на новый
+            w.id = id;
+            if (!string.IsNullOrEmpty(s))
+            {
+                this.alphabet.Add(s, id);
+                this.ialphabet.Add(id, s);
+            }
+            this.words.Add(w, w.id);
+            this.iwords.Add(w.id, w);
+            return id;
         }
 
 
