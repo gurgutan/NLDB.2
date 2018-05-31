@@ -16,7 +16,7 @@
 #include<vector>
 #include<tuple>
 
-
+using namespace std;
 namespace nldb
 {
 	///Максимальный размер слова. 
@@ -25,26 +25,23 @@ namespace nldb
 	const int MAX_WORDS_COUNT = MAXINT32 / MAX_WORD_SIZE;
 
 
-	typedef std::tuple<std::vector<float>, std::vector<int>> SparseRow;
-
-
 	class Word
 	{
 	public:
 		int id;
-		std::vector<int> childs;
-		std::vector<float> assurance;
+		vector<int> childs;
+		vector<float> assurance;
 
 		Word();
 		Word(int _id);
-		Word(int _id, std::vector<int> _childs);
+		Word(int _id, vector<int>& _childs);
 		~Word();
 
-		int Size();
+		unsigned int size() const;
 		bool Equals(const Word& w);
-		int GetHashCode();
+		unsigned int GetHashCode();
 
-		SparseRow ToSparseRow();
+		void ToSparseRow(float* values, int* indexes);
 
 	};
 

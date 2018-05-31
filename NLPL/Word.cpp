@@ -12,11 +12,11 @@ nldb::Word::Word(int _id)
 	this->id = _id;
 }
 
-nldb::Word::Word(int _id, std::vector<int> _childs)
+nldb::Word::Word(int _id, vector<int>& _childs)
 {
 	this->id = _id;
 	this->childs = _childs;
-	this->assurance.assign(_childs.size, 1);
+	this->assurance.assign(_childs.size(), 1);
 }
 
 nldb::Word::~Word()
@@ -25,26 +25,21 @@ nldb::Word::~Word()
 	this->assurance.clear();
 }
 
-int nldb::Word::Size()
+unsigned int nldb::Word::size() const
 {
-	return childs.size;
+	return this->childs.size();
 }
 
 /// Возвращает разреженный вектор-строку в формате 2 вектора - ненулевые значения и номера колонок ненулевых значений
-nldb::SparseRow nldb::Word::ToSparseRow()
+void nldb::Word::ToSparseRow(float* values, int* indexes)
 {
-	SparseRow result;
-	std::vector<int> values;
-	std::vector<int> cols;
-
-	for (int i = 0; i < this->childs.size; ++i)
+	values = new float[this->childs.size()];
+	indexes = new int[this->childs.size()];
+	for (UINT32 i = 0; i < this->childs.size(); ++i)
 	{
-		int index = MAX_WORD_SIZE*this->childs[i] + i % MAX_WORD_SIZE;
-		values.push_back(this->assurance[i]);
-		cols.push_back(index);
+		values[i] = this->assurance[i];
+		indexes[i] = MAX_WORD_SIZE*this->childs[i] + i % MAX_WORD_SIZE;
 	}
-	result = std::make_tuple(values, cols);
-	return result;
 }
 
 /// Сопоставление слов по буквам или по id. Слова считаются эквивалентными, если соблюдается хотя-бы одно из условий:
@@ -53,9 +48,9 @@ nldb::SparseRow nldb::Word::ToSparseRow()
 bool nldb::Word::Equals(const Word& w)
 {
 	if (w.id == this->id) return true;
-	if (w.childs.size != this->Size()) return false;
-	if (w.childs.size == 0) return w.id == this->id;
-	for (int i = 0;i < this->childs.size;++i)
+	if (w.size() != this->size()) return false;
+	if (w.size() == 0) return w.id == this->id;
+	for (UINT32 i = 0;i < this->size();++i)
 		if (w.childs[i] != this->childs[i]) return false;
 	return true;
 }
@@ -63,11 +58,11 @@ bool nldb::Word::Equals(const Word& w)
 /// Вычисление хэш-функции на наборе букв слова. Применяется линейный конгруэнтный метод для набора символов:
 /// H(c[i+1]) <- H(c[i]) * 1664525 + 1013904223
 /// c[i] - i-й символ слова, i=0...n, где n - длина слова
-int nldb::Word::GetHashCode()
+unsigned int nldb::Word::GetHashCode()
 {
-	if (this->childs.size == 0)return this->id;
-	int hash = 0;
-	for (int i = 0; i < this->childs.size; i++)
+	if (this->childs.size() == 0)return this->id;
+	unsigned int hash = 0;
+	for (UINT32 i = 0; i < this->childs.size(); i++)
 	{
 		hash += this->childs[i] + 1013904223;
 		hash *= 1664525;
