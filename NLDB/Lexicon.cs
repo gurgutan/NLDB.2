@@ -33,6 +33,7 @@ namespace NLDB
 
     public partial class Lexicon
     {
+
         private readonly Parser parser;
         private int count = 0;
 
@@ -243,10 +244,32 @@ namespace NLDB
             return matrix;
         }
 
-        public int FindOneNearest(int[] subwords)
+        public Dictionary<int[], double> AsSparseMatrix()
         {
-            if(this.Rank==0) throw new 
-            SparseMatrix m = new SparseMatrix(this.count,
+            if (this.Rank == 0) throw new ArgumentOutOfRangeException("Для словаря нулевого ранга не существует матричного представления");
+            Dictionary<int[], double> result = new Dictionary<int[], double>(this.count * Language.WORD_SIZE);
+            foreach (var pair in w2i)
+            {
+                int col = pair.Value;
+                int pos = 0;
+                foreach (var c in pair.Key.childs)
+                {
+                    int row = c * Language.WORD_SIZE + pos;
+                    result.Add(new int[] { row, col }, 1.0);
+                    pos++;
+                }
+            }
+            return result;
+        }
+
+        public int FindOneNearest(Word w)
+        {
+            if (this.Rank == 0) throw new Exception("Нельзя искать ближайшего соседа в словаре ранга 0");
+            int rows = this.Child.count;
+            int columns = this.count;
+            SparseMatrix m = new SparseMatrix(this.AsSparseMatrix(), rows, columns);
+            SparseMatrix v = new SparseMatrix(w.AsSparseVector(), 1, rows);
+            v.multiply()
         }
 
         private int Register(Word w, string s = "")
@@ -262,7 +285,7 @@ namespace NLDB
                 this.i2s.Add(id, s);
             }
             this.w2i.Add(w, w.id);
-            this.i2w.Add(w.id, w);            
+            this.i2w.Add(w.id, w);
             return id;
         }
 

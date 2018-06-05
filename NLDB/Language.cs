@@ -9,6 +9,7 @@ namespace NLDB
 {
     public partial class Language
     {
+        public static int WORD_SIZE = 64;
         private readonly int bufferSize = 1 << 20;
         private readonly string Name;
         public int Rank;

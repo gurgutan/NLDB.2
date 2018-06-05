@@ -24,21 +24,15 @@ namespace NLDB
             this.childs = _childs;
         }
 
-        public int[][] AsSparseVector()
+        public Dictionary<int[], double> AsSparseVector()
         {
-            Dictionary<int, int> bitmap = new Dictionary<int, int>(childs.Length);
-            int i = 0;
+            Dictionary<int[], double> vector = new Dictionary<int[], double>();
+            int pos = 0;
             foreach (var c in childs)
             {
-                if (!bitmap.ContainsKey(c))
-                    bitmap[c] = (1 << i);
-                else
-                    bitmap[c] |= (1 << i);
-                i++;
+                vector.Add(new int[] { 0, c * Language.WORD_SIZE + pos }, 1.0);
+                pos++;
             }
-            int[][] vector = new int[2][];
-            vector[0] = bitmap.Values.ToArray();
-            vector[1] = bitmap.Keys.ToArray();
             return vector;
         }
 
