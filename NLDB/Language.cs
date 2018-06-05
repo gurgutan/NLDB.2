@@ -49,6 +49,11 @@ namespace NLDB
             }
         }
 
+        public void CreateFromString(string text)
+        {
+            this.Lexicons[this.Rank].TryAddMany(text);
+        }
+
         private void Init(string[] splitters)
         {
             for (int i = 0; i < splitters.Length; i++)

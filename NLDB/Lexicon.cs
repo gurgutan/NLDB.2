@@ -1,4 +1,5 @@
-﻿using System;
+﻿using StarMathLib;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -30,19 +31,20 @@ namespace NLDB
         }
     }
 
-    public class Lexicon
+    public partial class Lexicon
     {
         private readonly Parser parser;
+        private int count = 0;
 
         public int Rank;
         public string Splitter = "";
 
         public Lexicon Child;
         public Lexicon Parent;
-        readonly Dictionary<Word, int> words = new Dictionary<Word, int>();
-        readonly Dictionary<int, Word> iwords = new Dictionary<int, Word>();
-        readonly Dictionary<string, int> alphabet = new Dictionary<string, int>();
-        readonly Dictionary<int, string> ialphabet = new Dictionary<int, string>();
+        readonly Dictionary<Word, int> w2i = new Dictionary<Word, int>();
+        readonly Dictionary<int, Word> i2w = new Dictionary<int, Word>();
+        readonly Dictionary<string, int> s2i = new Dictionary<string, int>();
+        readonly Dictionary<int, string> i2s = new Dictionary<int, string>();
 
 
         public Lexicon(string splitter, Lexicon child = null, Lexicon parent = null)
@@ -59,7 +61,7 @@ namespace NLDB
 
         public int Count
         {
-            get { return this.words.Count; }
+            get { return this.w2i.Count; }
         }
 
         /// <summary>
@@ -69,7 +71,7 @@ namespace NLDB
         {
             get
             {
-                return this.words.Values.ToArray();
+                return this.w2i.Values.ToArray();
             }
         }
 
@@ -77,7 +79,7 @@ namespace NLDB
         {
             get
             {
-                return words.Keys;
+                return w2i.Keys;
             }
         }
 
@@ -88,15 +90,15 @@ namespace NLDB
         {
             get
             {
-                return this.alphabet.Keys;
+                return this.s2i.Keys;
             }
         }
 
         public string AsText(int i)
         {
             if (this.Rank == 0)
-                return this.ialphabet[i];
-            return this.iwords[i].childs.Aggregate("",
+                return this.i2s[i];
+            return this.i2w[i].childs.Aggregate("",
                 (c, n) => c + this.Child.AsText(n));
         }
 
@@ -108,7 +110,7 @@ namespace NLDB
         public int AsCode(string s)
         {
             int code;
-            if (this.alphabet.TryGetValue(s, out code))
+            if (this.s2i.TryGetValue(s, out code))
                 return code;
             return -1;
         }
@@ -134,13 +136,13 @@ namespace NLDB
             int id = -1;
             if (this.Rank == 0)
             {
-                if ((id = this.Find(s)) == -1)
-                    id = this.Add(s);
+                if ((id = this.FindAtom(s)) == -1)
+                    id = this.AddAtom(s);
             }
             else
             {
                 int[] subwords = this.Child.TryAddMany(s);
-                if ((id = this.Find(subwords)) == -1)
+                if ((id = this.FindEqual(subwords)) == -1)
                     id = this.Add(subwords);
             }
             return id;
@@ -151,7 +153,7 @@ namespace NLDB
         /// </summary>
         /// <param name="s">тектсовое представление слова</param>
         /// <returns>возвращает код добавленного слова</returns>
-        public int Add(string s)
+        public int AddAtom(string s)
         {
             return this.Register(new Word(-1, new int[0]), s);
         }
@@ -166,18 +168,18 @@ namespace NLDB
             return this.Register(new Word(-1, subwords));
         }
 
-        public int Find(int[] subwords)
+        public int FindEqual(int[] subwords)
         {
             int id;
-            if (this.words.TryGetValue(new Word(-1, subwords), out id))
+            if (this.w2i.TryGetValue(new Word(-1, subwords), out id))
                 return id;
             return -1;
         }
 
-        public int Find(string s)
+        public int FindAtom(string s)
         {
             int id;
-            if (this.alphabet.TryGetValue(s, out id))
+            if (this.s2i.TryGetValue(s, out id))
                 return id;
             return -1;
         }
@@ -192,7 +194,7 @@ namespace NLDB
             if (this.Rank == 0) throw new ArgumentOutOfRangeException("Для словаря нулевого ранга не существует матричного представления");
             int[,] matrix = new int[this.Child.Count, this.Count];
             int col = 0;
-            foreach (var w in words.Keys)
+            foreach (var w in w2i.Keys)
             {
                 for (int i = 0; i < w.childs.Length; i++)
                 {
@@ -212,7 +214,7 @@ namespace NLDB
             if (this.Rank == 0) throw new ArgumentOutOfRangeException("Для словаря нулевого ранга не существует матричного представления");
             List<TripleInt> values = new List<TripleInt>();
             int col = 0;
-            foreach (var w in words.Keys)
+            foreach (var w in w2i.Keys)
             {
                 //Составляем набор значений для записи в матрицу
                 Dictionary<int, int> bitmap = new Dictionary<int, int>(w.childs.Length);
@@ -226,12 +228,13 @@ namespace NLDB
                     pos++;
                 }
                 //Добавляем значения в списки для COOMatrix
-                foreach(var v in bitmap)
+                foreach (var v in bitmap)
                 {
                     values.Add(new TripleInt(v.Value, v.Key, col));
                 }
                 col++;
             }
+            //Сортировка по строкам, потом по столбцам
             values.Sort((a, b) => TripleInt.Compare(a, b));
             int[][] matrix = new int[3][];
             matrix[0] = values.Select(v => v.val).ToArray();
@@ -240,19 +243,26 @@ namespace NLDB
             return matrix;
         }
 
+        public int FindOneNearest(int[] subwords)
+        {
+            if(this.Rank==0) throw new 
+            SparseMatrix m = new SparseMatrix(this.count,
+        }
 
         private int Register(Word w, string s = "")
         {
-            int id = this.words.Count;
-            //Заменяем id слова w, на новый
+            count++;
+            //получаем новый id. Он может быть получен и другим способом, необязательно как следующий номер за последним
+            int id = count;
+            //Заменяем id переданного слова w, на новый
             w.id = id;
             if (!string.IsNullOrEmpty(s))
             {
-                this.alphabet.Add(s, id);
-                this.ialphabet.Add(id, s);
+                this.s2i.Add(s, id);
+                this.i2s.Add(id, s);
             }
-            this.words.Add(w, w.id);
-            this.iwords.Add(w.id, w);
+            this.w2i.Add(w, w.id);
+            this.i2w.Add(w.id, w);            
             return id;
         }
 
