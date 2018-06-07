@@ -9,9 +9,32 @@ namespace NLDB
 {
     class Program
     {
-        
+
         static void Main(string[] args)
         {
+            string trainfile = @"D:\Data\Text\philosoph2.txt";
+            Language lang1 = new Language("Русские слова", new string[] { "", @"[^а-яА-ЯёЁ0-9]", @"[\.\?\!\n\r]" });
+            lang1.CreateFromTextFile(trainfile);
+
+            string line = "";
+            Console.Write(">>");
+            while ((line = Console.ReadLine()) != "q")
+            {
+
+                int[] s = line.ToCharArray().Select(c => lang1[0].FindAtom("" + c)).ToArray();
+                if (s.Any(c_id => c_id < 0))
+                {
+                    Console.WriteLine("Неизвестная буква");
+                    continue;
+                }
+                else
+                {
+                    int nearest_id = lang1[1].FindOneNearest(s);
+                    if (nearest_id >= 0)
+                        Console.WriteLine(lang1[1].AsText(nearest_id));
+                }
+                Console.Write(">>");
+            }
             Console.ReadKey();
         }
 

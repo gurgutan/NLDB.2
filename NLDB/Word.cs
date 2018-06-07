@@ -7,10 +7,25 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
+    public struct WordLink
+    {
+        public int id;
+        public byte pos;
+        //public float value;
+
+        public WordLink(int _id, byte _pos, float _v)
+        {
+            id = _id;
+            pos = _pos;
+            //value = _v;
+        }
+    }
+
     public class Word
     {
         public int id;
         public int[] childs;
+        public List<WordLink> parents = new List<WordLink>();
 
         public Word(int _id)
         {
@@ -22,6 +37,11 @@ namespace NLDB
         {
             this.id = _id;
             this.childs = _childs;
+        }
+
+        public IEnumerable<int> ParentCodes
+        {
+            get { return parents.Select(p => p.id); }
         }
 
         public Dictionary<int[], double> AsSparseVector()

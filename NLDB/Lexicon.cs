@@ -33,7 +33,6 @@ namespace NLDB
 
     public partial class Lexicon
     {
-
         private readonly Parser parser;
         private int count = 0;
 
@@ -46,7 +45,6 @@ namespace NLDB
         readonly Dictionary<int, Word> i2w = new Dictionary<int, Word>();
         readonly Dictionary<string, int> s2i = new Dictionary<string, int>();
         readonly Dictionary<int, string> i2s = new Dictionary<int, string>();
-
 
         public Lexicon(string splitter, Lexicon child = null, Lexicon parent = null)
         {
@@ -65,23 +63,27 @@ namespace NLDB
             get { return this.w2i.Count; }
         }
 
+        public Word this[int id]
+        {
+            get { return i2w[id]; }
+        }
+
+        public int this[Word w]
+        {
+            get { return w2i[w]; }
+        }
+
         /// <summary>
         /// Массив Id слов
         /// </summary>
         public IEnumerable<int> Codes
         {
-            get
-            {
-                return this.w2i.Values.ToArray();
-            }
+            get { return this.w2i.Values.ToArray(); }
         }
 
         public IEnumerable<Word> Words
         {
-            get
-            {
-                return w2i.Keys;
-            }
+            get { return w2i.Keys; }
         }
 
         /// <summary>
@@ -89,10 +91,7 @@ namespace NLDB
         /// </summary>
         public IEnumerable<string> Alphabet
         {
-            get
-            {
-                return this.s2i.Keys;
-            }
+            get { return this.s2i.Keys; }
         }
 
         public string AsText(int i)
@@ -138,35 +137,15 @@ namespace NLDB
             if (this.Rank == 0)
             {
                 if ((id = this.FindAtom(s)) == -1)
-                    id = this.AddAtom(s);
+                    id = this.Register(new int[0], s);
             }
             else
             {
                 int[] subwords = this.Child.TryAddMany(s);
                 if ((id = this.FindEqual(subwords)) == -1)
-                    id = this.Add(subwords);
+                    id = this.Register(subwords);
             }
             return id;
-        }
-
-        /// <summary>
-        /// Добавляет атомарное слово, представленное строкой s
-        /// </summary>
-        /// <param name="s">тектсовое представление слова</param>
-        /// <returns>возвращает код добавленного слова</returns>
-        public int AddAtom(string s)
-        {
-            return this.Register(new Word(-1, new int[0]), s);
-        }
-
-        /// <summary>
-        /// Добавляет составное слово
-        /// </summary>
-        /// <param name="subwords">id дочерних слов</param>
-        /// <returns>код добавленного слова</returns>
-        public int Add(int[] subwords)
-        {
-            return this.Register(new Word(-1, subwords));
         }
 
         public int FindEqual(int[] subwords)
@@ -262,33 +241,64 @@ namespace NLDB
             return result;
         }
 
-        public int FindOneNearest(Word w)
+        public int FindOneNearest(int[] subwords)
         {
             if (this.Rank == 0) throw new Exception("Нельзя искать ближайшего соседа в словаре ранга 0");
-            int rows = this.Child.count;
-            int columns = this.count;
-            SparseMatrix m = new SparseMatrix(this.AsSparseMatrix(), rows, columns);
-            SparseMatrix v = new SparseMatrix(w.AsSparseVector(), 1, rows);
-            v.multiply()
+            Dictionary<int, int> parents = new Dictionary<int, int>();
+            //Подсчитываем
+            for (int i = 0; i < subwords.Length; i++)
+            {
+                Word w = this.Child.i2w[subwords[i]];
+                for (int j = 0; j < w.parents.Count; j++)
+                {
+                    if (i == w.parents[j].pos)
+                    {
+                        int p = w.parents[j].id;
+                        if (!parents.ContainsKey(p))
+                            parents.Add(p, 1);
+                        else
+                            parents[p]++;
+                    }
+                }
+            }
+            //Ищем слово с маскимальным значением
+            int id = -1;
+            double score = 0;
+            foreach (var p in parents)
+            {
+                if (p.Value > score)
+                {
+                    score = p.Value;
+                    id = p.Key;
+                }
+            }
+            return id;
         }
 
-        private int Register(Word w, string s = "")
+        private int Register(int[] subwords, string s = "")
         {
             count++;
             //получаем новый id. Он может быть получен и другим способом, необязательно как следующий номер за последним
             int id = count;
-            //Заменяем id переданного слова w, на новый
-            w.id = id;
+            //Создаем новое слово
+            Word w = new Word(id, subwords);
+            //Добавляем строковый символ для слова, если он задан
             if (!string.IsNullOrEmpty(s))
             {
                 this.s2i.Add(s, id);
                 this.i2s.Add(id, s);
             }
+            //Добавляем индексы в словарь
             this.w2i.Add(w, w.id);
             this.i2w.Add(w.id, w);
+            //Добавляем связи дочерних слов с данным словом
+            for (byte i = 0; i < subwords.Length; i++)
+            {
+                var child = this.Child.i2w[subwords[i]];
+                child.parents.Add(new WordLink(id, i, 1));
+            }
             return id;
         }
-
 
     }
 }
