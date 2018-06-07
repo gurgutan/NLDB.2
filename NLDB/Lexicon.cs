@@ -245,15 +245,19 @@ namespace NLDB
         {
             if (this.Rank == 0) throw new Exception("Нельзя искать ближайшего соседа в словаре ранга 0");
             Dictionary<int, int> parents = new Dictionary<int, int>();
-            //Подсчитываем
+            //Считаем произведение вектора-слова ранга r-1 на матрицу вхождений слов в словарь ранга r
+            //Цикл по всем буквам (словам ранга r-1)
             for (int i = 0; i < subwords.Length; i++)
             {
+                //Ищем соответствующую букву в словаре ранга r-1
                 Word w = this.Child.i2w[subwords[i]];
+                //По всем словам, в которые входит данная буква, увеличиваем счетчик совпадений, при совпадении позиции
                 for (int j = 0; j < w.parents.Count; j++)
                 {
-                    if (i == w.parents[j].pos)
+                    WordLink parent = w.parents[j];
+                    if (i == parent.pos)
                     {
-                        int p = w.parents[j].id;
+                        int p = parent.id;
                         if (!parents.ContainsKey(p))
                             parents.Add(p, 1);
                         else
