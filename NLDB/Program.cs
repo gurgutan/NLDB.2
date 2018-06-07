@@ -12,15 +12,20 @@ namespace NLDB
 
         static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Text\philosoph2.txt";
+            Random rand = new Random((int)DateTime.Now.Ticks);
+            string trainfile = @"D:\Data\teachers.txt";
             Language lang1 = new Language("Русские слова", new string[] { "", @"[^а-яА-ЯёЁ0-9]", @"[\.\?\!\n\r]" });
             lang1.CreateFromTextFile(trainfile);
+            foreach (var lex in lang1.Lexicons)
+            {
+                Console.WriteLine($"Слов ранга {lex.Rank}: {lex.Count}");
+                Console.WriteLine(lex.AsText(rand.Next(lex.Count)));
+            }
 
             string line = "";
             Console.Write(">>");
             while ((line = Console.ReadLine()) != "q")
             {
-
                 int[] s = line.ToCharArray().Select(c => lang1[0].FindAtom("" + c)).ToArray();
                 if (s.Any(c_id => c_id < 0))
                 {

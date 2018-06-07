@@ -18,7 +18,7 @@ namespace NLDB
         {
             this.SplitExpr = splitExpr;
             this.splitRegex = new Regex(this.SplitExpr, RegexOptions.Compiled);
-            this.removeRegex = new Regex(@"[^а-яА-ЯёЁa-zA-Z0-9\s\t\r\n\!\?\,\;\:\%\$\#\@\*\+\-\&\^\(\)\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
+            this.removeRegex = new Regex(@"[^а-яА-ЯёЁ\s\t\r\n\!\?\,\;\:\*\+\-\&\^\(\)\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
         }
 
         public string[] Split(string text)
@@ -28,7 +28,8 @@ namespace NLDB
 
         public string Normilize(string text)
         {
-            return this.removeRegex.Replace(text.ToLower(), "");
+            string formated = text.ToLower().Trim();
+            return this.removeRegex.Replace(formated, "");
         }
     }
 }

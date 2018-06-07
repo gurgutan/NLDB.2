@@ -96,10 +96,9 @@ namespace NLDB
 
         public string AsText(int i)
         {
-            if (this.Rank == 0)
-                return this.i2s[i];
-            return this.i2w[i].childs.Aggregate("",
-                (c, n) => c + this.Child.AsText(n));
+            string[] sp = new string[] { "", " ", ".", "\n", "\n\n" };
+            if (this.Rank == 0) return this.i2s[i];
+            return this.i2w[i].childs.Aggregate("", (c, n) => c + sp[this.Rank-1] + this.Child.AsText(n));
         }
 
         /// <summary>
@@ -121,7 +120,8 @@ namespace NLDB
             return
                 this.parser.
                 Split(normilizedText).
-                Where(s => !string.IsNullOrEmpty(s)).
+                Select(t=>t.Trim()).
+                Where(s => !string.IsNullOrWhiteSpace(s)).
                 Select(s => this.TryAdd(s)).
                 ToArray();
         }
@@ -296,10 +296,10 @@ namespace NLDB
             this.w2i.Add(w, w.id);
             this.i2w.Add(w.id, w);
             //Добавляем связи дочерних слов с данным словом
-            for (byte i = 0; i < subwords.Length; i++)
+            for (int i = 0; i < subwords.Length; i++)
             {
                 var child = this.Child.i2w[subwords[i]];
-                child.parents.Add(new WordLink(id, i, 1));
+                child.parents.Add(new WordLink(id, i));
             }
             return id;
         }

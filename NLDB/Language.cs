@@ -9,8 +9,8 @@ namespace NLDB
 {
     public partial class Language
     {
-        public static int WORD_SIZE = 64;
-        private readonly int bufferSize = 1 << 20;
+        public static int WORD_SIZE = 1024;
+        private readonly int bufferSize = 1 << 26;
         private readonly string Name;
         public int Rank;
 
@@ -44,6 +44,7 @@ namespace NLDB
                     count = file.ReadBlock(buffer, 0, this.bufferSize);
                     total += count;
                     string text = new string(buffer);
+                    Console.WriteLine("Считана строка длины {0}", text.Length);
                     this.Lexicons[this.Rank].TryAddMany(text);
                     Console.WriteLine($"Считано {total} байт");
                 }

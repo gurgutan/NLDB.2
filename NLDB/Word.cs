@@ -10,10 +10,10 @@ namespace NLDB
     public struct WordLink
     {
         public int id;
-        public byte pos;
+        public int pos;
         //public float value;
 
-        public WordLink(int _id, byte _pos, float _v)
+        public WordLink(int _id, int _pos)
         {
             id = _id;
             pos = _pos;
