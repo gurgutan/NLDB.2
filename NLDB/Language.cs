@@ -10,7 +10,7 @@ namespace NLDB
     public partial class Language
     {
         public static int WORD_SIZE = 1024;
-        private readonly int bufferSize = 1 << 26;
+        private readonly int bufferSize = 1 << 28;
         private readonly string Name;
         public int Rank;
 
@@ -54,6 +54,11 @@ namespace NLDB
         public void CreateFromString(string text)
         {
             this.Lexicons[this.Rank].TryAddMany(text);
+        }
+
+        public Term BuildTerm(string s, int rank)
+        {
+            return Lexicons[rank].BuildTerm(s);
         }
 
         private void Init(string[] splitters)

@@ -90,6 +90,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Lexicon.cs" />
+    <Compile Include="Term.cs" />
     <Compile Include="Word.cs" />
   </ItemGroup>
   <ItemGroup>

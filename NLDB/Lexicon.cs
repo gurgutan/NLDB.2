@@ -96,9 +96,10 @@ namespace NLDB
 
         public string AsText(int i)
         {
+            //разделители слов разного ранга в строку 
             string[] sp = new string[] { "", " ", ".", "\n", "\n\n" };
             if (this.Rank == 0) return this.i2s[i];
-            return this.i2w[i].childs.Aggregate("", (c, n) => c + sp[this.Rank-1] + this.Child.AsText(n));
+            return this.i2w[i].childs.Aggregate("", (c, n) => c + sp[this.Rank - 1] + this.Child.AsText(n));
         }
 
         /// <summary>
@@ -116,14 +117,57 @@ namespace NLDB
 
         public int[] TryAddMany(string text)
         {
-            string normilizedText = this.parser.Normilize(text);
+            string normText = this.parser.Normilize(text);
             return
                 this.parser.
-                Split(normilizedText).
-                Select(t=>t.Trim()).
+                Split(normText).
+                Select(t => t.Trim()).
                 Where(s => !string.IsNullOrWhiteSpace(s)).
                 Select(s => this.TryAdd(s)).
                 ToArray();
+        }
+
+        public Term BuildTerm(string s)
+        {
+            string text = this.parser.Normilize(s);
+            if (this.Rank == 0)
+                return new Term(text, new List<Term>());
+            else
+                return new Term(text,
+                    this.Child.parser.
+                    Split(text).
+                    Select(t => t.Trim()).
+                    Where(e => !string.IsNullOrWhiteSpace(e)).
+                    Select(e => this.BuildTerm(s)).
+                    ToList());
+        }
+
+        public void EvaluateTerm(Term term)
+        {
+            if (term.Rank < this.Rank)
+            {
+                this.Child.EvaluateTerm(term);
+                return;
+            }
+            if (term.Rank > this.Rank)
+            {
+                this.Parent.EvaluateTerm(term);
+                return;
+            }
+            //Если терм нулевого ранга, то есть символ, то оценка = 1
+            if (term.Rank == 0)
+            {
+                int a;
+                if (!s2i.TryGetValue(term.Text, out a)) a = -1;
+                term.Id = a;
+                term.Confidence = 1;
+                return;
+            }
+            //Вычисляем оценки дочерних термов
+            term.Childs.ForEach(c => this.Child.EvaluateTerm(c));
+            //TODO: вычисляем полную вероятность терма term, по априорным и апостериорным вероятностям символов слова (Childs)
+            double confidence = term.Childs.Aggregate(0,(c,n)=>)
+
         }
 
         /// <summary>
@@ -136,27 +180,27 @@ namespace NLDB
             int id = -1;
             if (this.Rank == 0)
             {
-                if ((id = this.FindAtom(s)) == -1)
+                if ((id = this.AtomId(s)) == -1)
                     id = this.Register(new int[0], s);
             }
             else
             {
-                int[] subwords = this.Child.TryAddMany(s);
-                if ((id = this.FindEqual(subwords)) == -1)
-                    id = this.Register(subwords);
+                int[] childs = this.Child.TryAddMany(s);
+                if ((id = this.GetByChilds(childs)) == -1)
+                    id = this.Register(childs);
             }
             return id;
         }
 
-        public int FindEqual(int[] subwords)
+        public int GetByChilds(int[] childs)
         {
             int id;
-            if (this.w2i.TryGetValue(new Word(-1, subwords), out id))
+            if (this.w2i.TryGetValue(new Word(-1, childs), out id))
                 return id;
             return -1;
         }
 
-        public int FindAtom(string s)
+        public int AtomId(string s)
         {
             int id;
             if (this.s2i.TryGetValue(s, out id))
@@ -164,84 +208,8 @@ namespace NLDB
             return -1;
         }
 
-        /// <summary>
-        /// Возвращает представление словаря ранга r, как матрицы размерности m x n, где m - размер дочернего словаря, а n - размер словаря r
-        /// </summary>
-        /// <param name="r">ранга словаря</param>
-        /// <returns></returns>
-        public int[,] AsDenseMatrix()
-        {
-            if (this.Rank == 0) throw new ArgumentOutOfRangeException("Для словаря нулевого ранга не существует матричного представления");
-            int[,] matrix = new int[this.Child.Count, this.Count];
-            int col = 0;
-            foreach (var w in w2i.Keys)
-            {
-                for (int i = 0; i < w.childs.Length; i++)
-                {
-                    matrix[w.childs[i], col] |= (1 << i);
-                }
-                col++;
-            }
-            return matrix;
-        }
-
-        /// <summary>
-        /// Метод формирует матрицу в координатном формате
-        /// </summary>
-        /// <returns>массив из трех массивов: [0] - значения, [1] - индексы строк, [2] - индексы колонок</returns>
-        public int[][] AsCOOMatrix()
-        {
-            if (this.Rank == 0) throw new ArgumentOutOfRangeException("Для словаря нулевого ранга не существует матричного представления");
-            List<TripleInt> values = new List<TripleInt>();
-            int col = 0;
-            foreach (var w in w2i.Keys)
-            {
-                //Составляем набор значений для записи в матрицу
-                Dictionary<int, int> bitmap = new Dictionary<int, int>(w.childs.Length);
-                int pos = 0;
-                foreach (var row in w.childs)
-                {
-                    if (!bitmap.ContainsKey(row))
-                        bitmap[row] = (1 << pos);
-                    else
-                        bitmap[row] |= (1 << pos);
-                    pos++;
-                }
-                //Добавляем значения в списки для COOMatrix
-                foreach (var v in bitmap)
-                {
-                    values.Add(new TripleInt(v.Value, v.Key, col));
-                }
-                col++;
-            }
-            //Сортировка по строкам, потом по столбцам
-            values.Sort((a, b) => TripleInt.Compare(a, b));
-            int[][] matrix = new int[3][];
-            matrix[0] = values.Select(v => v.val).ToArray();
-            matrix[1] = values.Select(v => v.row).ToArray();
-            matrix[2] = values.Select(v => v.col).ToArray();
-            return matrix;
-        }
-
-        public Dictionary<int[], double> AsSparseMatrix()
-        {
-            if (this.Rank == 0) throw new ArgumentOutOfRangeException("Для словаря нулевого ранга не существует матричного представления");
-            Dictionary<int[], double> result = new Dictionary<int[], double>(this.count * Language.WORD_SIZE);
-            foreach (var pair in w2i)
-            {
-                int col = pair.Value;
-                int pos = 0;
-                foreach (var c in pair.Key.childs)
-                {
-                    int row = c * Language.WORD_SIZE + pos;
-                    result.Add(new int[] { row, col }, 1.0);
-                    pos++;
-                }
-            }
-            return result;
-        }
-
-        public int FindOneNearest(int[] subwords)
+        //TODO: функция должна возвращать id и оценку типа float корректности ответа (т.е. возвращать Tuple<int, float>)
+        public int FindNearest(int[] subwords)
         {
             if (this.Rank == 0) throw new Exception("Нельзя искать ближайшего соседа в словаре ранга 0");
             Dictionary<int, int> parents = new Dictionary<int, int>();
@@ -270,6 +238,7 @@ namespace NLDB
             double score = 0;
             foreach (var p in parents)
             {
+                //TODO: Здесь должна вычисляться оценка уверенности в результате
                 if (p.Value > score)
                 {
                     score = p.Value;
@@ -303,6 +272,84 @@ namespace NLDB
             }
             return id;
         }
+
+        //Закомментировано. Пока не найдена возможность использовать высокопроизводительные вычисления с разреженными матрицами
+        ///// <summary>
+        ///// Возвращает представление словаря ранга r, как матрицы размерности m x n, где m - размер дочернего словаря, а n - размер словаря r
+        ///// </summary>
+        ///// <param name="r">ранга словаря</param>
+        ///// <returns></returns>
+        //public int[,] AsDenseMatrix()
+        //{
+        //    if (this.Rank == 0) throw new ArgumentOutOfRangeException("Для словаря нулевого ранга не существует матричного представления");
+        //    int[,] matrix = new int[this.Child.Count, this.Count];
+        //    int col = 0;
+        //    foreach (var w in w2i.Keys)
+        //    {
+        //        for (int i = 0; i < w.childs.Length; i++)
+        //        {
+        //            matrix[w.childs[i], col] |= (1 << i);
+        //        }
+        //        col++;
+        //    }
+        //    return matrix;
+        //}
+
+        ///// <summary>
+        ///// Метод формирует матрицу в координатном формате
+        ///// </summary>
+        ///// <returns>массив из трех массивов: [0] - значения, [1] - индексы строк, [2] - индексы колонок</returns>
+        //public int[][] AsCOOMatrix()
+        //{
+        //    if (this.Rank == 0) throw new ArgumentOutOfRangeException("Для словаря нулевого ранга не существует матричного представления");
+        //    List<TripleInt> values = new List<TripleInt>();
+        //    int col = 0;
+        //    foreach (var w in w2i.Keys)
+        //    {
+        //        //Составляем набор значений для записи в матрицу
+        //        Dictionary<int, int> bitmap = new Dictionary<int, int>(w.childs.Length);
+        //        int pos = 0;
+        //        foreach (var row in w.childs)
+        //        {
+        //            if (!bitmap.ContainsKey(row))
+        //                bitmap[row] = (1 << pos);
+        //            else
+        //                bitmap[row] |= (1 << pos);
+        //            pos++;
+        //        }
+        //        //Добавляем значения в списки для COOMatrix
+        //        foreach (var v in bitmap)
+        //        {
+        //            values.Add(new TripleInt(v.Value, v.Key, col));
+        //        }
+        //        col++;
+        //    }
+        //    //Сортировка по строкам, потом по столбцам
+        //    values.Sort((a, b) => TripleInt.Compare(a, b));
+        //    int[][] matrix = new int[3][];
+        //    matrix[0] = values.Select(v => v.val).ToArray();
+        //    matrix[1] = values.Select(v => v.row).ToArray();
+        //    matrix[2] = values.Select(v => v.col).ToArray();
+        //    return matrix;
+        //}
+
+        //public Dictionary<int[], double> AsSparseMatrix()
+        //{
+        //    if (this.Rank == 0) throw new ArgumentOutOfRangeException("Для словаря нулевого ранга не существует матричного представления");
+        //    Dictionary<int[], double> result = new Dictionary<int[], double>(this.count * Language.WORD_SIZE);
+        //    foreach (var pair in w2i)
+        //    {
+        //        int col = pair.Value;
+        //        int pos = 0;
+        //        foreach (var c in pair.Key.childs)
+        //        {
+        //            int row = c * Language.WORD_SIZE + pos;
+        //            result.Add(new int[] { row, col }, 1.0);
+        //            pos++;
+        //        }
+        //    }
+        //    return result;
+        //}
 
     }
 }

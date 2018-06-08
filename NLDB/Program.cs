@@ -13,7 +13,7 @@ namespace NLDB
         static void Main(string[] args)
         {
             Random rand = new Random((int)DateTime.Now.Ticks);
-            string trainfile = @"D:\Data\teachers.txt";
+            string trainfile = @"D:\Data\Text\teachers.txt";
             Language lang1 = new Language("Русские слова", new string[] { "", @"[^а-яА-ЯёЁ0-9]", @"[\.\?\!\n\r]" });
             lang1.CreateFromTextFile(trainfile);
             foreach (var lex in lang1.Lexicons)
@@ -26,7 +26,7 @@ namespace NLDB
             Console.Write(">>");
             while ((line = Console.ReadLine()) != "q")
             {
-                int[] s = line.ToCharArray().Select(c => lang1[0].FindAtom("" + c)).ToArray();
+                int[] s = line.ToCharArray().Select(c => lang1[0].AtomId("" + c)).ToArray();
                 if (s.Any(c_id => c_id < 0))
                 {
                     Console.WriteLine("Неизвестная буква");
@@ -34,13 +34,12 @@ namespace NLDB
                 }
                 else
                 {
-                    int nearest_id = lang1[1].FindOneNearest(s);
+                    int nearest_id = lang1[1].FindNearest(s);
                     if (nearest_id >= 0)
                         Console.WriteLine(lang1[1].AsText(nearest_id));
                 }
                 Console.Write(">>");
             }
-            Console.ReadKey();
         }
 
 
