@@ -138,7 +138,7 @@ namespace NLDB
                     Split(text).
                     Select(t => t.Trim()).
                     Where(e => !string.IsNullOrWhiteSpace(e)).
-                    Select(e => this.BuildTerm(s)).
+                    Select(e => this.Child.BuildTerm(e)).
                     ToList());
         }
 
@@ -158,16 +158,24 @@ namespace NLDB
             if (term.Rank == 0)
             {
                 int a;
-                if (!s2i.TryGetValue(term.Text, out a)) a = -1;
+                if (!this.s2i.TryGetValue(term.Text, out a)) a = -1;
                 term.Id = a;
-                term.Confidence = 1;
+                term.Confidence = (a >= 0 ? 1 : 0);
                 return;
             }
             //Вычисляем оценки дочерних термов
             term.Childs.ForEach(c => this.Child.EvaluateTerm(c));
-            //TODO: вычисляем полную вероятность терма term, по априорным и апостериорным вероятностям символов слова (Childs)
-            double confidence = term.Childs.Aggregate(0,(c,n)=>)
+            //вычисляем полную вероятность терма term, по априорным и апостериорным вероятностям символов слова (Childs)
+            Tuple<int, double> pair = FindNearest(term.Childs.Select(t => t.Id).ToArray());
+            term.Id = pair.Item1;
+            term.Confidence = pair.Item2;
+        }
 
+        public Term EvaluateTerm(string text)
+        {
+            Term term = this.BuildTerm(text);
+            this.EvaluateTerm(term);
+            return term;
         }
 
         /// <summary>
@@ -209,10 +217,10 @@ namespace NLDB
         }
 
         //TODO: функция должна возвращать id и оценку типа float корректности ответа (т.е. возвращать Tuple<int, float>)
-        public int FindNearest(int[] subwords)
+        public Tuple<int, double> FindNearest(int[] subwords)
         {
             if (this.Rank == 0) throw new Exception("Нельзя искать ближайшего соседа в словаре ранга 0");
-            Dictionary<int, int> parents = new Dictionary<int, int>();
+            Dictionary<int, double> parents = new Dictionary<int, double>();
             //Считаем произведение вектора-слова ранга r-1 на матрицу вхождений слов в словарь ранга r
             //Цикл по всем буквам (словам ранга r-1)
             for (int i = 0; i < subwords.Length; i++)
@@ -227,7 +235,7 @@ namespace NLDB
                     {
                         int p = parent.id;
                         if (!parents.ContainsKey(p))
-                            parents.Add(p, 1);
+                            parents.Add(p, 1.0);
                         else
                             parents[p]++;
                     }
@@ -235,17 +243,17 @@ namespace NLDB
             }
             //Ищем слово с маскимальным значением
             int id = -1;
-            double score = 0;
+            double confidence = 0;
             foreach (var p in parents)
             {
-                //TODO: Здесь должна вычисляться оценка уверенности в результате
-                if (p.Value > score)
+                double p_confidence = p.Value / this.i2w[p.Key].childs.Length;
+                if (p_confidence > confidence)
                 {
-                    score = p.Value;
+                    confidence = p_confidence;
                     id = p.Key;
                 }
             }
-            return id;
+            return new Tuple<int, double>(id, confidence);
         }
 
         private int Register(int[] subwords, string s = "")

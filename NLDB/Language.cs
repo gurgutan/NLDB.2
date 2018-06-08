@@ -25,10 +25,7 @@ namespace NLDB
 
         public Lexicon this[int r]
         {
-            get
-            {
-                return this.Lexicons[r];
-            }
+            get { return this.Lexicons[r]; }
         }
 
         public void CreateFromTextFile(string filename)
@@ -56,17 +53,21 @@ namespace NLDB
             this.Lexicons[this.Rank].TryAddMany(text);
         }
 
-        public Term BuildTerm(string s, int rank)
+        public Term Eval(string s)
         {
-            return Lexicons[rank].BuildTerm(s);
+            return this.Lexicons[this.Rank].EvaluateTerm(s);
         }
 
         private void Init(string[] splitters)
         {
-            for (int i = 0; i < splitters.Length; i++)
+            int n = splitters.Length;
+            for (int i = 0; i < n; i++)
                 this.Lexicons.Add(
                     new Lexicon(splitters[i], i > 0 ? this.Lexicons[i - 1] : null)
                     );
+            //Назначаем связи Parent лексиконов
+            for (int i = 0; i < n - 1; i++)
+                this.Lexicons[i].Parent = this.Lexicons[i + 1];
         }
     }
 }
