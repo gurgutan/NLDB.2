@@ -21,9 +21,14 @@ namespace NLDB
             this.Confidence = 0;
             this.Childs = _childs;
             if (this.Childs.Count > 0)
-                this.Rank = this.Childs[0].Rank;
+                this.Rank = this.Childs[0].Rank + 1;
             else
                 this.Rank = 0;
+        }
+
+        public override string ToString()
+        {
+            return Text;
         }
     }
 }

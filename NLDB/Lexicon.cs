@@ -134,8 +134,7 @@ namespace NLDB
                 return new Term(text, new List<Term>());
             else
                 return new Term(text,
-                    this.Child.parser.
-                    Split(text).
+                    this.Child.parser.Split(text).
                     Select(t => t.Trim()).
                     Where(e => !string.IsNullOrWhiteSpace(e)).
                     Select(e => this.Child.BuildTerm(e)).
@@ -163,12 +162,106 @@ namespace NLDB
                 term.Confidence = (a >= 0 ? 1 : 0);
                 return;
             }
-            //Вычисляем оценки дочерних термов
-            term.Childs.ForEach(c => this.Child.EvaluateTerm(c));
             //вычисляем полную вероятность терма term, по априорным и апостериорным вероятностям символов слова (Childs)
-            Tuple<int, double> pair = FindNearest(term.Childs.Select(t => t.Id).ToArray());
+            Tuple<int, double> pair = FindNearest(term);
             term.Id = pair.Item1;
             term.Confidence = pair.Item2;
+        }
+
+        private Tuple<int, double> FindNearest(Term term)
+        {
+            int id = -1;
+            double confidence = 0;
+            //Для нулевого ранга - ищем атомарный символ
+            if (this.Rank==0)
+            {
+                //Пытаемся найти атомарное слово, соответствующее терму
+                if (this.s2i.TryGetValue(term.Text, out id))
+                    confidence = 1;
+                return new Tuple<int, double>(id, confidence);
+            }
+            //Для терма ранга > 0
+            Dictionary<int, double> parents = new Dictionary<int, double>();
+            //Считаем произведение вектора-слова ранга r-1 на матрицу вхождений слов в словарь ранга r
+            //Цикл по всем буквам (словам ранга r-1)
+            for (int child_pos = 0; child_pos < term.Childs.Count; child_pos++)
+            {
+                int child_id = term.Childs[child_pos].Id;
+                double child_conf = 0;
+                //Если слово term.Childs[i] еще не определено, то пытаемся его определить
+                if (child_id == -1)
+                {
+                    Tuple<int, double> child_pair = this.Child.FindNearest(term.Childs[child_pos]);
+                    child_id = child_pair.Item1;
+                    child_conf = child_pair.Item2;
+                }
+                //если слово определить не получилось, то пропускаем его дальнейшую обработку
+                if (child_id == -1) continue;
+                //Получаем букву (подслово) соответствующее терму term.Childs[i]
+                Word child_word = this.Child.i2w[child_id];
+                //По всем словам, в которые входит данная буква, увеличиваем счетчик совпадений, при совпадении позиции
+                for (int j = 0; j < child_word.parents.Count; j++)
+                {
+                    WordLink link = child_word.parents[j];
+                    Word parent_word = this.i2w[link.id];
+                    double max_dist = Math.Max(parent_word.childs.Length, term.Childs.Count);
+                    if (!parents.ContainsKey(link.id)) parents.Add(link.id, 0);
+                    parents[link.id] += (max_dist - Math.Abs(child_pos - link.pos)) * child_conf;
+                }
+            }
+            //Ищем слово с маскимальным значением
+            
+            foreach (var p in parents)
+            {
+                double max_dist = Math.Max(this.i2w[p.Key].childs.Length, term.Childs.Count);
+                double p_confidence = p.Value / (max_dist * max_dist);
+                if (p_confidence > confidence)
+                {
+                    confidence = p_confidence;
+                    id = p.Key;
+                }
+            }
+            return new Tuple<int, double>(id, confidence);
+        }
+
+        //TODO: функция должна возвращать id и оценку типа float корректности ответа (т.е. возвращать Tuple<int, float>)
+        public Tuple<int, double> FindNearest(int[] subwords)
+        {
+            if (this.Rank == 0) throw new Exception("Нельзя искать ближайшего соседа в словаре ранга 0");
+            Dictionary<int, double> parents = new Dictionary<int, double>();
+            //Считаем произведение вектора-слова ранга r-1 на матрицу вхождений слов в словарь ранга r
+            //Цикл по всем буквам (словам ранга r-1)
+            for (int i = 0; i < subwords.Length; i++)
+            {
+                //Ищем соответствующую букву в словаре ранга r-1
+                Word w = this.Child.i2w[subwords[i]];
+                //По всем словам, в которые входит данная буква, увеличиваем счетчик совпадений, при совпадении позиции
+                for (int j = 0; j < w.parents.Count; j++)
+                {
+                    WordLink parent = w.parents[j];
+                    if (i == parent.pos)
+                    {
+                        int p = parent.id;
+                        if (!parents.ContainsKey(p))
+                            parents.Add(p, 1.0);
+                        else
+                            parents[p]++;
+                    }
+                }
+            }
+            //Ищем слово с маскимальным значением
+            int id = -1;
+            double confidence = 0;
+            foreach (var p in parents)
+            {
+                double p_confidence = p.Value / this.i2w[p.Key].childs.Length;
+                if (p_confidence > confidence)
+                {
+                    confidence = p_confidence;
+                    id = p.Key;
+                }
+            }
+            return new Tuple<int, double>(id, confidence);
         }
 
         public Term EvaluateTerm(string text)
@@ -214,46 +307,6 @@ namespace NLDB
             if (this.s2i.TryGetValue(s, out id))
                 return id;
             return -1;
-        }
-
-        //TODO: функция должна возвращать id и оценку типа float корректности ответа (т.е. возвращать Tuple<int, float>)
-        public Tuple<int, double> FindNearest(int[] subwords)
-        {
-            if (this.Rank == 0) throw new Exception("Нельзя искать ближайшего соседа в словаре ранга 0");
-            Dictionary<int, double> parents = new Dictionary<int, double>();
-            //Считаем произведение вектора-слова ранга r-1 на матрицу вхождений слов в словарь ранга r
-            //Цикл по всем буквам (словам ранга r-1)
-            for (int i = 0; i < subwords.Length; i++)
-            {
-                //Ищем соответствующую букву в словаре ранга r-1
-                Word w = this.Child.i2w[subwords[i]];
-                //По всем словам, в которые входит данная буква, увеличиваем счетчик совпадений, при совпадении позиции
-                for (int j = 0; j < w.parents.Count; j++)
-                {
-                    WordLink parent = w.parents[j];
-                    if (i == parent.pos)
-                    {
-                        int p = parent.id;
-                        if (!parents.ContainsKey(p))
-                            parents.Add(p, 1.0);
-                        else
-                            parents[p]++;
-                    }
-                }
-            }
-            //Ищем слово с маскимальным значением
-            int id = -1;
-            double confidence = 0;
-            foreach (var p in parents)
-            {
-                double p_confidence = p.Value / this.i2w[p.Key].childs.Length;
-                if (p_confidence > confidence)
-                {
-                    confidence = p_confidence;
-                    id = p.Key;
-                }
-            }
-            return new Tuple<int, double>(id, confidence);
         }
 
         private int Register(int[] subwords, string s = "")

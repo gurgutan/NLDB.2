@@ -13,7 +13,7 @@ namespace NLDB
         static void Main(string[] args)
         {
             Random rand = new Random((int)DateTime.Now.Ticks);
-            string trainfile = @"D:\Data\philosoph1.txt";
+            string trainfile = @"D:\Data\Text\philosoph1.txt";
             Language l = new Language("Русские слова", new string[] { "", @"[^а-яА-ЯёЁ0-9]", @"[\.\?\!\n\r]" });
             l.CreateFromTextFile(trainfile);
             foreach (var lex in l.Lexicons)
@@ -35,9 +35,6 @@ namespace NLDB
                 }
             }
         }
-
-
-
 
         static void NormilizeTest()
         {
