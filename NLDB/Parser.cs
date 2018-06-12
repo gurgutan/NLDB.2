@@ -7,9 +7,10 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
+    [Serializable]
     public class Parser
     {
-        private string SplitExpr;
+        private readonly string SplitExpr;
         //private string RemoveExpr = "";
         private readonly Regex splitRegex;
         private readonly Regex removeRegex;
@@ -18,7 +19,7 @@ namespace NLDB
         {
             this.SplitExpr = splitExpr;
             this.splitRegex = new Regex(this.SplitExpr, RegexOptions.Compiled);
-            this.removeRegex = new Regex(@"[^а-яА-ЯёЁ\s\t\r\n\!\?\,\;\:\*\+\-\&\^\(\)\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
+            this.removeRegex = new Regex(@"[^а-яА-ЯёЁ\d\s\t\r\n\!\?\.\,\;\:\*\+\-\&\\\/\%\$\^\(\)\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
         }
 
         public string[] Split(string text)

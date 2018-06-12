@@ -8,29 +8,7 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
-    public struct TripleInt
-    {
-        public int val;
-        public int row;
-        public int col;
-
-        public TripleInt(int v, int r, int c)
-        {
-            val = v;
-            row = r;
-            col = c;
-        }
-
-        public static int Compare(TripleInt a, TripleInt b)
-        {
-            if (a.row > b.row) return 1;
-            if (a.row < b.row) return -1;
-            if (a.col > b.col) return 1;
-            if (a.col < b.col) return -1;
-            return 0;
-        }
-    }
-
+    [Serializable]
     public partial class Lexicon
     {
         private readonly Parser parser;
@@ -56,6 +34,7 @@ namespace NLDB
             this.Parent = parent;
             this.Splitter = splitter;
             this.parser = new Parser(this.Splitter);
+            if (child != null) child.Parent = this;
         }
 
         public int Count
@@ -65,12 +44,12 @@ namespace NLDB
 
         public Word this[int id]
         {
-            get { return i2w[id]; }
+            get { return this.i2w[id]; }
         }
 
         public int this[Word w]
         {
-            get { return w2i[w]; }
+            get { return this.w2i[w]; }
         }
 
         /// <summary>
@@ -83,7 +62,7 @@ namespace NLDB
 
         public IEnumerable<Word> Words
         {
-            get { return w2i.Keys; }
+            get { return this.w2i.Keys; }
         }
 
         /// <summary>
@@ -94,12 +73,12 @@ namespace NLDB
             get { return this.s2i.Keys; }
         }
 
-        public string AsText(int i)
+        public string ToText(int i)
         {
             //разделители слов разного ранга в строку 
             string[] sp = new string[] { "", " ", ".", "\n", "\n\n" };
             if (this.Rank == 0) return this.i2s[i];
-            return this.i2w[i].childs.Aggregate("", (c, n) => c + sp[this.Rank - 1] + this.Child.AsText(n));
+            return this.i2w[i].Childs.Aggregate("", (c, n) => c + sp[this.Rank - 1] + this.Child.ToText(n));
         }
 
         /// <summary>
@@ -107,7 +86,7 @@ namespace NLDB
         /// </summary>
         /// <param name="s">тектсовое представление слова</param>
         /// <returns>код, идентифицирующий слово или -1, если слово с текстовым представлением s не найдено в словаре</returns>
-        public int AsCode(string s)
+        public int ToCode(string s)
         {
             int code;
             if (this.s2i.TryGetValue(s, out code))
@@ -141,6 +120,13 @@ namespace NLDB
                     ToList());
         }
 
+        public Term EvaluateTerm(string text)
+        {
+            Term term = this.BuildTerm(text);
+            this.EvaluateTerm(term);
+            return term;
+        }
+
         public void EvaluateTerm(Term term)
         {
             if (term.Rank < this.Rank)
@@ -154,122 +140,76 @@ namespace NLDB
                 return;
             }
             //Если терм нулевого ранга, то есть символ, то оценка = 1
-            if (term.Rank == 0)
-            {
-                int a;
-                if (!this.s2i.TryGetValue(term.Text, out a)) a = -1;
-                term.Id = a;
-                term.Confidence = (a >= 0 ? 1 : 0);
-                return;
-            }
+            //if (term.Rank == 0)
+            //{
+            //    int a;
+            //    if (!this.s2i.TryGetValue(term.Text, out a)) a = -1;
+            //    term.Id = a;
+            //    term.Confidence = (a >= 0 ? 1 : 0);
+            //    return;
+            //}
             //вычисляем полную вероятность терма term, по априорным и апостериорным вероятностям символов слова (Childs)
-            Tuple<int, double> pair = FindNearest(term);
-            term.Id = pair.Item1;
-            term.Confidence = pair.Item2;
+            Confidence calculator = new Confidence(this);
+            if (term.Rank > 0)
+                foreach (var t in term.Childs)
+                    this.EvaluateTerm(t);
+            calculator.Evaluate(term);
         }
 
-        private Tuple<int, double> FindNearest(Term term)
-        {
-            int id = -1;
-            double confidence = 0;
-            //Для нулевого ранга - ищем атомарный символ
-            if (this.Rank==0)
-            {
-                //Пытаемся найти атомарное слово, соответствующее терму
-                if (this.s2i.TryGetValue(term.Text, out id))
-                    confidence = 1;
-                return new Tuple<int, double>(id, confidence);
-            }
-            //Для терма ранга > 0
-            Dictionary<int, double> parents = new Dictionary<int, double>();
-            //Считаем произведение вектора-слова ранга r-1 на матрицу вхождений слов в словарь ранга r
-            //Цикл по всем буквам (словам ранга r-1)
-            for (int child_pos = 0; child_pos < term.Childs.Count; child_pos++)
-            {
-                int child_id = term.Childs[child_pos].Id;
-                double child_conf = 0;
-                //Если слово term.Childs[i] еще не определено, то пытаемся его определить
-                if (child_id == -1)
-                {
-                    Tuple<int, double> child_pair = this.Child.FindNearest(term.Childs[child_pos]);
-                    child_id = child_pair.Item1;
-                    child_conf = child_pair.Item2;
-                }
-                //если слово определить не получилось, то пропускаем его дальнейшую обработку
-                if (child_id == -1) continue;
-                //Получаем букву (подслово) соответствующее терму term.Childs[i]
-                Word child_word = this.Child.i2w[child_id];
-                //По всем словам, в которые входит данная буква, увеличиваем счетчик совпадений, при совпадении позиции
-                for (int j = 0; j < child_word.parents.Count; j++)
-                {
-                    WordLink link = child_word.parents[j];
-                    Word parent_word = this.i2w[link.id];
-                    double max_dist = Math.Max(parent_word.childs.Length, term.Childs.Count);
-                    if (!parents.ContainsKey(link.id)) parents.Add(link.id, 0);
-                    parents[link.id] += (max_dist - Math.Abs(child_pos - link.pos)) * child_conf;
-                }
-            }
-            //Ищем слово с маскимальным значением
-            
-            foreach (var p in parents)
-            {
-                double max_dist = Math.Max(this.i2w[p.Key].childs.Length, term.Childs.Count);
-                double p_confidence = p.Value / (max_dist * max_dist);
-                if (p_confidence > confidence)
-                {
-                    confidence = p_confidence;
-                    id = p.Key;
-                }
-            }
-            return new Tuple<int, double>(id, confidence);
-        }
-
-        //TODO: функция должна возвращать id и оценку типа float корректности ответа (т.е. возвращать Tuple<int, float>)
-        public Tuple<int, double> FindNearest(int[] subwords)
-        {
-            if (this.Rank == 0) throw new Exception("Нельзя искать ближайшего соседа в словаре ранга 0");
-            Dictionary<int, double> parents = new Dictionary<int, double>();
-            //Считаем произведение вектора-слова ранга r-1 на матрицу вхождений слов в словарь ранга r
-            //Цикл по всем буквам (словам ранга r-1)
-            for (int i = 0; i < subwords.Length; i++)
-            {
-                //Ищем соответствующую букву в словаре ранга r-1
-                Word w = this.Child.i2w[subwords[i]];
-                //По всем словам, в которые входит данная буква, увеличиваем счетчик совпадений, при совпадении позиции
-                for (int j = 0; j < w.parents.Count; j++)
-                {
-                    WordLink parent = w.parents[j];
-                    if (i == parent.pos)
-                    {
-                        int p = parent.id;
-                        if (!parents.ContainsKey(p))
-                            parents.Add(p, 1.0);
-                        else
-                            parents[p]++;
-                    }
-                }
-            }
-            //Ищем слово с маскимальным значением
-            int id = -1;
-            double confidence = 0;
-            foreach (var p in parents)
-            {
-                double p_confidence = p.Value / this.i2w[p.Key].childs.Length;
-                if (p_confidence > confidence)
-                {
-                    confidence = p_confidence;
-                    id = p.Key;
-                }
-            }
-            return new Tuple<int, double>(id, confidence);
-        }
-
-        public Term EvaluateTerm(string text)
-        {
-            Term term = this.BuildTerm(text);
-            this.EvaluateTerm(term);
-            return term;
-        }
+        //private Tuple<int, double> FindNearest(Term term)
+        //{
+        //    int id = -1;
+        //    double confidence = 0;
+        //    //Для нулевого ранга - ищем атомарный символ
+        //    if (this.Rank == 0)
+        //    {
+        //        //Пытаемся найти атомарное слово, соответствующее терму
+        //        if (this.s2i.TryGetValue(term.Text, out id)) confidence = 1;
+        //        return new Tuple<int, double>(id, confidence);
+        //    }
+        //    //Для терма ранга > 0
+        //    Dictionary<int, double> parents = new Dictionary<int, double>();
+        //    //Считаем произведение вектора-слова ранга r-1 на матрицу вхождений слов в словарь ранга r
+        //    //Цикл по всем буквам (словам ранга r-1)
+        //    for (int i = 0; i < term.Childs.Count; i++)
+        //    {
+        //        Term subterm = term.Childs[i];
+        //        //Если слово term.Childs[i] еще не определено, то пытаемся его определить
+        //        if (subterm.Id == -1)
+        //        {
+        //            Tuple<int, double> pair = this.Child.FindNearest(subterm);
+        //            subterm.Id = pair.Item1;
+        //            subterm.Confidence = pair.Item2;
+        //        }
+        //        //если слово определить не получилось, то пропускаем его дальнейшую обработку, т.к. id=-1, confidence=0
+        //        if (subterm.Id == -1) continue;
+        //        //Получаем букву (подслово) соответствующее терму term.Childs[i]
+        //        Word subword = this.Child[subterm.Id];
+        //        //По всем словам, в которые входит данная буква, увеличиваем confidence
+        //        for (int j = 0; j < subword.parents.Count; j++)
+        //        {
+        //            WordLink plink = subword.parents[j];
+        //            Word word = this.i2w[plink.id];
+        //            //Максимальное расстояние между словами. Нужно для нормирования
+        //            //double max_dist = Math.Max(parent_word.childs.Length, term.Childs.Count);
+        //            if (!parents.ContainsKey(plink.id)) parents.Add(plink.id, 0);
+        //            parents[plink.id] += ((i == plink.pos) ? 1 : 0) * subterm.Confidence / subword.parents.Count;// (max_dist - Math.Abs(child_pos - link.pos)) * child_conf;
+        //        }
+        //    }
+        //    //Ищем слово с маскимальным значением
+        //    foreach (var p in parents)
+        //    {
+        //        //Произведение длин векторов для знаменателя косинусного расстояния
+        //        double denominator = term.Childs.Count;// this.i2w[p.Key].childs.Length * term.Childs.Count;
+        //        double p_confidence = p.Value / denominator;
+        //        if (p_confidence > confidence)
+        //        {
+        //            confidence = p_confidence;
+        //            id = p.Key;
+        //        }
+        //    }
+        //    return new Tuple<int, double>(id, confidence);
+        //}
 
         /// <summary>
         /// Пытается добавить слово, представленное строкой s, в словарь. Если такое слово уже есть, то добавления не происходит.
@@ -311,9 +251,8 @@ namespace NLDB
 
         private int Register(int[] subwords, string s = "")
         {
-            count++;
-            //получаем новый id. Он может быть получен и другим способом, необязательно как следующий номер за последним
-            int id = count;
+            int id = this.count;
+            this.count++;
             //Создаем новое слово
             Word w = new Word(id, subwords);
             //Добавляем строковый символ для слова, если он задан
@@ -323,13 +262,12 @@ namespace NLDB
                 this.i2s.Add(id, s);
             }
             //Добавляем индексы в словарь
-            this.w2i.Add(w, w.id);
-            this.i2w.Add(w.id, w);
+            this.w2i.Add(w, w.Id);
+            this.i2w.Add(w.Id, w);
             //Добавляем связи дочерних слов с данным словом
             for (int i = 0; i < subwords.Length; i++)
             {
-                var child = this.Child.i2w[subwords[i]];
-                child.parents.Add(new WordLink(id, i));
+                this.Child.i2w[subwords[i]].AddParent(id, i);
             }
             return id;
         }

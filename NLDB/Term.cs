@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
+    [Serializable]
     public class Term
     {
         public string Text;
@@ -26,9 +27,6 @@ namespace NLDB
                 this.Rank = 0;
         }
 
-        public override string ToString()
-        {
-            return Text;
-        }
+        public override string ToString() => this.Text;
     }
 }

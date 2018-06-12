@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
+    [Serializable]
     public struct WordLink
     {
         public int id;
@@ -21,34 +22,40 @@ namespace NLDB
         }
     }
 
+    [Serializable]
     public class Word
     {
-        public int id;
-        public int[] childs;
-        public List<WordLink> parents = new List<WordLink>();
+        public int Id;
+        public int[] Childs;
+        public List<WordLink> Parents = new List<WordLink>();
 
         public Word(int _id)
         {
-            this.id = _id;
-            this.childs = new int[0];
+            this.Id = _id;
+            this.Childs = new int[0];
         }
 
         public Word(int _id, int[] _childs)
         {
-            this.id = _id;
-            this.childs = _childs;
+            this.Id = _id;
+            this.Childs = _childs;
+        }
+
+        public void AddParent(int _id, int _pos)
+        {
+            Parents.Add(new WordLink(_id, _pos));
         }
 
         public IEnumerable<int> ParentCodes
         {
-            get { return parents.Select(p => p.id); }
+            get { return Parents.Select(p => p.id); }
         }
 
         public Dictionary<int[], double> AsSparseVector()
         {
             Dictionary<int[], double> vector = new Dictionary<int[], double>();
             int pos = 0;
-            foreach (var c in childs)
+            foreach (var c in Childs)
             {
                 vector.Add(new int[] { 0, c * Language.WORD_SIZE + pos }, 1.0);
                 pos++;
@@ -60,29 +67,26 @@ namespace NLDB
         {
             Word w = (Word)obj;
             //Если указан id, то сравниваем по id (состав может отличаться). Такой способ нужен для поиска с неизвестным составом
-            if (this.id == w.id) return true;
+            if (this.Id == w.Id) return true;
             //Если длины слов не равны то слова не равны
-            if (w.childs.Length != this.childs.Length) return false;
-            if (w.childs.Length == 0) return w.id == this.id;
-            for (int i = 0; i < this.childs.Length; i++)
-                if (w.childs[i] != this.childs[i]) return false;
+            if (w.Childs.Length != this.Childs.Length) return false;
+            if (w.Childs.Length == 0) return w.Id == this.Id;
+            for (int i = 0; i < this.Childs.Length; i++)
+                if (w.Childs[i] != this.Childs[i]) return false;
             return true;
         }
 
         public override int GetHashCode()
         {
-            if (this.childs.Length == 0)
-                return this.id;
+            if (this.Childs.Length == 0)
+                return this.Id;
             int hash = 0;
-            for (int i = 0; i < this.childs.Length; i++)
+            for (int i = 0; i < this.Childs.Length; i++)
             {
-                hash += this.childs[i] + 1013904223;
+                hash += this.Childs[i] + 1013904223;
                 hash *= 1664525;
             }
             return hash;
         }
-
     }
-
-
 }
