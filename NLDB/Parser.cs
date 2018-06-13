@@ -19,7 +19,7 @@ namespace NLDB
         {
             this.SplitExpr = splitExpr;
             this.splitRegex = new Regex(this.SplitExpr, RegexOptions.Compiled);
-            this.removeRegex = new Regex(@"[^а-яА-ЯёЁ\d\s\t\r\n\!\?\.\,\;\:\*\+\-\&\\\/\%\$\^\(\)\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
+            this.removeRegex = new Regex(@"[^\w\d\s\t\r\n\!\?\.\,\;\:\*\+\-\&\\\/\%\$\^\(\)\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
         }
 
         public string[] Split(string text)

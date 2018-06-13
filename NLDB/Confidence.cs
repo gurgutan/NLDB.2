@@ -13,10 +13,10 @@ namespace NLDB
         //Функция применяется к двум скалярным элементам веторов, в соответствующих позициях
         private readonly Func<double, double, double>[] PointwiseOperations = new Func<double, double, double>[4]
         {
-            Confidence.DotMul,
-            Confidence.DotMul,
-            Confidence.ConstOne,
-            Confidence.ConstOne
+            Confidence.DotOverlap,
+            Confidence.DotOverlap,
+            Confidence.DotNorm2,
+            Confidence.DotExists
         };
 
         public Confidence(Lexicon l)
@@ -52,7 +52,10 @@ namespace NLDB
                     confidences[p] += this.PointwiseOperations[term.Rank](i, link.pos) * k;
                 });
             }
-            //Вычисляем максимум confidence
+            //Вычисляем максимум confidence как cos(терм, слово) по всем словам Лексикона
+            //cos(a,b) = (a*b)/(|a|*|b|)
+            //В нашем случае m=max(длина_терма, длина_слова),
+            //следовательно |a|*|b|=Sqrt(<a,a>)*Sqrt(<b,b>)=Sqrt(<m,m>)*Sqrt(<m,m>)=m           
             confidences.Aggregate(term, (c, n) =>
             {
                 double value = n.Value / Math.Max(n.Key.Childs.Length, term.Childs.Count);
@@ -110,14 +113,24 @@ namespace NLDB
             return;
         }
 
-        private static double DotMul(double a, double b)
+        private static double DotOverlap(double a, double b)
         {
             return (a == b) ? 1 : 0;
         }
 
-        private static double ConstOne(double a, double b)
+        private static double DotExists(double a, double b)
         {
             return 1;
+        }
+
+        private static double DotNorm1(double a, double b)
+        {
+            return Math.Abs(a - b);
+        }
+
+        private static double DotNorm2(double a, double b)
+        {
+            return (a - b) * (a - b);
         }
 
     }

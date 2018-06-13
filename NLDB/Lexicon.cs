@@ -79,7 +79,7 @@ namespace NLDB
         public string ToText(int i)
         {
             //разделители слов разного ранга в строку 
-            string[] sp = new string[] { "", " ", ".", "\n", "\n\n" };
+            string[] sp = new string[] { "", " ", ". ", "\n", "\n\n" };
             if (this.Rank == 0) return this.i2s[i];
             return this.i2w[i].Childs.Aggregate("", (c, n) => c + sp[this.Rank - 1] + this.Child.ToText(n));
         }
@@ -142,76 +142,12 @@ namespace NLDB
                 this.Parent.EvaluateTerm(term);
                 return;
             }
-            //Если терм нулевого ранга, то есть символ, то оценка = 1
-            //if (term.Rank == 0)
-            //{
-            //    int a;
-            //    if (!this.s2i.TryGetValue(term.Text, out a)) a = -1;
-            //    term.Id = a;
-            //    term.Confidence = (a >= 0 ? 1 : 0);
-            //    return;
-            //}
             //вычисляем полную вероятность терма term, по априорным и апостериорным вероятностям символов слова (Childs)
             if (term.Rank > 0)
                 foreach (var t in term.Childs)
                     this.EvaluateTerm(t);
-            calculator.Evaluate(term);
+            this.calculator.Evaluate(term);
         }
-
-        //private Tuple<int, double> FindNearest(Term term)
-        //{
-        //    int id = -1;
-        //    double confidence = 0;
-        //    //Для нулевого ранга - ищем атомарный символ
-        //    if (this.Rank == 0)
-        //    {
-        //        //Пытаемся найти атомарное слово, соответствующее терму
-        //        if (this.s2i.TryGetValue(term.Text, out id)) confidence = 1;
-        //        return new Tuple<int, double>(id, confidence);
-        //    }
-        //    //Для терма ранга > 0
-        //    Dictionary<int, double> parents = new Dictionary<int, double>();
-        //    //Считаем произведение вектора-слова ранга r-1 на матрицу вхождений слов в словарь ранга r
-        //    //Цикл по всем буквам (словам ранга r-1)
-        //    for (int i = 0; i < term.Childs.Count; i++)
-        //    {
-        //        Term subterm = term.Childs[i];
-        //        //Если слово term.Childs[i] еще не определено, то пытаемся его определить
-        //        if (subterm.Id == -1)
-        //        {
-        //            Tuple<int, double> pair = this.Child.FindNearest(subterm);
-        //            subterm.Id = pair.Item1;
-        //            subterm.Confidence = pair.Item2;
-        //        }
-        //        //если слово определить не получилось, то пропускаем его дальнейшую обработку, т.к. id=-1, confidence=0
-        //        if (subterm.Id == -1) continue;
-        //        //Получаем букву (подслово) соответствующее терму term.Childs[i]
-        //        Word subword = this.Child[subterm.Id];
-        //        //По всем словам, в которые входит данная буква, увеличиваем confidence
-        //        for (int j = 0; j < subword.parents.Count; j++)
-        //        {
-        //            WordLink plink = subword.parents[j];
-        //            Word word = this.i2w[plink.id];
-        //            //Максимальное расстояние между словами. Нужно для нормирования
-        //            //double max_dist = Math.Max(parent_word.childs.Length, term.Childs.Count);
-        //            if (!parents.ContainsKey(plink.id)) parents.Add(plink.id, 0);
-        //            parents[plink.id] += ((i == plink.pos) ? 1 : 0) * subterm.Confidence / subword.parents.Count;// (max_dist - Math.Abs(child_pos - link.pos)) * child_conf;
-        //        }
-        //    }
-        //    //Ищем слово с маскимальным значением
-        //    foreach (var p in parents)
-        //    {
-        //        //Произведение длин векторов для знаменателя косинусного расстояния
-        //        double denominator = term.Childs.Count;// this.i2w[p.Key].childs.Length * term.Childs.Count;
-        //        double p_confidence = p.Value / denominator;
-        //        if (p_confidence > confidence)
-        //        {
-        //            confidence = p_confidence;
-        //            id = p.Key;
-        //        }
-        //    }
-        //    return new Tuple<int, double>(id, confidence);
-        //}
 
         /// <summary>
         /// Пытается добавить слово, представленное строкой s, в словарь. Если такое слово уже есть, то добавления не происходит.
