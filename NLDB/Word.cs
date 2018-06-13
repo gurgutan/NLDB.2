@@ -10,13 +10,13 @@ namespace NLDB
     [Serializable]
     public struct WordLink
     {
-        public int id;
+        public int Id;
         public int pos;
         //public float value;
 
         public WordLink(int _id, int _pos)
         {
-            id = _id;
+            Id = _id;
             pos = _pos;
             //value = _v;
         }
@@ -48,7 +48,7 @@ namespace NLDB
 
         public IEnumerable<int> ParentCodes
         {
-            get { return Parents.Select(p => p.id); }
+            get { return Parents.Select(p => p.Id); }
         }
 
         public Dictionary<int[], double> AsSparseVector()

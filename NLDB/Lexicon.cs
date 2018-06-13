@@ -13,6 +13,8 @@ namespace NLDB
     {
         private readonly Parser parser;
         private int count = 0;
+        Confidence calculator;
+
 
         public int Rank;
         public string Splitter = "";
@@ -35,6 +37,7 @@ namespace NLDB
             this.Splitter = splitter;
             this.parser = new Parser(this.Splitter);
             if (child != null) child.Parent = this;
+            this.calculator = new Confidence(this);
         }
 
         public int Count
@@ -149,7 +152,6 @@ namespace NLDB
             //    return;
             //}
             //вычисляем полную вероятность терма term, по априорным и апостериорным вероятностям символов слова (Childs)
-            Confidence calculator = new Confidence(this);
             if (term.Rank > 0)
                 foreach (var t in term.Childs)
                     this.EvaluateTerm(t);
