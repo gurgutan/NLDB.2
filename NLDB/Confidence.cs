@@ -17,41 +17,36 @@ namespace NLDB
             this.lexicon = l;
         }
 
-        public void Evaluate(Term term)
+        private void EvaluateByText(Term term)
         {
-            switch (term.Rank)
-            {
-                case 0: this.EvaluateNearestToAtom(term); break;
-                case 1: this.EvaluateNearest(term); break;
-                case 2: this.EvaluateNearest(term); break;
-                case 3: this.EvaluateNearest(term); break;
-                default: throw new ArgumentOutOfRangeException("Для терма ранга >3 определение ближайшего не определено");
-            }
+            term.Id = this.lexicon.AtomId(term.Text);
+            term.Confidence = (term.Id == -1) ? 0 : 1;
+            return;
         }
 
-        public void EvaluateNearest(Term a)
+        public void Evaluate(Term a)
         {
+            if (a.Rank == 0) { this.EvaluateByText(a); return; }
             var lex = this.lexicon;
             var sublex = this.lexicon.Child;
-            if (a.Rank == 0)
-            {
-                this.EvaluateNearestToAtom(a);
-                return;
-            }
             //Выделение претендентов на роль ближайшего
-            var parents = a.Childs.SelectMany(t => sublex[t.Id].Parents.
+            var parents = a.Childs.
+                SelectMany(t => sublex[t.Id].Parents.
                 Select(link => lex[link.Id])).
                 Distinct().
-                Select(p => new Term(p, sublex));
+                Select(p => new Term(p, lex)).
+                ToList();
             //Поиск ближайшего
-            var nearest = parents.Aggregate<Term, Term>(null,
-                (c, n) =>
+            parents.ForEach(p =>
+            {
+                double confidence = Confidence.Compare(a, p);
+                if (a.Confidence < confidence)
                 {
-                    if (c == null) return n;
-                    if (c.Confidence < this.Compare(a, n)) return n;
-                    return c;
-                });
-            a = nearest;
+                    a.Id = p.Id;
+                    a.Confidence = confidence;
+                }
+            });
+
             //Dictionary<Word, double> confidences = new Dictionary<Word, double>();
             ////Получаем список подслов, входящих в терм term.Childs
             //var subwords = term.Childs.Select(t => this.lexicon.Child[t.Id]).ToList();
@@ -84,10 +79,10 @@ namespace NLDB
             //});
         }
 
-        public double Compare(Term a, Term b)
+        public static double Compare(Term a, Term b)
         {
             if (a.Rank != b.Rank) throw new ArgumentException("Попытка сравнить термы разных рангов");
-            return 
+            return Operations[a.Rank](a, b);
         }
 
         //Возвращает 1, если вектор a полностью входит в b
@@ -105,11 +100,21 @@ namespace NLDB
 
         private static double Cosine(Term a, Term b)
         {
-            int n = Math.Min(a.Count, b.Count);
+            int n = a.Count < b.Count ? a.Count : b.Count;
             double s = 0;
-            for (int i = 0; i < n; n++)
+            for (int i = 0; i < n; i++)
                 s += (a.Childs[i].Id == b.Childs[i].Id) ? a.Childs[i].Confidence : 0;
             double denominator = a.Count * b.Count;
+            return s / denominator;
+        }
+
+        private static double CosineLeft(Term a, Term b)
+        {
+            int n = a.Count < b.Count ? a.Count : b.Count;
+            double s = 0;
+            for (int i = 0; i < n; i++)
+                s += (a.Childs[i].Id == b.Childs[i].Id) ? a.Childs[i].Confidence : 0;
+            double denominator = a.Count * a.Count;
             return s / denominator;
         }
 
@@ -119,13 +124,13 @@ namespace NLDB
             double da = 0, db = 0;
             for (int i = 0; i < a.Count; i++)
                 for (int j = 0; j < b.Count; j++)
-                    s += this.Compare(a.Childs[i], b.Childs[j]);
+                    s += Confidence.Compare(a.Childs[i], b.Childs[j]);
             for (int i = 0; i < a.Count; i++)
                 for (int j = 0; j < a.Count; j++)
-                    da += this.Compare(a.Childs[i], a.Childs[j]);
+                    da += Confidence.Compare(a.Childs[i], a.Childs[j]);
             for (int i = 0; i < b.Count; i++)
                 for (int j = 0; j < b.Count; j++)
-                    db += this.Compare(b.Childs[i], b.Childs[j]);
+                    db += Confidence.Compare(b.Childs[i], b.Childs[j]);
             return s / (Math.Sqrt(da) * Math.Sqrt(db));
         }
 
@@ -134,24 +139,17 @@ namespace NLDB
             return a.Id == b.Id ? 1 : 0;
         }
 
-        private void EvaluateNearestToAtom(Term term)
-        {
-            term.Id = this.lexicon.AtomId(term.Text);
-            term.Confidence = (term.Id == -1) ? 0 : 1;
-            return;
-        }
-
         //----------------------------------------------------------------------------------------------------------------
         //Частные свойства и поля
         private readonly Lexicon lexicon;
         //Массив функций для поэлементного вычисления "похожести" векторов слов. Индекс в массиве - ранг сравниваемых слов.
         //Функция применяется к двум скалярным элементам веторов, в соответствующих позициях
-        private readonly Func<Term, Term, double>[] Operations = new Func<Term, Term, double>[4]
+        private static readonly Func<Term, Term, double>[] Operations = new Func<Term, Term, double>[4]
         {
             Confidence.Equality,
-            Confidence.Cosine,
+            Confidence.CosineLeft,
             Confidence.SoftCosine,
-            Confidence.ConstOne
+            Confidence.SoftCosine
         };
 
     }

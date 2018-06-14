@@ -53,9 +53,9 @@ namespace NLDB
         static void TestLanguage()
         {
             Random rand = new Random((int)DateTime.Now.Ticks);
-            string trainfile = @"D:\Data\Wiki\ru\100mb.txt";
+            string trainfile = @"D:\Data\Wiki\ru\254kb.txt";
             //string trainfile = @"D:\Data\Text\philosoph1.txt";
-            Language l = new Language("Русские слова", new string[] { "", @"[^\w\d]+", @"[\.\?\!\n\r]+", @"\[\[\d+\]\]" });
+            Language l = new Language("Русские слова", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
             l.CreateFromTextFile(trainfile);
             foreach (var lex in l.Lexicons)
             {
@@ -63,7 +63,6 @@ namespace NLDB
                 Console.WriteLine(lex.ToText(rand.Next(lex.Count)));
                 Console.WriteLine("-----------------------------------------------------------");
             }
-            Console.WriteLine("-----------------------------------------");
 
             string line = "---";
             while (line != "")

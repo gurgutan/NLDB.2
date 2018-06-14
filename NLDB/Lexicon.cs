@@ -113,9 +113,9 @@ namespace NLDB
         {
             string text = this.parser.Normilize(s);
             if (this.Rank == 0)
-                return new Term(text, new List<Term>());
+                return new Term(-1, text, new List<Term>());
             else
-                return new Term(text,
+                return new Term(-1, text,
                     this.Child.parser.Split(text).
                     Select(t => t.Trim()).
                     Where(e => !string.IsNullOrWhiteSpace(e)).

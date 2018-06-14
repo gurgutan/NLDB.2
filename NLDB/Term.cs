@@ -16,10 +16,10 @@ namespace NLDB
         public readonly List<Term> Childs = new List<Term>();
         public readonly Dictionary<Term, int> ChildsBag = new Dictionary<Term, int>();
 
-        public Term(string _t, List<Term> _childs)
+        public Term(int _id, string _t, List<Term> _childs)
         {
             this.Text = _t;
-            this.Id = -1;
+            this.Id = _id;
             this.Confidence = 0;
             this.Childs = _childs;
             if (this.Childs.Count > 0)
@@ -41,7 +41,11 @@ namespace NLDB
             this.Confidence = 1;
             if (w.Childs.Length > 0)
             {
-                this.Childs = w.Childs.Select(c => new Term(lex.Child[c], lex.Child)).ToList();
+                this.Childs = w.Childs.Select(
+                    c =>
+                    (lex.Rank == 0) ? 
+                    new Term(c, lex.ToText(c), new List<Term>()) : 
+                    new Term(lex.Child[c], lex.Child)).ToList();
                 this.ChildsBag = this.Childs.
                     Distinct().
                     Select((t, i) => new KeyValuePair<Term, int>(t, i)).
