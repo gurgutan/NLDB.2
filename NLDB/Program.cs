@@ -14,9 +14,7 @@ namespace NLDB
     {
         static void Main(string[] args)
         {
-
             //Language l = TestDeserializing();
-            //TestLangConsole(l);
             TestLanguage();
             //SplitTest();
         }
@@ -24,36 +22,35 @@ namespace NLDB
         private static Language TestDeserializing()
         {
             string datafile = @"D:\Data\Lang.dat";
-            Language l = Language.Deserialize(datafile);
-            return l;
+            return Language.Deserialize(datafile);
         }
 
         static void TestLangConsole(Language l)
         {
-            Random rand = new Random((int)DateTime.Now.Ticks);
-            foreach (var lex in l.Lexicons)
-            {
-                Console.WriteLine($"Слов ранга {lex.Rank}: {lex.Count}");
-                Console.WriteLine(lex.ToText(rand.Next(lex.Count)));
-                Console.WriteLine("-----------------------------------------------------------");
-            }
+            Queue<string> lines = new Queue<string>();
             string line = "---";
             while (line != "")
             {
                 Console.Write(">>");
                 line = Console.ReadLine();
-                var term = l.Eval(line, 2);
+                if (line == "") continue;
+                lines.Enqueue(line);
+                if (lines.Count > 1) lines.Dequeue();
+                string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "." + n);
+                var term = l.Evaluate(text, 2);
                 if (term.Id >= 0)
                 {
+                    Console.WriteLine(text);
                     Console.WriteLine(l.Lexicons[term.Rank].ToText(term.Id));
                     Console.WriteLine(term.Confidence);
                 }
             }
         }
+
         static void TestLanguage()
         {
             Random rand = new Random((int)DateTime.Now.Ticks);
-            string trainfile = @"D:\Data\Wiki\ru\254kb.txt";
+            string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
             //string trainfile = @"D:\Data\Text\philosoph1.txt";
             Language l = new Language("Русские слова", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
             l.CreateFromTextFile(trainfile);
@@ -63,19 +60,7 @@ namespace NLDB
                 Console.WriteLine(lex.ToText(rand.Next(lex.Count)));
                 Console.WriteLine("-----------------------------------------------------------");
             }
-
-            string line = "---";
-            while (line != "")
-            {
-                Console.Write(">>");
-                line = Console.ReadLine();
-                var term = l.Eval(line, 2);
-                if (term.Id >= 0)
-                {
-                    Console.WriteLine(l.Lexicons[term.Rank].ToText(term.Id));
-                    Console.WriteLine(term.Confidence);
-                }
-            }
+            TestLangConsole(l);
         }
 
         static void NormilizeTest()

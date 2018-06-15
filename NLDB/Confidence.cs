@@ -39,44 +39,13 @@ namespace NLDB
             //Поиск ближайшего
             parents.ForEach(p =>
             {
-                double confidence = Confidence.Compare(a, p);
+                double confidence = Compare(a, p);
                 if (a.Confidence < confidence)
                 {
                     a.Id = p.Id;
                     a.Confidence = confidence;
                 }
             });
-
-            //Dictionary<Word, double> confidences = new Dictionary<Word, double>();
-            ////Получаем список подслов, входящих в терм term.Childs
-            //var subwords = term.Childs.Select(t => this.lexicon.Child[t.Id]).ToList();
-            ////Вычисляем оценки всех возможных вариантов соответствия терму term
-            //for (int i = 0; i < subwords.Count; i++)
-            //{
-            //    double k = term.Childs[i].Confidence;
-            //    subwords[i].Parents.ForEach(link =>
-            //    {
-            //        Word p = this.lexicon[link.Id];
-            //        if (!confidences.ContainsKey(p)) confidences.Add(p, 0);
-            //        confidences[p] += this.PointwiseOperations[term.Rank](i, link.pos) * k;
-            //    });
-            //}
-            ////Вычисляем максимум confidence как cos(терм, слово) по всем словам Лексикона
-            ////cos(a,b) = (a*b)/(|a|*|b|)
-            ////В нашем случае m=max(длина_терма, длина_слова),
-            ////следовательно |a|*|b|=Sqrt(<a,a>)*Sqrt(<b,b>)=Sqrt(<m,m>)*Sqrt(<m,m>)=m           
-            //confidences.Aggregate(term, (c, n) =>
-            //{
-            //    double value = n.Value / Math.Max(n.Key.Childs.Length, term.Childs.Count);
-            //    if (value > c.Confidence)
-            //    {
-            //        c.Id = n.Key.Id;
-            //        c.Confidence = value;
-            //        return c;
-            //    }
-            //    else
-            //        return c;
-            //});
         }
 
         public static double Compare(Term a, Term b)
@@ -94,7 +63,7 @@ namespace NLDB
 
         private static double SoftInclusive(Term a, Term b)
         {
-            double count = a.Childs.Aggregate<Term, double>(0, (c, n) => b.Contains(n) ? c + n.Confidence : c);
+            double count = a.Childs.Aggregate<Term, double>(0, (c, n) => b.ContainsId(n.Id) ? c + n.Confidence : c);
             return count / a.Count;
         }
 
@@ -104,7 +73,7 @@ namespace NLDB
             double s = 0;
             for (int i = 0; i < n; i++)
                 s += (a.Childs[i].Id == b.Childs[i].Id) ? a.Childs[i].Confidence : 0;
-            double denominator = a.Count * b.Count;
+            double denominator = Math.Sqrt(a.Count) * Math.Sqrt(b.Count);
             return s / denominator;
         }
 
@@ -114,8 +83,7 @@ namespace NLDB
             double s = 0;
             for (int i = 0; i < n; i++)
                 s += (a.Childs[i].Id == b.Childs[i].Id) ? a.Childs[i].Confidence : 0;
-            double denominator = a.Count * a.Count;
-            return s / denominator;
+            return s / a.Count;
         }
 
         private static double SoftCosine(Term a, Term b)
@@ -142,14 +110,15 @@ namespace NLDB
         //----------------------------------------------------------------------------------------------------------------
         //Частные свойства и поля
         private readonly Lexicon lexicon;
+
         //Массив функций для поэлементного вычисления "похожести" векторов слов. Индекс в массиве - ранг сравниваемых слов.
         //Функция применяется к двум скалярным элементам веторов, в соответствующих позициях
         private static readonly Func<Term, Term, double>[] Operations = new Func<Term, Term, double>[4]
         {
             Confidence.Equality,
-            Confidence.CosineLeft,
-            Confidence.SoftCosine,
-            Confidence.SoftCosine
+            Confidence.Cosine,
+            Confidence.SoftInclusive,
+            Confidence.SoftInclusive
         };
 
     }

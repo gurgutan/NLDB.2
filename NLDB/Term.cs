@@ -43,8 +43,8 @@ namespace NLDB
             {
                 this.Childs = w.Childs.Select(
                     c =>
-                    (lex.Rank == 0) ? 
-                    new Term(c, lex.ToText(c), new List<Term>()) : 
+                    (lex.Rank == 0) ?
+                    new Term(c, lex.ToText(c), new List<Term>()) :
                     new Term(lex.Child[c], lex.Child)).ToList();
                 this.ChildsBag = this.Childs.
                     Distinct().
@@ -59,6 +59,10 @@ namespace NLDB
         public bool Contains(Term c)
         {
             return this.ChildsBag.ContainsKey(c);
+        }
+        public bool ContainsId(int id)
+        {
+            return this.Childs.Any(c => c.Id == id);
         }
 
         public int Count { get { return this.Childs.Count; } }

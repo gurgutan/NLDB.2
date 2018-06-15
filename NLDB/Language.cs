@@ -31,10 +31,16 @@ namespace NLDB
             get { return this.Lexicons[r]; }
         }
 
-        public Term Eval(string s, int rank = 1)
+        public Term Evaluate(string s, int rank = 1)
         {
             rank = Math.Min(this.Rank, rank);
             return this.Lexicons[rank].EvaluateTerm(s);
+        }
+        public void EvaluateTerm(Term term)
+        {
+            if (term.Rank < 0 || term.Rank > this.Rank)
+                throw new ArgumentOutOfRangeException($"Ранг терма выходит за границы допустимых значений данного языка: [0,{this.Rank}]");
+            this.Lexicons[term.Rank].EvaluateTerm(term);
         }
 
         public void CreateFromTextFile(string filename)
@@ -109,7 +115,7 @@ namespace NLDB
             int n = splitters.Length;
             for (int i = 0; i < n; i++)
                 this.Lexicons.Add(
-                    new Lexicon(splitters[i], i > 0 ? this.Lexicons[i - 1] : null)
+                    new Lexicon(this, splitters[i], i > 0 ? this.Lexicons[i - 1] : null)
                     );
         }
     }

@@ -11,6 +11,7 @@ namespace NLDB
     [Serializable]
     public partial class Lexicon
     {
+        private readonly Language language;
         private readonly Parser parser;
         private int count = 0;
         Confidence calculator;
@@ -26,7 +27,7 @@ namespace NLDB
         readonly Dictionary<string, int> s2i = new Dictionary<string, int>();
         readonly Dictionary<int, string> i2s = new Dictionary<int, string>();
 
-        public Lexicon(string splitter, Lexicon child = null, Lexicon parent = null)
+        public Lexicon(Language lang, string splitter, Lexicon child = null, Lexicon parent = null)
         {
             if (child == null)
                 this.Rank = 0;
@@ -38,6 +39,7 @@ namespace NLDB
             this.parser = new Parser(this.Splitter);
             if (child != null) child.Parent = this;
             this.calculator = new Confidence(this);
+            this.language = lang;
         }
 
         public int Count
@@ -104,9 +106,33 @@ namespace NLDB
                 this.parser.
                 Split(normText).
                 Select(t => t.Trim()).
-                Where(s => !string.IsNullOrWhiteSpace(s)).
+                Where(s => !string.IsNullOrEmpty(s)).
                 Select(s => this.TryAdd(s)).
+                //Where(id => id != -1).
                 ToArray();
+        }
+
+        /// <summary>
+        /// Пытается добавить слово, представленное строкой s, в словарь. Если такое слово уже есть, то добавления не происходит.
+        /// </summary>
+        /// <param name="s">текстовое предстваление слова</param>
+        /// <returns>возвращает id слова</returns>
+        public int TryAdd(string s)
+        {
+            int id = -1;
+            if (this.Rank == 0)
+            {
+                if ((id = this.AtomId(s)) == -1)
+                    id = this.Register(new int[0], s);
+            }
+            else
+            {
+                int[] childs = this.Child.TryAddMany(s);
+                //if (childs.Length == 0) return -1;
+                if ((id = this.GetByChilds(childs)) == -1)
+                    id = this.Register(childs);
+            }
+            return id;
         }
 
         public Term BuildTerm(string s)
@@ -132,43 +158,11 @@ namespace NLDB
 
         public void EvaluateTerm(Term term)
         {
-            if (term.Rank < this.Rank)
-            {
-                this.Child.EvaluateTerm(term);
-                return;
-            }
-            if (term.Rank > this.Rank)
-            {
-                this.Parent.EvaluateTerm(term);
-                return;
-            }
-            //вычисляем полную вероятность терма term, по априорным и апостериорным вероятностям символов слова (Childs)
+            if (term.Rank != this.Rank)
+                throw new ArgumentException("Несоответствие рангов терма и лексикона");
             if (term.Rank > 0)
-                foreach (var t in term.Childs)
-                    this.EvaluateTerm(t);
+                term.Childs.ForEach(t => this.language.EvaluateTerm(t));
             this.calculator.Evaluate(term);
-        }
-
-        /// <summary>
-        /// Пытается добавить слово, представленное строкой s, в словарь. Если такое слово уже есть, то добавления не происходит.
-        /// </summary>
-        /// <param name="s">текстовое предстваление слова</param>
-        /// <returns>возвращает id слова</returns>
-        public int TryAdd(string s)
-        {
-            int id = -1;
-            if (this.Rank == 0)
-            {
-                if ((id = this.AtomId(s)) == -1)
-                    id = this.Register(new int[0], s);
-            }
-            else
-            {
-                int[] childs = this.Child.TryAddMany(s);
-                if ((id = this.GetByChilds(childs)) == -1)
-                    id = this.Register(childs);
-            }
-            return id;
         }
 
         public int GetByChilds(int[] childs)
@@ -177,7 +171,7 @@ namespace NLDB
             if (this.w2i.TryGetValue(new Word(-1, childs), out id))
                 return id;
             return -1;
-        }
+        }        
 
         public int AtomId(string s)
         {
