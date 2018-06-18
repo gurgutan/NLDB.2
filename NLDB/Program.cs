@@ -37,20 +37,19 @@ namespace NLDB
                 lines.Enqueue(line);
                 if (lines.Count > 1) lines.Dequeue();
                 string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "." + n);
-                var term = l.Evaluate(text, 2);
-                if (term.Id >= 0)
+                var terms = l.FindMany(text, 10, 2);
+                terms.ToList().ForEach(term =>
                 {
-                    Console.WriteLine(text);
-                    Console.WriteLine(l.Lexicons[term.Rank].ToText(term.Id));
-                    Console.WriteLine(term.Confidence);
-                }
+                    if (term.Id >= 0)
+                        Console.WriteLine($"{term.Confidence}: {l.Lexicons[term.Rank].ToText(term.Id)}");
+                });
             }
         }
 
         static void TestLanguage()
         {
             Random rand = new Random((int)DateTime.Now.Ticks);
-            string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
+            string trainfile = @"D:\Data\Wiki\ru\100mb.txt";
             //string trainfile = @"D:\Data\Text\philosoph1.txt";
             Language l = new Language("Русские слова", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
             l.CreateFromTextFile(trainfile);

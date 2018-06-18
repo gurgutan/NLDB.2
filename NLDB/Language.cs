@@ -36,11 +36,19 @@ namespace NLDB
             rank = Math.Min(this.Rank, rank);
             return this.Lexicons[rank].Evaluate(s);
         }
+
         public void EvaluateTerm(Term term)
         {
             if (term.Rank < 0 || term.Rank > this.Rank)
                 throw new ArgumentOutOfRangeException($"Ранг терма выходит за границы допустимых значений данного языка: [0,{this.Rank}]");
             this.Lexicons[term.Rank].Evaluate(term);
+        }
+
+        public IEnumerable<Term> FindMany(string s, int count = 0, int rank = 1)
+        {
+            rank = Math.Min(this.Rank, rank);
+            Term term = this.Lexicons[rank].BuildTerm(s);
+            return this.Lexicons[rank].FindMany(term, count);
         }
 
         public void CreateFromTextFile(string filename)

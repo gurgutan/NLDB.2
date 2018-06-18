@@ -165,13 +165,22 @@ namespace NLDB
             this.calculator.Evaluate(term);
         }
 
+        public IEnumerable<Term> FindMany(Term term, int count = 0)
+        {
+            if (term.Rank != this.Rank)
+                throw new ArgumentException("Несоответствие рангов терма и лексикона");
+            if (term.Rank > 0)
+                term.Childs.ForEach(t => this.Child.Evaluate(t));
+            return this.calculator.FindMany(term, count);
+        }
+
         public int GetByChilds(int[] childs)
         {
             int id;
             if (this.w2i.TryGetValue(new Word(-1, childs), out id))
                 return id;
             return -1;
-        }        
+        }
 
         public int AtomId(string s)
         {

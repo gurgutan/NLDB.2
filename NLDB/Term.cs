@@ -85,6 +85,7 @@ namespace NLDB
             Term w = (Term)obj;
             //Если указан id, то сравниваем по id (состав может отличаться). Такой способ нужен для поиска с неизвестным составом
             if (this.Id == w.Id) return true;
+            if ((w.Childs == null && this.Childs != null) || (w.Childs != null && this.Childs == null)) return false;
             //Если длины слов не равны то слова не равны
             if (w.Childs.Count != this.Childs.Count) return false;
             if (w.Childs.Count == 0) return w.Id == this.Id;
@@ -95,7 +96,7 @@ namespace NLDB
 
         public override int GetHashCode()
         {
-            if (this.Childs.Count == 0)
+            if (this.Childs == null || this.Childs.Count == 0)
                 return this.Id;
             int hash = 0;
             for (int i = 0; i < this.Childs.Count; i++)
@@ -106,6 +107,11 @@ namespace NLDB
             return hash;
         }
 
+        /// <summary>
+        /// Сравнение по Confidence
+        /// </summary>
+        /// <param name="obj"></param>
+        /// <returns></returns>
         public int CompareTo(object obj)
         {
             return Confidence.CompareTo(obj);

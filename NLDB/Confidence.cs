@@ -60,9 +60,10 @@ namespace NLDB
                 Select(p => new Term(p, lex)).
                 ToList();
 
-            //Поиск ближайшего родителя, т.е. родителя с максимумом Confedence
+            //Расчет оценок Confidence для каждого из соседа
             parents.AsParallel().ForAll(p => p.Confidence = Compare(term, p));
-            parents.Sort();
+            //Сортировка по убыванию оценки
+            parents.Sort(new Comparison<Term>((t1, t2) => (int)(t2.Confidence - t1.Confidence)));
             if (count > 0)
                 result.AddRange(parents.Take(count));
             else
