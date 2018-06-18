@@ -30,7 +30,7 @@ namespace NLDB
         public string Normilize(string text)
         {
             string formated = text.ToLower().Trim();
-            return this.removeRegex.Replace(formated, "");
+            return formated; // this.removeRegex.Replace(formated, "");
         }
     }
 }

@@ -17,16 +17,9 @@ namespace NLDB
             this.lexicon = l;
         }
 
-        private void EvaluateByText(Term term)
-        {
-            term.Id = this.lexicon.AtomId(term.Text);
-            term.Confidence = (term.Id == -1) ? 0 : 1;
-            return;
-        }
-
         public void Evaluate(Term a)
         {
-            if (a.Rank == 0) { this.EvaluateByText(a); return; }
+            if (a.Rank == 0) { this.EvaluateAtom(a); return; }
             var lex = this.lexicon;
             var sublex = this.lexicon.Child;
             //Выделение претендентов на роль ближайшего
@@ -36,8 +29,9 @@ namespace NLDB
                 Distinct().
                 Select(p => new Term(p, lex)).
                 ToList();
-            //Поиск ближайшего
-            parents.ForEach(p =>
+
+            //Поиск ближайшего родителя, т.е. родителя с максимумом Confedence
+            parents.AsParallel().ForAll(p =>
             {
                 double confidence = Compare(a, p);
                 if (a.Confidence < confidence)
@@ -48,11 +42,57 @@ namespace NLDB
             });
         }
 
+        public IEnumerable<Term> FindMany(Term term, int count = 0)
+        {
+            List<Term> result = new List<Term>();
+            if (term.Rank == 0)
+            {
+                result.Add(this.FindAtom(term));
+                return result;
+            }
+            var lex = this.lexicon;
+            var sublex = this.lexicon.Child;
+            //Выделение претендентов на роль ближайшего
+            var parents = term.Childs.
+                SelectMany(t => sublex[t.Id].Parents.
+                Select(link => lex[link.Id])).
+                Distinct().
+                Select(p => new Term(p, lex)).
+                ToList();
+
+            //Поиск ближайшего родителя, т.е. родителя с максимумом Confedence
+            parents.AsParallel().ForAll(p => p.Confidence = Compare(term, p));
+            parents.Sort();
+            if (count > 0)
+                result.AddRange(parents.Take(count));
+            else
+                result.AddRange(parents);
+            return result;
+        }
+
         public static double Compare(Term a, Term b)
         {
             if (a.Rank != b.Rank) throw new ArgumentException("Попытка сравнить термы разных рангов");
             return Operations[a.Rank](a, b);
         }
+
+        //----------------------------------------------------------------------------------------------------------------
+        //Частные методы
+        private void EvaluateAtom(Term term)
+        {
+            int id = this.lexicon.AtomId(term.Text);
+            double confidence = (id == -1) ? 0 : 1;
+            term.Id = id;
+            term.Confidence = confidence;
+        }
+
+        private Term FindAtom(Term term)
+        {
+            Term result = new Term(term);
+            this.Evaluate(result);
+            return new Term(term);
+        }
+
 
         //Возвращает 1, если вектор a полностью входит в b
         private static double Inclusive(Term a, Term b)

@@ -7,14 +7,24 @@ using System.Threading.Tasks;
 namespace NLDB
 {
     [Serializable]
-    public class Term
+    public class Term : IComparable
     {
         public string Text;
         public int Id;
         public int Rank;
         public double Confidence;
-        public readonly List<Term> Childs = new List<Term>();
-        public readonly Dictionary<Term, int> ChildsBag = new Dictionary<Term, int>();
+        public readonly List<Term> Childs;
+        public readonly Dictionary<Term, int> ChildsBag;
+
+        public Term(Term t)
+        {
+            this.Text = t.Text;
+            this.Id = t.Id;
+            this.Rank = t.Rank;
+            this.Confidence = t.Confidence;
+            this.Childs = new List<Term>(t.Childs);
+            this.ChildsBag = new Dictionary<Term, int>(t.ChildsBag);
+        }
 
         public Term(int _id, string _t, List<Term> _childs)
         {
@@ -94,6 +104,11 @@ namespace NLDB
                 hash *= 1664525;
             }
             return hash;
+        }
+
+        public int CompareTo(object obj)
+        {
+            return Confidence.CompareTo(obj);
         }
     }
 }

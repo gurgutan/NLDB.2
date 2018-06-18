@@ -149,19 +149,19 @@ namespace NLDB
                     ToList());
         }
 
-        public Term EvaluateTerm(string text)
+        public Term Evaluate(string text)
         {
             Term term = this.BuildTerm(text);
-            this.EvaluateTerm(term);
+            this.Evaluate(term);
             return term;
         }
 
-        public void EvaluateTerm(Term term)
+        public void Evaluate(Term term)
         {
             if (term.Rank != this.Rank)
                 throw new ArgumentException("Несоответствие рангов терма и лексикона");
             if (term.Rank > 0)
-                term.Childs.ForEach(t => this.language.EvaluateTerm(t));
+                term.Childs.ForEach(t => this.Child.Evaluate(t));
             this.calculator.Evaluate(term);
         }
 

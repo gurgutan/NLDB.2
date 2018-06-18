@@ -34,13 +34,13 @@ namespace NLDB
         public Term Evaluate(string s, int rank = 1)
         {
             rank = Math.Min(this.Rank, rank);
-            return this.Lexicons[rank].EvaluateTerm(s);
+            return this.Lexicons[rank].Evaluate(s);
         }
         public void EvaluateTerm(Term term)
         {
             if (term.Rank < 0 || term.Rank > this.Rank)
                 throw new ArgumentOutOfRangeException($"Ранг терма выходит за границы допустимых значений данного языка: [0,{this.Rank}]");
-            this.Lexicons[term.Rank].EvaluateTerm(term);
+            this.Lexicons[term.Rank].Evaluate(term);
         }
 
         public void CreateFromTextFile(string filename)
