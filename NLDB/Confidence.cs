@@ -59,7 +59,6 @@ namespace NLDB
                 Distinct().
                 Select(p => new Term(p, lex)).
                 ToList();
-
             //Расчет оценок Confidence для каждого из соседа
             parents.AsParallel().ForAll(p => p.Confidence = Compare(term, p));
             //Сортировка по убыванию оценки
@@ -133,13 +132,13 @@ namespace NLDB
             double da = 0, db = 0;
             for (int i = 0; i < a.Count; i++)
                 for (int j = 0; j < b.Count; j++)
-                    s += Confidence.Compare(a.Childs[i], b.Childs[j]);
+                    s += a.Childs[i].Confidence * b.Childs[j].Confidence;
             for (int i = 0; i < a.Count; i++)
                 for (int j = 0; j < a.Count; j++)
-                    da += Confidence.Compare(a.Childs[i], a.Childs[j]);
+                    da += a.Childs[i].Confidence * a.Childs[j].Confidence;
             for (int i = 0; i < b.Count; i++)
                 for (int j = 0; j < b.Count; j++)
-                    db += Confidence.Compare(b.Childs[i], b.Childs[j]);
+                    db += b.Childs[i].Confidence * b.Childs[j].Confidence;
             return s / (Math.Sqrt(da) * Math.Sqrt(db));
         }
 

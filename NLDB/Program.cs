@@ -49,7 +49,7 @@ namespace NLDB
         static void TestLanguage()
         {
             Random rand = new Random((int)DateTime.Now.Ticks);
-            string trainfile = @"D:\Data\Wiki\ru\100mb.txt";
+            string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
             //string trainfile = @"D:\Data\Text\philosoph1.txt";
             Language l = new Language("Русские слова", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
             l.CreateFromTextFile(trainfile);
