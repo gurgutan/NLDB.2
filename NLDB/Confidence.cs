@@ -6,12 +6,9 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
-    using WordVector = Dictionary<Word, double>;
-    public enum CompareFunctionType { Cosine, Injection, OrderedInjection };
-
+    //TODO: Создать модульные тесты для Confidence
     public class Confidence
     {
-
         public Confidence(Lexicon l)
         {
             this.lexicon = l;

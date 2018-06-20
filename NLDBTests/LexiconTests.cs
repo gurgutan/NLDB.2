@@ -12,12 +12,6 @@ namespace NLDB.Tests
     public class LexiconTests
     {
         [TestMethod()]
-        public void AsCOOMatrixTest()
-        {
-            Assert.Fail();
-        }
-
-        [TestMethod()]
         public void LexiconTest()
         {
             Assert.Fail();
@@ -71,16 +65,5 @@ namespace NLDB.Tests
             Assert.Fail();
         }
 
-        [TestMethod()]
-        public void AsDenseMatrixTest()
-        {
-            Assert.Fail();
-        }
-
-        [TestMethod()]
-        public void AsCOOMatrixTest1()
-        {
-            Assert.Fail();
-        }
     }
 }

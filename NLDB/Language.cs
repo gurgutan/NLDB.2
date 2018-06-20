@@ -14,7 +14,7 @@ namespace NLDB
     {
         public static int WORD_SIZE = 1024;
         private readonly int bufferSize = 1 << 28;
-        private readonly string Name;
+        public readonly string Name;
         public int Rank;
 
         public List<Lexicon> Lexicons = new List<Lexicon>();
@@ -24,6 +24,12 @@ namespace NLDB
             this.Name = name;
             this.Rank = splitters.Length - 1;
             this.Init(splitters);
+        }
+
+        public void Clear()
+        {
+            Lexicons.ForEach(l => l.Clear());
+            Lexicons.Clear();
         }
 
         public Lexicon this[int r]

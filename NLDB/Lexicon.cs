@@ -42,6 +42,15 @@ namespace NLDB
             this.language = lang;
         }
 
+        public void Clear()
+        {
+            w2i.Clear();
+            i2w.Clear();
+            s2i.Clear();
+            i2s.Clear();
+            count = 0;
+        }
+
         public int Count
         {
             get { return this.w2i.Count; }

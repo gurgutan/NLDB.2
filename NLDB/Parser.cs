@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
+    //TODO: Создать модульные тесты для Parser
     [Serializable]
     public class Parser
     {

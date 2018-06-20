@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
+    //TODO: Создать модульные тесты для Term
     [Serializable]
     public class Term : IComparable
     {
@@ -70,6 +71,7 @@ namespace NLDB
         {
             return this.ChildsBag.ContainsKey(c);
         }
+
         public bool ContainsId(int id)
         {
             return this.Childs.Any(c => c.Id == id);
@@ -78,7 +80,6 @@ namespace NLDB
         public int Count { get { return this.Childs.Count; } }
 
         public override string ToString() => this.Text;
-
 
         public override bool Equals(object obj)
         {
