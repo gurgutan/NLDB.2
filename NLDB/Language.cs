@@ -57,9 +57,10 @@ namespace NLDB
             return this.Lexicons[rank].FindMany(term, count);
         }
 
-        public void CreateFromTextFile(string filename)
+        public int CreateFromTextFile(string filename)
         {
             if (!File.Exists(filename)) throw new FileNotFoundException("Файл не найден");
+            int wordscount = 0;
             using (StreamReader file = File.OpenText(filename))
             {
                 Console.WriteLine($"\nОбработка файла '{filename}'");
@@ -73,15 +74,21 @@ namespace NLDB
                     string text = new string(buffer, 0, count);
                     Console.Write($"Считана строка длины {count}. Всего {total} байт ");
                     Console.CursorLeft = 0;
-                    this.Lexicons[this.Rank].TryAddMany(text);
+                    wordscount += this.Lexicons[this.Rank].TryAddMany(text).Length;
                 }
                 Console.WriteLine("\nОбработка файла завершена");
             }
+            return wordscount;
         }
 
-        public void CreateFromString(string text)
+        /// <summary>
+        /// Добавляет слова в лексикон и возвращает количество добавленных слов
+        /// </summary>
+        /// <param name="text">строка текста для анализа и разбиения на слова</param>
+        /// <returns>количество добавленных в лексикон слов</returns>
+        public int CreateFromString(string text)
         {
-            this.Lexicons[this.Rank].TryAddMany(text);
+            return this.Lexicons[this.Rank].TryAddMany(text).Length;
         }
 
         public void Seriailize(string filename)
