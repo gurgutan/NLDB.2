@@ -89,6 +89,8 @@ namespace NLDB
 
         public string ToText(int i)
         {
+            //при i==-1 безаварийный возврат пустой строки
+            if (i == -1) return "";
             //разделители слов разного ранга в строку 
             string[] sp = new string[] { "", " ", ". ", "\n", "\n\n" };
             if (this.Rank == 0) return this.i2s[i];

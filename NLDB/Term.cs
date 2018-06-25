@@ -16,9 +16,11 @@ namespace NLDB
         public double Confidence;
         public readonly List<Term> Childs;
         public readonly Dictionary<Term, int> ChildsBag;
+        public readonly Lexicon lex;
 
         public Term(Term t)
         {
+            this.lex = null;
             this.Text = t.Text;
             this.Id = t.Id;
             this.Rank = t.Rank;
@@ -29,6 +31,7 @@ namespace NLDB
 
         public Term(int _id, string _t, List<Term> _childs)
         {
+            this.lex = null;
             this.Text = _t;
             this.Id = _id;
             this.Confidence = 0;
@@ -47,7 +50,8 @@ namespace NLDB
 
         public Term(Word w, Lexicon lex)
         {
-            this.Text = ""; //для скорости можно было бы lex.ToText(w)
+            this.lex = lex;
+            this.Text = "";//Для тестирования можно использовать lex.ToText(w.Id);
             this.Id = w.Id;
             this.Confidence = 1;
             if (w.Childs.Length > 0)
@@ -77,19 +81,36 @@ namespace NLDB
             return this.Childs.Any(c => c.Id == id);
         }
 
+        /// <summary>
+        /// Количество дочерних слов в терме
+        /// </summary>
         public int Count { get { return this.Childs.Count; } }
 
         public override string ToString() => this.Text;
+
+        /// <summary>
+        /// Возвращает вычисленное текстовое представление терма
+        /// </summary>
+        public string AsText
+        {
+            get
+            {
+                if (this.lex == null) return this.Text;
+                return this.lex.ToText(this.Id);
+            }
+        }
 
         public override bool Equals(object obj)
         {
             Term w = (Term)obj;
             //Если указан id, то сравниваем по id (состав может отличаться). Такой способ нужен для поиска с неизвестным составом
             if (this.Id == w.Id) return true;
-            if ((w.Childs == null && this.Childs != null) || (w.Childs != null && this.Childs == null)) return false;
+            //Если один из термов не имеет дочерних слов, то сравнение производится по Id
+            if (w.Childs == null || this.Childs == null) return (this.Id == w.Id);
             //Если длины слов не равны то слова не равны
             if (w.Childs.Count != this.Childs.Count) return false;
-            if (w.Childs.Count == 0) return w.Id == this.Id;
+            if (w.Childs.Count == 0 || this.Childs.Count == 0) return w.Id == this.Id;
+            //Если тривиальные случаи не сработали, то сравниваем каждое дочернее слово с соответствующим
             for (int i = 0; i < this.Childs.Count; i++)
                 if (w.Childs[i] != this.Childs[i]) return false;
             return true;

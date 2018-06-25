@@ -39,7 +39,13 @@ namespace NLDB
             });
         }
 
-        public IEnumerable<Term> FindMany(Term term, int count = 0)
+        /// <summary>
+        /// Возвращает List<Term> термов из ассоциированного словаря, с наиболее близким по смыслу контекстом
+        /// </summary>
+        /// <param name="term">терм для сравнения</param>
+        /// <param name="count">количество наилучших совпадений</param>
+        /// <returns>список термов</returns>
+        public List<Term> FindMany(Term term, int count = 0)
         {
             List<Term> result = new List<Term>();
             if (term.Rank == 0)
@@ -59,7 +65,7 @@ namespace NLDB
             //Расчет оценок Confidence для каждого из соседа
             parents.AsParallel().ForAll(p => p.Confidence = Compare(term, p));
             //Сортировка по убыванию оценки
-            parents.Sort(new Comparison<Term>((t1, t2) => (int)(t2.Confidence - t1.Confidence)));
+            parents.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.Confidence - t1.Confidence)));
             if (count > 0)
                 result.AddRange(parents.Take(count));
             else
@@ -90,17 +96,21 @@ namespace NLDB
             return new Term(term);
         }
 
-
-        //Возвращает 1, если вектор a полностью входит в b
+        /// <summary>
+        /// Возвращает отношение количества дочерних слов, вошедших в b и количетсва дочерних слов b. Учитываются точные вхождения
+        /// </summary>
+        /// <param name="a">терм</param>
+        /// <param name="b">терм</param>
+        /// <returns>оценка схожести из интервала [0,1], где 0 - не похожи, 1 - максимально похожи</returns>
         private static double Inclusive(Term a, Term b)
         {
-            int count = a.Childs.Aggregate(0, (c, n) => b.Contains(n) ? c + 1 : c);
-            return (count == a.Count) ? 1 : 0;
+            int count = a.Childs.Sum(c => b.ContainsId(c.Id) ? 1 : 0);
+            return count / a.Count;
         }
 
         private static double SoftInclusive(Term a, Term b)
         {
-            double count = a.Childs.Aggregate<Term, double>(0, (c, n) => b.ContainsId(n.Id) ? c + n.Confidence : c);
+            double count = a.Childs.Sum(c => b.ContainsId(c.Id) ? c.Confidence : 0);
             return count / a.Count;
         }
 
