@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using NLDB;
+using System.IO;
 
 namespace NLDB.NLCLI
 {
@@ -16,6 +17,7 @@ namespace NLDB.NLCLI
         public const string Version = "0.01";
         public readonly string WelcomeMessage = "Оболочка командной строки NLDB " + Version + "\nДля подсказки используйте команду 'help'";
         public string PromptDelimiter = ">>";
+
         Language DB;
 
         public ShellExecuteMode ExecuteMode = ShellExecuteMode.Debug;
@@ -27,7 +29,7 @@ namespace NLDB.NLCLI
             DB = db;
         }
 
-        public void Loop()
+        public void DialogLoop()
         {
             Command c = new Command();
             ShowWelcomeMessage();
@@ -37,7 +39,7 @@ namespace NLDB.NLCLI
                 string line = Console.ReadLine();
                 if (c.TryParse(line))
                     this.Execute(c);
-                else ErrorMessage("Ошибка интерпретации команды");
+                else ErrorMessage("Ошибка интерпретации команды. Воспользуйтесь командой help");
             }
         }
 
@@ -77,7 +79,7 @@ namespace NLDB.NLCLI
         {
             if (DB == null)
             {
-                Console.WriteLine("База данных не инициализирована. Сначала загрузите или создайте БД.");
+                ErrorMessage("База данных не инициализирована. Сначала загрузите или создайте БД.");
                 return 0;
             }
             string text = "";
@@ -102,7 +104,6 @@ namespace NLDB.NLCLI
                     default: UnknownParameter(key); break;
                 }
             //Вывод информации о команде
-
             Stopwatch stopwatch = Stopwatch.StartNew();
             this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] поиск ближайших {maxcount} к '{text}' в лексиконе ранга {rank}");
             var terms = DB.FindMany(text, maxcount, rank);
@@ -119,30 +120,70 @@ namespace NLDB.NLCLI
         //TODO: сделать возможной обработку данных из Stream
         private int CreateDB(Dictionary<string, string> parameters)
         {
+            string name = "";
+            List<string> splitters = new List<string>();
             foreach (var key in parameters.Keys)
                 switch (key)
                 {
-                    case "file": InsertDataFromFile(parameters[key]); break;
-                    case "folder": InsertDataFromFolder(parameters[key]); break;
-                    case "string": InsertDataFromString(parameters[key]); break;
+                    case "name": name = parameters[key]; break;
+                    case "splitters": splitters.Add(parameters[key]); break;
+                    default: { UnknownParameter(key); return 1001; };
+                }
+            DB = new Language(name, splitters.ToArray());
+            return 0;
+        }
+
+        private int AddData(Dictionary<string, string> parameters)
+        {
+            if (DB == null)
+            {
+                ErrorMessage("База данных не инициализирована. Сначала загрузите или создайте БД.");
+                return 0;
+            }
+            foreach (var key in parameters.Keys)
+                switch (key)
+                {
+                    case "file": return AddDataFromFile(parameters[key]);
+                    case "folder": return AddDataFromFolder(parameters[key]);
+                    case "string": return AddDataFromString(parameters[key]);
                     default: { UnknownParameter(key); return 1001; };
                 }
             return 0;
         }
 
-        private void InsertDataFromString(string v)
+        private int AddDataFromString(string s)
         {
-            throw new NotImplementedException();
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] Добавление данных из строки");
+            int wordscount = DB.CreateFromString(s);
+            stopwatch.Stop();
+            Console.WriteLine($"В БД {DB.Name} добавлено {wordscount} слов.");
+            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
+            return 0;
         }
 
-        private void InsertDataFromFolder(string v)
+        private int AddDataFromFolder(string path)
         {
-            throw new NotImplementedException();
+            int wordscount = 0;
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] Добавление данных из папки '{path}'");
+            var files = Directory.GetFiles(path);
+            foreach(var file in files)
+                wordscount += DB.CreateFromTextFile(file);
+            Console.WriteLine($"В БД {DB.Name} добавлено {wordscount} слов.");
+            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
+            return 0;
         }
 
-        private void InsertDataFromFile(string v)
+        private int AddDataFromFile(string filename)
         {
-            throw new NotImplementedException();
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] Добавление данных из файла '{filename}'");
+            int wordscount = DB.CreateFromTextFile(filename);
+            stopwatch.Stop();
+            Console.WriteLine($"В БД {DB.Name} добавлено {wordscount} слов.");
+            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
+            return 0;
         }
 
         private int ClearDB()

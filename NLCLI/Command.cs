@@ -13,10 +13,11 @@ namespace NLDB.NLCLI
     {
         public static readonly List<string> ptrns = new List<string>
         {
-            @"^(?'CMD'create)\s+(?'FROM'(file|folder|string))://(?'SRC'.+)",
-            @"^(?'CMD'load)\s+(?'FROM'file)://(?'SRC'.+)",
-            @"^(?'CMD'save)\s+(?'TO'(file|folder|string))://(?'SRC'.+)",
-            @"^(?'CMD'find)\s+(?'RANK'rank:(?'RANKVAL'\d{1,4})\s+)?(?'TOP'top:(?'TOPVAL'\d{1,15})\s+)?(?'TEXT'text:(?'TEXTVAL'.+))",
+            @"^(?'CMD'create)\s+(?'NAMEKEY'name):(?'NAMEVAL'[\w]+)\s+(?'SPLKEY'splitters):(?'SPLVAL'"".+""\,?)+",
+            @"^(?'CMD'add)\s+(?'FROM'(file|folder|string)):(?'SRC'.+)",
+            @"^(?'CMD'load)\s+(?'FROM'file):(?'SRC'.+)",
+            @"^(?'CMD'save)\s+(?'TO'(file|folder|string)):(?'SRC'.+)",
+            @"^(?'CMD'find)\s+((?'RANK'rank):(?'RANKVAL'\d{1,4})\s+)?((?'TOP'top):(?'TOPVAL'\d{1,15})\s+)?((?'TEXT'text):(?'TEXTVAL'.+))",
             @"^(?'CMD'clear)",
             @"^(?'CMD'help)",
             @"^(?'CMD'quit)"
@@ -24,13 +25,14 @@ namespace NLDB.NLCLI
 
         public static readonly List<string> helpstrings = new List<string>
         {
-            "create <source>",
-            "load <source>",
-            "save <destination>",
-            "find [rank:<r>] [top:<n>] text:<string>",
-            "clear",
-            "help",
-            "quit"
+            @"create name:<name> splitters:""<split_expr1>"" ""<split_expr2>"" ""<split_exprN>""",
+            @"add (file|folder|string):<path>",
+            @"load file:<path>",
+            @"save file:<path>",
+            @"find [rank:<r>] [top:<n>] text:<string>",
+            @"clear",
+            @"help",
+            @"quit"
         };
 
         public CommandTypes CommandType = CommandTypes.Empty;
@@ -52,6 +54,13 @@ namespace NLDB.NLCLI
                     case "create":
                         {
                             CommandType = CommandTypes.Create;
+                            Parameters.Add(match.Groups[2].Value, match.Groups[3].Value);
+                            Parameters.Add(match.Groups[4].Value, match.Groups[5].Value);
+                            return true;
+                        };
+                    case "add":
+                        {
+                            CommandType = CommandTypes.Load;
                             Parameters.Add(match.Groups[2].Value, match.Groups[3].Value);
                             return true;
                         };
