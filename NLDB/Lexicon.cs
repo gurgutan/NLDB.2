@@ -176,7 +176,7 @@ namespace NLDB
             this.calculator.Evaluate(term);
         }
 
-        public IEnumerable<Term> FindMany(Term term, int count = 0)
+        public List<Term> FindMany(Term term, int count = 0)
         {
             if (term.Rank != this.Rank)
                 throw new ArgumentException("Несоответствие рангов терма и лексикона");

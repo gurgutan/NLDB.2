@@ -160,10 +160,11 @@ namespace NLDB
 
         //Массив функций для поэлементного вычисления "похожести" векторов слов. Индекс в массиве - ранг сравниваемых слов.
         //Функция применяется к двум скалярным элементам веторов, в соответствующих позициях
-        private static readonly Func<Term, Term, double>[] Operations = new Func<Term, Term, double>[4]
+        private static readonly Func<Term, Term, double>[] Operations = new Func<Term, Term, double>[5]
         {
             Confidence.Equality,
             Confidence.Cosine,
+            Confidence.SoftInclusive,
             Confidence.SoftInclusive,
             Confidence.SoftInclusive
         };

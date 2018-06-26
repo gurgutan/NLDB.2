@@ -12,6 +12,8 @@ namespace NLDB
 {
     class Program
     {
+        static string splitline = "----------------------------------------------------------------------";
+
         static void Main(string[] args)
         {
             //Language l = TestDeserializing();
@@ -31,6 +33,7 @@ namespace NLDB
             string line = "---";
             while (line != "")
             {
+                Console.WriteLine(splitline);
                 Console.Write(">>");
                 line = Console.ReadLine();
                 if (line == "") continue;
@@ -38,7 +41,7 @@ namespace NLDB
                 if (lines.Count > 1) lines.Dequeue();
                 string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "." + n);
                 var terms = l.FindMany(text, 10, 2);
-                terms.ToList().ForEach(term =>
+                terms.ForEach(term =>
                 {
                     if (term.Id >= 0)
                         Console.WriteLine($"{term.Confidence}: {l.Lexicons[term.Rank].ToText(term.Id)}");
@@ -51,13 +54,13 @@ namespace NLDB
             Random rand = new Random((int)DateTime.Now.Ticks);
             string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
             //string trainfile = @"D:\Data\Text\philosoph1.txt";
-            Language l = new Language("Русские слова", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
+            Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
             l.CreateFromTextFile(trainfile);
             foreach (var lex in l.Lexicons)
             {
                 Console.WriteLine($"Слов ранга {lex.Rank}: {lex.Count}");
                 Console.WriteLine(lex.ToText(rand.Next(lex.Count)));
-                Console.WriteLine("-----------------------------------------------------------");
+                Console.WriteLine(splitline);
             }
             TestLangConsole(l);
         }

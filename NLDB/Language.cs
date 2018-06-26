@@ -29,7 +29,6 @@ namespace NLDB
         public void Clear()
         {
             Lexicons.ForEach(l => l.Clear());
-            Lexicons.Clear();
         }
 
         public Lexicon this[int r]
@@ -50,11 +49,18 @@ namespace NLDB
             this.Lexicons[term.Rank].Evaluate(term);
         }
 
-        public IEnumerable<Term> FindMany(string s, int count = 0, int rank = 1)
+        /// <summary>
+        /// Функция возвращает список ближайших (в смысле набора метрик) соседей строки s
+        /// </summary>
+        /// <param name="s">строка, которая переводится в терм</param>
+        /// <param name="count">максимальное количество возвращаемых термов (при count=0, возвращает все найденные)</param>
+        /// <param name="rank">ранг словаря, в котором производится поиск</param>
+        /// <returns></returns>
+        public List<Term> FindMany(string s, int count = 0, int rank = 1)
         {
-            rank = Math.Min(this.Rank, rank);
-            Term term = this.Lexicons[rank].BuildTerm(s);
-            return this.Lexicons[rank].FindMany(term, count);
+            int minrank = Math.Min(this.Rank, rank);
+            Term term = this.Lexicons[minrank].BuildTerm(s);
+            return this.Lexicons[minrank].FindMany(term, count);
         }
 
         public int CreateFromTextFile(string filename)
@@ -131,8 +137,11 @@ namespace NLDB
             }
         }
 
-        private void Init(string[] splitters)
+        public void Init(string[] splitters)
         {
+            //Переопределение разделителей слов, означает полное переформирование словарей
+            this.Clear();
+            this.Lexicons.Clear();
             int n = splitters.Length;
             for (int i = 0; i < n; i++)
                 this.Lexicons.Add(
