@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -9,22 +10,34 @@ namespace NLDB
 {
     //TODO: Создать модульные тесты для Word
     [Serializable]
-    public struct WordLink
+    public struct WordLink : ISerializable
     {
         public int Id;
-        public int pos;
+        public int Pos;
         //public float value;
 
         public WordLink(int _id, int _pos)
         {
             Id = _id;
-            pos = _pos;
+            Pos = _pos;
             //value = _v;
+        }
+
+        public WordLink(SerializationInfo info, StreamingContext context)
+        {
+            Id = info.GetInt32("Id");
+            Pos = info.GetInt32("Pos");
+        }
+
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue("Id", Id);
+            info.AddValue("Pos", Pos);
         }
     }
 
     [Serializable]
-    public class Word
+    public class Word : ISerializable
     {
         public int Id;
         public int[] Childs;
@@ -36,10 +49,35 @@ namespace NLDB
             this.Childs = new int[0];
         }
 
+        /// <summary>
+        /// Быстрая инициализация слова через передачу(присвоение) ссылки на массив дочерних _childs
+        /// </summary>
+        /// <param name="_id"></param>
+        /// <param name="_childs"></param>
         public Word(int _id, int[] _childs)
         {
             this.Id = _id;
             this.Childs = _childs;
+        }
+
+        /// <summary>
+        /// Инициализация слова через копирование коллекций _childs и _parents
+        /// </summary>
+        /// <param name="_id">Id слова</param>
+        /// <param name="_childs">коллекция идентификаторов дочерних слов</param>
+        /// <param name="_parents">коллекция линков на родительские слова</param>
+        public Word(int _id, IEnumerable<int> _childs, IEnumerable<WordLink> _parents)
+        {
+            this.Id = _id;
+            this.Childs = _childs.ToArray();
+            this.Parents = _parents.ToList();
+        }
+        
+        public Word(SerializationInfo info, StreamingContext context)
+        {
+            Id = info.GetInt32("Id");
+            Childs = (int[])info.GetValue("Childs", typeof(int[]));
+            Parents = (List<WordLink>)info.GetValue("Parents", typeof(List<WordLink>));
         }
 
         public void AddParent(int _id, int _pos)
@@ -88,6 +126,13 @@ namespace NLDB
                 hash *= 1664525;
             }
             return hash;
+        }
+
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue("Id", Id);
+            info.AddValue("Childs", Childs);
+            info.AddValue("Parents", Parents);
         }
     }
 }
