@@ -88,9 +88,7 @@ namespace NLDB.Tests
             Language l = new Language("Тест1", splitters);
             //Создаем тестовый файл
             using (StreamWriter writer = new StreamWriter(srcfilename))
-            {
                 writer.Write(srctext);
-            }
             //Создаем объект из файла
             l.CreateFromTextFile(srcfilename);
             //Проверяем результат:
@@ -118,15 +116,41 @@ namespace NLDB.Tests
         }
 
         [TestMethod()]
-        public void SeriailizeTest()
+        public void SerializeTest()
         {
-            Assert.Fail();
+            string filename = "SerializeTest.dat";
+            Language l = new Language("Тест сериализации", splitters);
+            //Создаем объект из строки
+            l.CreateFromString(srctext);
+            l.Serialize(filename);
+            //Проверяем наличие файла и успешность завершения сереиализации
+            Assert.IsTrue(File.Exists(filename));
         }
 
         [TestMethod()]
         public void DeserializeTest()
         {
-            Assert.Fail();
+            string filename = "SerializeLanguageTest.dat";
+            string lang_name = "Тест сериализации";
+            Language l1 = new Language(lang_name, splitters);
+            //Создаем объект из строки
+            l1.CreateFromString(srctext);
+            l1.Serialize(filename);
+            //Проверяем наличие файла и успешность завершения сереиализации
+            Assert.IsTrue(File.Exists(filename));
+            //Десериализуем
+            Language l2 = Language.Deserialize(filename);
+            //Проверяем результат
+            Assert.AreEqual(lang_name, l2.Name);
+            Assert.AreEqual(2, l2.Rank);
+            //Количество различных букв (словарь 0-го ранга) равно 23
+            Assert.AreEqual(23, l2[0].Count);
+            //Количество различных слов (словарь 1-го ранга) равно 10
+            Assert.AreEqual(10, l2[1].Count);
+            //Количество различных предложений (словарь 2-го ранга) равно 10
+            Assert.AreEqual(3, l2[2].Count);
+            for (int i = 1; i < l2.Lexicons.Count; i++)
+                Assert.IsTrue(l2[i - 1].Parent == l2[i] && l2[i].Child == l2[i - 1]);
         }
 
         [TestMethod()]

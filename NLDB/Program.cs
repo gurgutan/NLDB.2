@@ -16,15 +16,28 @@ namespace NLDB
 
         static void Main(string[] args)
         {
-            //Language l = TestDeserializing();
+            TestSerialization();
+            TestDeserialization();
             TestLanguage();
-            //SplitTest();
         }
 
-        private static Language TestDeserializing()
+        private static void TestDeserialization()
         {
-            string datafile = @"D:\Data\Lang.dat";
-            return Language.Deserialize(datafile);
+            string filename = @"D:\Data\SerializeLanguageTest.dat";
+            Console.WriteLine($"Десериализация из файла {filename}");
+            Language l = Language.Deserialize(filename);
+            TestLangConsole(l);
+        }
+
+        private static void TestSerialization()
+        {
+            string filename = @"D:\Data\SerializeLanguageTest.dat";
+            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
+            //string trainfile = @"D:\Data\Text\philosoph1.txt";
+            Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
+            l.CreateFromTextFile(trainfile);
+            Console.WriteLine($"Сериализация в файл {filename}");
+            l.Serialize(filename);
         }
 
         static void TestLangConsole(Language l)

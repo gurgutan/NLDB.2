@@ -9,24 +9,32 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
+    //TODO: переделать сериализацию на собственный формат!!!
     [Serializable]
-    public partial class Lexicon
+    public partial class Lexicon : ISerializable
     {
+        [NonSerialized]
         private readonly Language language;
+        [NonSerialized]
         private readonly Parser parser;
+        [NonSerialized]
         private int count = 0;
-        Confidence calculator;
+        [NonSerialized]
+        protected Confidence calculator;
+        [NonSerialized]
+        protected Dictionary<int, Word> i2w;
+        [NonSerialized]
+        protected Dictionary<int, string> i2s;
 
+        protected Dictionary<Word, int> w2i;
+        protected Dictionary<string, int> s2i;
 
         public int Rank;
         public string Splitter = "";
-
+        [NonSerialized]
         public Lexicon Child;
+        [NonSerialized]
         public Lexicon Parent;
-        readonly Dictionary<Word, int> w2i = new Dictionary<Word, int>();
-        readonly Dictionary<int, Word> i2w = new Dictionary<int, Word>();
-        readonly Dictionary<string, int> s2i = new Dictionary<string, int>();
-        readonly Dictionary<int, string> i2s = new Dictionary<int, string>();
 
         public Lexicon(Language lang, string splitter, Lexicon child = null, Lexicon parent = null)
         {
@@ -38,9 +46,40 @@ namespace NLDB
             this.Parent = parent;
             this.Splitter = splitter;
             this.parser = new Parser(this.Splitter);
-            if (child != null) child.Parent = this;
             this.calculator = new Confidence(this);
+            if (child != null) child.Parent = this;
+            i2w = new Dictionary<int, Word>();
+            i2s = new Dictionary<int, string>();
+            w2i = new Dictionary<Word, int>();
+            s2i = new Dictionary<string, int>();
             this.language = lang;
+        }
+
+        protected Lexicon(SerializationInfo info, StreamingContext context)
+        {
+            Rank = info.GetInt32("Rank");
+            Splitter = info.GetString("Splitter");
+            w2i = (Dictionary<Word, int>)info.GetValue("w2i", typeof(Dictionary<Word, int>));
+            s2i = (Dictionary<string, int>)info.GetValue("s2i", typeof(Dictionary<string, int>));
+            calculator = new Confidence(this);
+            parser = new Parser(this.Splitter);
+            //Остаются не инициализированными: language, Child, Parent. Они должны быть присвоены при десериализации Language
+        }
+
+        void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue("Rank", Rank);
+            info.AddValue("Splitter", Splitter);
+            info.AddValue("w2i", w2i, typeof(Dictionary<Word, int>));
+            info.AddValue("s2i", s2i, typeof(Dictionary<string, int>));
+        }
+        
+        [OnDeserialized]
+        public void OnDeserializedMethod(StreamingContext context)
+        {
+            i2w = w2i.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);
+            i2s = s2i.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);
+            count = w2i.Count;
         }
 
         public void Clear()
@@ -72,12 +111,12 @@ namespace NLDB
         /// </summary>
         public IEnumerable<int> Codes
         {
-            get { return this.w2i.Values.ToArray(); }
+            get { return this.w2i.Values; }
         }
 
         public IEnumerable<Word> Words
         {
-            get { return this.w2i.Keys; }
+            get { return this.i2w.Values; }
         }
 
         /// <summary>
@@ -85,7 +124,12 @@ namespace NLDB
         /// </summary>
         public IEnumerable<string> Alphabet
         {
-            get { return this.s2i.Keys; }
+            get { return this.i2s.Values; }
+        }
+
+        public IEnumerable<int> AlphabetCodes
+        {
+            get { return this.s2i.Values; }
         }
 
         public string ToText(int i)

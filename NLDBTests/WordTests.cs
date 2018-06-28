@@ -39,11 +39,12 @@ namespace NLDB.Tests
             Assert.AreEqual(a.Parents[1].Pos, 2);
         }
 
-        [TestMethod()]
-        public void AsSparseVectorTest()
-        {
-            Assert.Fail();
-        }
+        //Тест закоментирован, т.к. пока нет нужды в представлении слова в качестве разреженного вектора
+        //[TestMethod()]
+        //public void AsSparseVectorTest()
+        //{
+        //    Assert.Fail();
+        //}
 
         [TestMethod()]
         public void EqualsTest()

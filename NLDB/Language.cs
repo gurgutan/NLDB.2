@@ -9,21 +9,52 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
+    //TODO: переделать сериализацию на собственный формат!!!
     [Serializable]
-    public partial class Language
+    public partial class Language : ISerializable
     {
+        [NonSerialized]
         public static int WORD_SIZE = 1024;
+        [NonSerialized]
         private readonly int bufferSize = 1 << 28;
         public readonly string Name;
         public int Rank;
-
-        public List<Lexicon> Lexicons = new List<Lexicon>();
+        public List<Lexicon> Lexicons;
 
         public Language(string name, string[] splitters)
         {
             this.Name = name;
             this.Rank = splitters.Length - 1;
+            this.Lexicons = new List<Lexicon>();
             this.Init(splitters);
+        }
+
+        protected Language(SerializationInfo info, StreamingContext context)
+        {
+            Name = info.GetString("Name");
+            Rank = info.GetInt32("Rank");
+            Lexicons = (List<Lexicon>)info.GetValue("Lexicons", typeof(List<Lexicon>));
+        }
+
+        void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue("Name", Name);
+            info.AddValue("Rank", Rank);
+            info.AddValue("Lexicons", Lexicons);
+        }
+
+        [OnDeserialized]
+        void OnDeserializedMethod(StreamingContext context)
+        {
+            foreach(var lex in Lexicons)
+            {
+                lex.OnDeserializedMethod(context);
+            }
+            for (int i = 1; i < Lexicons.Count; i++)
+            {
+                Lexicons[i - 1].Parent = Lexicons[i];
+                Lexicons[i].Child = Lexicons[i - 1];
+            }
         }
 
         public void Clear()
@@ -97,7 +128,7 @@ namespace NLDB
             return this.Lexicons[this.Rank].TryAddMany(text).Length;
         }
 
-        public void Seriailize(string filename)
+        public void Serialize(string filename)
         {
             FileStream fs = new FileStream(filename, FileMode.Create);
             BinaryFormatter formatter = new BinaryFormatter();
@@ -148,5 +179,6 @@ namespace NLDB
                     new Lexicon(this, splitters[i], i > 0 ? this.Lexicons[i - 1] : null)
                     );
         }
+
     }
 }

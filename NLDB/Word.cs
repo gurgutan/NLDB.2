@@ -41,12 +41,13 @@ namespace NLDB
     {
         public int Id;
         public int[] Childs;
-        public List<WordLink> Parents = new List<WordLink>();
+        public List<WordLink> Parents;
 
         public Word(int _id)
         {
             this.Id = _id;
             this.Childs = new int[0];
+            this.Parents = new List<WordLink>();
         }
 
         /// <summary>
@@ -58,6 +59,7 @@ namespace NLDB
         {
             this.Id = _id;
             this.Childs = _childs;
+            this.Parents = new List<WordLink>();
         }
 
         /// <summary>
@@ -72,12 +74,19 @@ namespace NLDB
             this.Childs = _childs.ToArray();
             this.Parents = _parents.ToList();
         }
-        
-        public Word(SerializationInfo info, StreamingContext context)
+
+        protected Word(SerializationInfo info, StreamingContext context)
         {
             Id = info.GetInt32("Id");
             Childs = (int[])info.GetValue("Childs", typeof(int[]));
             Parents = (List<WordLink>)info.GetValue("Parents", typeof(List<WordLink>));
+        }
+        
+        void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue("Id", Id);
+            info.AddValue("Childs", Childs);
+            info.AddValue("Parents", Parents);
         }
 
         public void AddParent(int _id, int _pos)
@@ -128,11 +137,5 @@ namespace NLDB
             return hash;
         }
 
-        public void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            info.AddValue("Id", Id);
-            info.AddValue("Childs", Childs);
-            info.AddValue("Parents", Parents);
-        }
     }
 }
