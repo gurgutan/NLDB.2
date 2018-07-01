@@ -9,57 +9,46 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
-    //TODO: переделать сериализацию на собственный формат!!!
     [Serializable]
-    public partial class Language : ISerializable
+    public partial class Language
     {
-        [NonSerialized]
+        //Длина слова, используемая для преобразования лексикона в разреженную матрицу
         public static int WORD_SIZE = 1024;
-        [NonSerialized]
+        //Размер буфера для чтения текста
         private readonly int bufferSize = 1 << 28;
         public readonly string Name;
         public int Rank;
         public List<Lexicon> Lexicons;
 
-        public Language(string name, string[] splitters)
+        private string[] splitters;
+        public string[] Splitters
         {
-            this.Name = name;
-            this.Rank = splitters.Length - 1;
-            this.Lexicons = new List<Lexicon>();
-            this.Init(splitters);
-        }
-
-        protected Language(SerializationInfo info, StreamingContext context)
-        {
-            Name = info.GetString("Name");
-            Rank = info.GetInt32("Rank");
-            Lexicons = (List<Lexicon>)info.GetValue("Lexicons", typeof(List<Lexicon>));
-        }
-
-        void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            info.AddValue("Name", Name);
-            info.AddValue("Rank", Rank);
-            info.AddValue("Lexicons", Lexicons);
-        }
-
-        [OnDeserialized]
-        void OnDeserializedMethod(StreamingContext context)
-        {
-            foreach(var lex in Lexicons)
+            get
             {
-                lex.OnDeserializedMethod(context);
+                return this.splitters;
             }
-            for (int i = 1; i < Lexicons.Count; i++)
+            set
             {
-                Lexicons[i - 1].Parent = Lexicons[i];
-                Lexicons[i].Child = Lexicons[i - 1];
+                if (this.splitters != null)
+                {
+                    this.splitters = value;
+                    this.Rank = this.splitters.Length - 1;
+                    this.Lexicons = new List<Lexicon>();
+                    for (int i = 0; i < this.splitters.Length; i++)
+                        this.Lexicons.Add(new Lexicon(this, this.splitters[i], i > 0 ? this.Lexicons[i - 1] : null));
+                }
             }
+        }
+
+        public Language(string _name, string[] _splitters)
+        {
+            this.Name = _name;
+            this.Splitters = _splitters;
         }
 
         public void Clear()
         {
-            Lexicons.ForEach(l => l.Clear());
+            this.Lexicons.ForEach(l => l.Clear());
         }
 
         public Lexicon this[int r]
@@ -168,7 +157,7 @@ namespace NLDB
             }
         }
 
-        public void Init(string[] splitters)
+        private void Init(string[] splitters)
         {
             //Переопределение разделителей слов, означает полное переформирование словарей
             this.Clear();

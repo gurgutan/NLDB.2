@@ -1,5 +1,4 @@
-﻿using StarMathLib;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,21 +8,14 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
-    //TODO: переделать сериализацию на собственный формат!!!
     [Serializable]
-    public partial class Lexicon : ISerializable
+    public partial class Lexicon: IDisposable
     {
-        [NonSerialized]
         private readonly Language language;
-        [NonSerialized]
         private readonly Parser parser;
-        [NonSerialized]
         private int count = 0;
-        [NonSerialized]
         protected Confidence calculator;
-        [NonSerialized]
         protected Dictionary<int, Word> i2w;
-        [NonSerialized]
         protected Dictionary<int, string> i2s;
 
         protected Dictionary<Word, int> w2i;
@@ -31,9 +23,7 @@ namespace NLDB
 
         public int Rank;
         public string Splitter = "";
-        [NonSerialized]
         public Lexicon Child;
-        [NonSerialized]
         public Lexicon Parent;
 
         public Lexicon(Language lang, string splitter, Lexicon child = null, Lexicon parent = null)
@@ -48,47 +38,20 @@ namespace NLDB
             this.parser = new Parser(this.Splitter);
             this.calculator = new Confidence(this);
             if (child != null) child.Parent = this;
-            i2w = new Dictionary<int, Word>();
-            i2s = new Dictionary<int, string>();
-            w2i = new Dictionary<Word, int>();
-            s2i = new Dictionary<string, int>();
+            this.i2w = new Dictionary<int, Word>();
+            this.i2s = new Dictionary<int, string>();
+            this.w2i = new Dictionary<Word, int>();
+            this.s2i = new Dictionary<string, int>();
             this.language = lang;
-        }
-
-        protected Lexicon(SerializationInfo info, StreamingContext context)
-        {
-            Rank = info.GetInt32("Rank");
-            Splitter = info.GetString("Splitter");
-            w2i = (Dictionary<Word, int>)info.GetValue("w2i", typeof(Dictionary<Word, int>));
-            s2i = (Dictionary<string, int>)info.GetValue("s2i", typeof(Dictionary<string, int>));
-            calculator = new Confidence(this);
-            parser = new Parser(this.Splitter);
-            //Остаются не инициализированными: language, Child, Parent. Они должны быть присвоены при десериализации Language
-        }
-
-        void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            info.AddValue("Rank", Rank);
-            info.AddValue("Splitter", Splitter);
-            info.AddValue("w2i", w2i, typeof(Dictionary<Word, int>));
-            info.AddValue("s2i", s2i, typeof(Dictionary<string, int>));
-        }
-        
-        [OnDeserialized]
-        public void OnDeserializedMethod(StreamingContext context)
-        {
-            i2w = w2i.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);
-            i2s = s2i.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);
-            count = w2i.Count;
         }
 
         public void Clear()
         {
-            w2i.Clear();
-            i2w.Clear();
-            s2i.Clear();
-            i2s.Clear();
-            count = 0;
+            this.w2i.Clear();
+            this.i2w.Clear();
+            this.s2i.Clear();
+            this.i2s.Clear();
+            this.count = 0;
         }
 
         public int Count
@@ -132,14 +95,14 @@ namespace NLDB
             get { return this.s2i.Values; }
         }
 
-        public string ToText(int i)
+        public string WordIdToText(int i)
         {
             //при i==-1 безаварийный возврат пустой строки
             if (i == -1) return "";
             //разделители слов разного ранга в строку 
             string[] sp = new string[] { "", " ", ". ", "\n", "\n\n" };
             if (this.Rank == 0) return this.i2s[i];
-            return this.i2w[i].Childs.Aggregate("", (c, n) => c + sp[this.Rank - 1] + this.Child.ToText(n));
+            return this.i2w[i].Childs.Aggregate("", (c, n) => c + sp[this.Rank - 1] + this.Child.WordIdToText(n));
         }
 
         /// <summary>
@@ -147,7 +110,7 @@ namespace NLDB
         /// </summary>
         /// <param name="s">тектсовое представление слова</param>
         /// <returns>код, идентифицирующий слово или -1, если слово с текстовым представлением s не найдено в словаре</returns>
-        public int ToCode(string s)
+        public int StringToWordId(string s)
         {
             int code;
             if (this.s2i.TryGetValue(s, out code))
@@ -267,6 +230,11 @@ namespace NLDB
                 this.Child.i2w[subwords[i]].AddParent(id, i);
             }
             return id;
+        }
+
+        public void Dispose()
+        {
+            this.Clear();
         }
 
         //Закомментировано. Пока не найдена возможность использовать высокопроизводительные вычисления с разреженными матрицами

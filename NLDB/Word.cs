@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
-    //TODO: Создать модульные тесты для Word
     [Serializable]
     public struct WordLink : ISerializable
     {

@@ -223,7 +223,7 @@ namespace NLDB.NLCLI
             terms.ToList().ForEach(term =>
             {
                 if (term.Id >= 0)
-                    Console.WriteLine($"[{term.Confidence}, {DB.Lexicons[term.Rank].ToText(term.Id)}]");
+                    Console.WriteLine($"[{term.Confidence}, {DB.Lexicons[term.Rank].WordIdToText(term.Id)}]");
             });
         }
 

@@ -6,7 +6,6 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading.Tasks;
-using StarMathLib;
 
 namespace NLDB
 {
@@ -57,7 +56,7 @@ namespace NLDB
                 terms.ForEach(term =>
                 {
                     if (term.Id >= 0)
-                        Console.WriteLine($"{term.Confidence}: {l.Lexicons[term.Rank].ToText(term.Id)}");
+                        Console.WriteLine($"{term.Confidence}: {l.Lexicons[term.Rank].WordIdToText(term.Id)}");
                 });
             }
         }
@@ -72,7 +71,7 @@ namespace NLDB
             foreach (var lex in l.Lexicons)
             {
                 Console.WriteLine($"Слов ранга {lex.Rank}: {lex.Count}");
-                Console.WriteLine(lex.ToText(rand.Next(lex.Count)));
+                Console.WriteLine(lex.WordIdToText(rand.Next(lex.Count)));
                 Console.WriteLine(splitline);
             }
             TestLangConsole(l);

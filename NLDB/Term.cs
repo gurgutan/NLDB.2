@@ -59,7 +59,7 @@ namespace NLDB
                 this.Childs = w.Childs.Select(
                     c =>
                     (lex.Rank == 0) ?
-                    new Term(c, lex.ToText(c), new List<Term>()) :
+                    new Term(c, lex.WordIdToText(c), new List<Term>()) :
                     new Term(lex.Child[c], lex.Child)).ToList();
                 this.ChildsBag = this.Childs.
                     Distinct().
@@ -96,7 +96,7 @@ namespace NLDB
             get
             {
                 if (this.lex == null) return this.Text;
-                return this.lex.ToText(this.Id);
+                return this.lex.WordIdToText(this.Id);
             }
         }
 
