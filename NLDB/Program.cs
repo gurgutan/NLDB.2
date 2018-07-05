@@ -15,28 +15,13 @@ namespace NLDB
 
         static void Main(string[] args)
         {
-            TestSerialization();
-            TestDeserialization();
-            TestLanguage();
-        }
-
-        private static void TestDeserialization()
-        {
-            string filename = @"D:\Data\SerializeLanguageTest.dat";
-            Console.WriteLine($"Десериализация из файла {filename}");
-            Language l = Language.Deserialize(filename);
-            TestLangConsole(l);
-        }
-
-        private static void TestSerialization()
-        {
-            string filename = @"D:\Data\SerializeLanguageTest.dat";
             string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
-            //string trainfile = @"D:\Data\Text\philosoph1.txt";
-            Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
-            l.CreateFromTextFile(trainfile);
-            Console.WriteLine($"Сериализация в файл {filename}");
-            l.Serialize(filename);
+            Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
+            using (StreamReader reader = File.OpenText(trainfile))
+                l.Create(reader);
+            Console.WriteLine();
+            Console.WriteLine($"Слов: {l.Count}");
+            TestLangConsole(l);
         }
 
         static void TestLangConsole(Language l)
@@ -52,30 +37,59 @@ namespace NLDB
                 lines.Enqueue(line);
                 if (lines.Count > 1) lines.Dequeue();
                 string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "." + n);
-                var terms = l.FindMany(text, 10, 2);
+                var terms = l.Similars(text, 2, count: 10).ToList();
                 terms.ForEach(term =>
                 {
-                    if (term.Id >= 0)
-                        Console.WriteLine($"{term.Confidence}: {l.Lexicons[term.Rank].WordIdToText(term.Id)}");
+                    if (term.id >= 0)
+                        Console.WriteLine($"{term.confidence}: {term.ToString()}");
                 });
             }
         }
 
-        static void TestLanguage()
-        {
-            Random rand = new Random((int)DateTime.Now.Ticks);
-            string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
-            //string trainfile = @"D:\Data\Text\philosoph1.txt";
-            Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
-            l.CreateFromTextFile(trainfile);
-            foreach (var lex in l.Lexicons)
-            {
-                Console.WriteLine($"Слов ранга {lex.Rank}: {lex.Count}");
-                Console.WriteLine(lex.WordIdToText(rand.Next(lex.Count)));
-                Console.WriteLine(splitline);
-            }
-            TestLangConsole(l);
-        }
+        //private static void TestDeserialization()
+        //{
+        //    string filename = @"D:\Data\SerializeLanguageTest.dat";
+        //    Console.WriteLine($"Десериализация из файла {filename}");
+        //    Language l = Language.Deserialize(filename);
+        //    TestLangConsole(l);
+        //}
+
+        //private static void TestDBSave()
+        //{
+        //    string filename = @"D:\Data\SaveLanguageTest.db";
+        //    string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
+        //    Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
+        //    l.CreateFromTextFile(trainfile);
+        //    Console.WriteLine($"Сохранение в БД {filename}");
+        //    l.DBSave(filename);
+        //    Console.ReadKey();
+        //}
+
+        //private static void TestSerialization()
+        //{
+        //    string filename = @"D:\Data\SerializeLanguageTest.dat";
+        //    string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
+        //    Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
+        //    l.CreateFromTextFile(trainfile);
+        //    Console.WriteLine($"Сериализация в файл {filename}");
+        //    l.Serialize(filename);
+        //}
+
+        //static void TestLanguage()
+        //{
+        //    Random rand = new Random((int)DateTime.Now.Ticks);
+        //    string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
+        //    //string trainfile = @"D:\Data\Text\philosoph1.txt";
+        //    Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
+        //    l.CreateFromTextFile(trainfile);
+        //    foreach (var lex in l.Lexicons)
+        //    {
+        //        Console.WriteLine($"Слов ранга {lex.Rank}: {lex.Count}");
+        //        Console.WriteLine(lex.WordIdToText(rand.Next(lex.Count)));
+        //        Console.WriteLine(splitline);
+        //    }
+        //    TestLangConsole(l);
+        //}
 
         static void NormilizeTest()
         {

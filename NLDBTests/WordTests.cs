@@ -18,7 +18,7 @@ namespace NLDB.Tests
         public void WordTest()
         {
             int[] childs = new int[] { 1, 2, 3, 4 };            
-            Word word = new Word(1, childs);
+            Word_old word = new Word_old(1, childs);
             word.AddParent(5, 1);
             word.AddParent(6, 1);
             word.AddParent(7, 1);
@@ -29,7 +29,7 @@ namespace NLDB.Tests
         [TestMethod()]
         public void AddParentTest()
         {
-            Word a = new Word(1, new int[] { 2 });
+            Word_old a = new Word_old(1, new int[] { 2 });
             a.AddParent(3, 1);
             a.AddParent(4, 2);
             Assert.AreEqual(a.Parents.Count, 2);
@@ -49,20 +49,20 @@ namespace NLDB.Tests
         [TestMethod()]
         public void EqualsTest()
         {
-            Word a = new Word(1, new int[] { 11, 12, 13 });
-            Word b = new Word(2, new int[] { 11, 12, 13 });
+            Word_old a = new Word_old(1, new int[] { 11, 12, 13 });
+            Word_old b = new Word_old(2, new int[] { 11, 12, 13 });
             Assert.IsTrue(a.Equals(b));
         }
 
         [TestMethod()]
         public void GetHashCodeTest()
         {
-            Word a = new Word(1, new int[] { 11, 12, 13 });
-            Word b = new Word(2, new int[] { 11, 12, 13 });
+            Word_old a = new Word_old(1, new int[] { 11, 12, 13 });
+            Word_old b = new Word_old(2, new int[] { 11, 12, 13 });
             Assert.AreEqual(a.GetHashCode(), b.GetHashCode());
 
             //Один потомок отличается на единицу
-            Word c = new Word(1, new int[] { 10, 12, 13 });
+            Word_old c = new Word_old(1, new int[] { 10, 12, 13 });
             Assert.AreNotEqual(a.GetHashCode(), c.GetHashCode());
         }
 
@@ -72,17 +72,17 @@ namespace NLDB.Tests
             string fileName = "TestWordData.dat";
             IFormatter formatter = new BinaryFormatter();
             //Сериализуем
-            Word a = new Word(
+            Word_old a = new Word_old(
                 1, 
                 new int[] { 11, 12, 13 }, 
-                new WordLink[] { new WordLink(5,1), new WordLink(6,1) });
+                new Link[] { new Link(5,1), new Link(6,1) });
             FileStream wStream = new FileStream(fileName, FileMode.Create);
             formatter.Serialize(wStream, a);
             wStream.Close();
 
             //Десериализуем
             FileStream rStream = new FileStream(fileName, FileMode.Open);
-            Word b = (Word)formatter.Deserialize(rStream);
+            Word_old b = (Word_old)formatter.Deserialize(rStream);
             rStream.Close();
 
             //Проверим результат десериализации

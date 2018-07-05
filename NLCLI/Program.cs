@@ -10,8 +10,8 @@ namespace NLDB.NLCLI
     {
         static void Main(string[] args)
         {
-            Shell shell = new Shell();
-            shell.DialogLoop();
+            //Shell shell = new Shell();
+            //shell.DialogLoop();
         }
     }
 }

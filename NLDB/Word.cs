@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,100 +8,48 @@ using System.Threading.Tasks;
 namespace NLDB
 {
     [Serializable]
-    public struct WordLink : ISerializable
-    {
-        public int Id;
-        public int Pos;
-        //public float value;
-
-        public WordLink(int _id, int _pos)
-        {
-            Id = _id;
-            Pos = _pos;
-            //value = _v;
-        }
-
-        public WordLink(SerializationInfo info, StreamingContext context)
-        {
-            Id = info.GetInt32("Id");
-            Pos = info.GetInt32("Pos");
-        }
-
-        public void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            info.AddValue("Id", Id);
-            info.AddValue("Pos", Pos);
-        }
-    }
-
-    [Serializable]
     public class Word : ISerializable
     {
-        public int Id;
-        public int[] Childs;
-        public List<WordLink> Parents;
+        public int id;
+        public int rank;
+        public int[] childs = new int[0];
+        public List<int> parents = new List<int>();
+        //public int[] parents = new int[0];
 
-        public Word(int _id)
+        public Word(int _id, int _rank, int[] _childs, int[] _parents)
         {
-            this.Id = _id;
-            this.Childs = new int[0];
-            this.Parents = new List<WordLink>();
-        }
-
-        /// <summary>
-        /// Быстрая инициализация слова через передачу(присвоение) ссылки на массив дочерних _childs
-        /// </summary>
-        /// <param name="_id"></param>
-        /// <param name="_childs"></param>
-        public Word(int _id, int[] _childs)
-        {
-            this.Id = _id;
-            this.Childs = _childs;
-            this.Parents = new List<WordLink>();
-        }
-
-        /// <summary>
-        /// Инициализация слова через копирование коллекций _childs и _parents
-        /// </summary>
-        /// <param name="_id">Id слова</param>
-        /// <param name="_childs">коллекция идентификаторов дочерних слов</param>
-        /// <param name="_parents">коллекция линков на родительские слова</param>
-        public Word(int _id, IEnumerable<int> _childs, IEnumerable<WordLink> _parents)
-        {
-            this.Id = _id;
-            this.Childs = _childs.ToArray();
-            this.Parents = _parents.ToList();
+            id = _id;
+            rank = _rank;
+            childs = _childs;
+            parents = new List<int>(_parents);
         }
 
         protected Word(SerializationInfo info, StreamingContext context)
         {
-            Id = info.GetInt32("Id");
-            Childs = (int[])info.GetValue("Childs", typeof(int[]));
-            Parents = (List<WordLink>)info.GetValue("Parents", typeof(List<WordLink>));
+            id = info.GetInt32("Id");
+            childs = (int[])info.GetValue("Childs", typeof(int[]));
+            parents = (List<int>)info.GetValue("Parents", typeof(List<int>));
         }
-        
+
         void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            info.AddValue("Id", Id);
-            info.AddValue("Childs", Childs);
-            info.AddValue("Parents", Parents);
+            info.AddValue("Id", id);
+            info.AddValue("Childs", childs);
+            info.AddValue("Parents", parents);
         }
 
-        public void AddParent(int _id, int _pos)
+        public void AddParent(int p)
         {
-            Parents.Add(new WordLink(_id, _pos));
-        }
-
-        public IEnumerable<int> ParentCodes
-        {
-            get { return Parents.Select(p => p.Id); }
+            parents.Add(p);
+            //Array.Resize(ref parents, parents.Length + 1);
+            //parents[parents.Length - 1] = p;
         }
 
         public Dictionary<int[], double> AsSparseVector()
         {
             Dictionary<int[], double> vector = new Dictionary<int[], double>();
             int pos = 0;
-            foreach (var c in Childs)
+            foreach (var c in childs)
             {
                 vector.Add(new int[] { 0, c * Language.WORD_SIZE + pos }, 1.0);
                 pos++;
@@ -110,31 +57,31 @@ namespace NLDB
             return vector;
         }
 
-        public override bool Equals(object obj)
-        {
-            Word w = (Word)obj;
-            //Если указан id, то сравниваем по id (состав может отличаться). Такой способ нужен для поиска с неизвестным составом
-            if (this.Id == w.Id) return true;
-            //Если длины слов не равны то слова не равны
-            if (w.Childs.Length != this.Childs.Length) return false;
-            if (w.Childs.Length == 0) return w.Id == this.Id;
-            for (int i = 0; i < this.Childs.Length; i++)
-                if (w.Childs[i] != this.Childs[i]) return false;
-            return true;
-        }
-
+        /// <summary>
+        /// Хэш-код слова зависит от ранга rank, id, childs 
+        /// </summary>
+        /// <returns></returns>
         public override int GetHashCode()
         {
-            if (this.Childs.Length == 0)
-                return this.Id;
-            int hash = 0;
-            for (int i = 0; i < this.Childs.Length; i++)
+            if (childs == null || childs.Length == 0) return id;
+            int hash = rank * 1664525;
+            for (int i = 0; i < childs.Length; i++)
             {
-                hash += this.Childs[i] + 1013904223;
+                hash += childs[i] + 1013904223;
                 hash *= 1664525;
             }
             return hash;
         }
 
+        public override bool Equals(object obj)
+        {
+            Word w = (Word)obj;
+            if (id == w.id) return true;
+            if (childs == null || w.childs == null) return false;
+            if (childs.Length != w.childs.Length) return false;
+            for (int i = 0; i < childs.Length; i++)
+                if (childs[i] != w.childs[i]) return false;
+            return true;
+        }
     }
 }

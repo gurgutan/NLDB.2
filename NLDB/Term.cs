@@ -6,137 +6,79 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
-    //TODO: Создать модульные тесты для Term
-    [Serializable]
     public class Term : IComparable
     {
-        public string Text;
-        public int Id;
-        public int Rank;
-        public double Confidence;
-        public readonly List<Term> Childs;
-        public readonly Dictionary<Term, int> ChildsBag;
-        public readonly Lexicon lex;
+        public int rank;
+        public int id;
+        public double confidence;
+        public string text;
+        public List<Term> childs;
 
-        public Term(Term t)
+        public Term(int _rank, int _id, double _confidence, string _text, IEnumerable<Term> _childs)
         {
-            this.lex = null;
-            this.Text = t.Text;
-            this.Id = t.Id;
-            this.Rank = t.Rank;
-            this.Confidence = t.Confidence;
-            this.Childs = new List<Term>(t.Childs);
-            this.ChildsBag = new Dictionary<Term, int>(t.ChildsBag);
+            rank = _rank;
+            id = _id;
+            confidence = _confidence;
+            text = _text;
+            if (_childs != null)
+                childs = new List<Term>(_childs);
         }
 
-        public Term(int _id, string _t, List<Term> _childs)
+        public override string ToString()
         {
-            this.lex = null;
-            this.Text = _t;
-            this.Id = _id;
-            this.Confidence = 0;
-            this.Childs = _childs;
-            if (this.Childs.Count > 0)
-            {
-                this.ChildsBag = this.Childs.
-                    Distinct().
-                    Select((t, i) => new KeyValuePair<Term, int>(t, i)).
-                    ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-                this.Rank = this.Childs[0].Rank + 1;
-            }
+            if (rank == 0)
+                return text;
             else
-                this.Rank = 0;
+                return "{" + childs.Aggregate("", (c, n) => c == "" ? n.ToString() : c + "" + n.ToString()) + "}";
         }
 
-        public Term(Word w, Lexicon lex)
+        public bool Contains(Term t)
         {
-            this.lex = lex;
-            this.Text = "";//Для тестирования можно использовать lex.ToText(w.Id);
-            this.Id = w.Id;
-            this.Confidence = 1;
-            if (w.Childs.Length > 0)
-            {
-                this.Childs = w.Childs.Select(
-                    c =>
-                    (lex.Rank == 0) ?
-                    new Term(c, lex.WordIdToText(c), new List<Term>()) :
-                    new Term(lex.Child[c], lex.Child)).ToList();
-                this.ChildsBag = this.Childs.
-                    Distinct().
-                    Select((t, i) => new KeyValuePair<Term, int>(t, i)).
-                    ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-                this.Rank = this.Childs[0].Rank + 1;
-            }
-            else
-                this.Rank = 0;
+            return childs.Any(c => c.id == t.id);
         }
 
-        public bool Contains(Term c)
-        {
-            return this.ChildsBag.ContainsKey(c);
-        }
-
-        public bool ContainsId(int id)
-        {
-            return this.Childs.Any(c => c.Id == id);
-        }
-
-        /// <summary>
-        /// Количество дочерних слов в терме
-        /// </summary>
-        public int Count { get { return this.Childs.Count; } }
-
-        public override string ToString() => this.Text;
-
-        /// <summary>
-        /// Возвращает вычисленное текстовое представление терма
-        /// </summary>
-        public string AsText
-        {
-            get
-            {
-                if (this.lex == null) return this.Text;
-                return this.lex.WordIdToText(this.Id);
-            }
-        }
+        public int Count { get { return childs == null ? 0 : childs.Count; } }
 
         public override bool Equals(object obj)
         {
-            Term w = (Term)obj;
+            Term t = (Term)obj;
             //Если указан id, то сравниваем по id (состав может отличаться). Такой способ нужен для поиска с неизвестным составом
-            if (this.Id == w.Id) return true;
-            //Если один из термов не имеет дочерних слов, то сравнение производится по Id
-            if (w.Childs == null || this.Childs == null) return (this.Id == w.Id);
+            if (this.id == t.id) return true;
+            //Если один из термов не имеет дочерних слов (и id не равны), то термы не равны
+            if (t.childs == null || this.childs == null || t.Count == 0 || this.Count == 0) return false;
             //Если длины слов не равны то слова не равны
-            if (w.Childs.Count != this.Childs.Count) return false;
-            if (w.Childs.Count == 0 || this.Childs.Count == 0) return w.Id == this.Id;
+            if (t.Count != this.Count) return false;
             //Если тривиальные случаи не сработали, то сравниваем каждое дочернее слово с соответствующим
-            for (int i = 0; i < this.Childs.Count; i++)
-                if (w.Childs[i] != this.Childs[i]) return false;
+            for (int i = 0; i < this.Count; i++)
+                if (t.childs[i] != this.childs[i]) return false;
             return true;
         }
 
+        /// <summary>
+        /// Хэш-код терма зависит от ранга rank, id, childs 
+        /// </summary>
+        /// <returns></returns>
         public override int GetHashCode()
         {
-            if (this.Childs == null || this.Childs.Count == 0)
-                return this.Id;
-            int hash = 0;
-            for (int i = 0; i < this.Childs.Count; i++)
+            if (this.childs == null || this.Count == 0)
+                return this.id;
+            int hash = rank * 1664525;
+            for (int i = 0; i < this.Count; i++)
             {
-                hash += this.Childs[i].Id + 1013904223;
+                hash += this.childs[i].id + 1013904223;
                 hash *= 1664525;
             }
             return hash;
         }
 
         /// <summary>
-        /// Сравнение по Confidence
+        /// Сравнение по confidence
         /// </summary>
         /// <param name="obj"></param>
         /// <returns></returns>
         public int CompareTo(object obj)
         {
-            return Confidence.CompareTo(obj);
+            return confidence.CompareTo(obj);
         }
     }
 }

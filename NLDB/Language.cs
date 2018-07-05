@@ -12,109 +12,63 @@ namespace NLDB
     [Serializable]
     public partial class Language
     {
-        //Длина слова, используемая для преобразования лексикона в разреженную матрицу
-        public static int WORD_SIZE = 1024;
-        //Размер буфера для чтения текста
-        private readonly int bufferSize = 1 << 28;
-        public readonly string Name;
-        public int Rank;
-        public List<Lexicon> Lexicons;
-
         private string[] splitters;
-        public string[] Splitters
-        {
-            get
-            {
-                return this.splitters;
-            }
-            set
-            {
-                if (this.splitters != null)
-                {
-                    this.splitters = value;
-                    this.Rank = this.splitters.Length - 1;
-                    this.Lexicons = new List<Lexicon>();
-                    for (int i = 0; i < this.splitters.Length; i++)
-                        this.Lexicons.Add(new Lexicon(this, this.splitters[i], i > 0 ? this.Lexicons[i - 1] : null));
-                }
-            }
-        }
+        private int[] EmptyArray = new int[0];
+        private int id_counter = 1;
+        private Alphabet alphabet = new Alphabet();
+        private Dictionary<int, Word> i2w = new Dictionary<int, Word>();
+        private Dictionary<Word, int> w2i = new Dictionary<Word, int>();
+        private Parser[] parsers;
 
-        public Language(string _name, string[] _splitters)
-        {
-            this.Name = _name;
-            this.Splitters = _splitters;
-        }
+        //Длина слова, используемая для преобразования лексикона в разреженную матрицу
+        public static readonly int WORD_SIZE = 1024;
+        //Размер буфера для чтения текста
+        public static readonly int TEXT_BUFFER_SIZE = 1 << 28;
+
 
         public void Clear()
         {
-            this.Lexicons.ForEach(l => l.Clear());
-        }
-
-        public Lexicon this[int r]
-        {
-            get { return this.Lexicons[r]; }
-        }
-
-        public Term Evaluate(string s, int rank = 1)
-        {
-            rank = Math.Min(this.Rank, rank);
-            return this.Lexicons[rank].Evaluate(s);
-        }
-
-        public void EvaluateTerm(Term term)
-        {
-            if (term.Rank < 0 || term.Rank > this.Rank)
-                throw new ArgumentOutOfRangeException($"Ранг терма выходит за границы допустимых значений данного языка: [0,{this.Rank}]");
-            this.Lexicons[term.Rank].Evaluate(term);
+            i2w.Clear();
+            w2i.Clear();
+            id_counter = 1;
+            alphabet.Clear();
         }
 
         /// <summary>
-        /// Функция возвращает список ближайших (в смысле набора метрик) соседей строки s
+        /// Создает словарь из потока
         /// </summary>
-        /// <param name="s">строка, которая переводится в терм</param>
-        /// <param name="count">максимальное количество возвращаемых термов (при count=0, возвращает все найденные)</param>
-        /// <param name="rank">ранг словаря, в котором производится поиск</param>
-        /// <returns></returns>
-        public List<Term> FindMany(string s, int count = 0, int rank = 1)
+        /// <param name="streamreader">считыватель потока</param>
+        /// <returns>количество созданных слов</returns>
+        public int Create(StreamReader streamreader)
         {
-            int minrank = Math.Min(this.Rank, rank);
-            Term term = this.Lexicons[minrank].BuildTerm(s);
-            return this.Lexicons[minrank].FindMany(term, count);
-        }
-
-        public int CreateFromTextFile(string filename)
-        {
-            if (!File.Exists(filename)) throw new FileNotFoundException("Файл не найден");
-            int wordscount = 0;
-            using (StreamReader file = File.OpenText(filename))
+            Console.WriteLine();
+            this.Clear();
+            int count_words = 0;
+            char[] buffer = new char[Language.TEXT_BUFFER_SIZE];
+            int count_chars = Language.TEXT_BUFFER_SIZE;
+            int total_chars = 0;
+            while (count_chars == Language.TEXT_BUFFER_SIZE)
             {
-                Console.WriteLine($"\nОбработка файла '{filename}'");
-                char[] buffer = new char[this.bufferSize];
-                int count = this.bufferSize;
-                int total = 0;
-                while (count == this.bufferSize)
-                {
-                    count = file.ReadBlock(buffer, 0, this.bufferSize);
-                    total += count;
-                    string text = new string(buffer, 0, count);
-                    Console.Write($"Считана строка длины {count}. Всего {total} байт ");
-                    Console.CursorLeft = 0;
-                    wordscount += this.Lexicons[this.Rank].TryAddMany(text).Length;
-                }
-                Console.WriteLine("\nОбработка файла завершена");
+                count_chars = streamreader.ReadBlock(buffer, 0, Language.TEXT_BUFFER_SIZE);
+                string text = new string(buffer, 0, count_chars);
+                int current_chars = text.Length;
+                total_chars += current_chars;
+                Console.CursorLeft = 0;
+                Console.Write($"Считано {current_chars}/{total_chars} байт ");
+                count_words += this.Parse(text, this.Rank).Count();
             }
-            return wordscount;
+            return count_words;
         }
 
         /// <summary>
-        /// Добавляет слова в лексикон и возвращает количество добавленных слов
+        /// Добавляет слова и возвращает количество добавленных слов
         /// </summary>
         /// <param name="text">строка текста для анализа и разбиения на слова</param>
         /// <returns>количество добавленных в лексикон слов</returns>
-        public int CreateFromString(string text)
+        public int Create(string text)
         {
-            return this.Lexicons[this.Rank].TryAddMany(text).Length;
+            this.Clear();
+            return Parse(text, this.Rank).Count();
         }
 
         public void Serialize(string filename)
@@ -155,18 +109,6 @@ namespace NLDB
             {
                 fs.Close();
             }
-        }
-
-        private void Init(string[] splitters)
-        {
-            //Переопределение разделителей слов, означает полное переформирование словарей
-            this.Clear();
-            this.Lexicons.Clear();
-            int n = splitters.Length;
-            for (int i = 0; i < n; i++)
-                this.Lexicons.Add(
-                    new Lexicon(this, splitters[i], i > 0 ? this.Lexicons[i - 1] : null)
-                    );
         }
 
     }
