@@ -104,9 +104,11 @@
     <Compile Include="Alphabet.cs" />
     <Compile Include="Confidence.cs" />
     <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="Primes.cs" />
     <Compile Include="Language.cs" />
     <Compile Include="Language.db.cs" />
     <Compile Include="Language.lex.cs" />
+    <Compile Include="Lexicon.cs" />
     <Compile Include="Parser.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

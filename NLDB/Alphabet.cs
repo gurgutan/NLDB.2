@@ -10,7 +10,11 @@ namespace NLDB
     public class Alphabet
     {
         Dictionary<string, int> codes = new Dictionary<string, int>();
-        Dictionary<int, string> strings = new Dictionary<int, string>();
+        Dictionary<int, string> letters = new Dictionary<int, string>();
+
+        public int Count { get { return codes.Count; } }
+
+        public Dictionary<int, string> Letters { get { return letters; } }
 
         public bool Contains(string text)
         {
@@ -19,19 +23,19 @@ namespace NLDB
 
         public bool Contains(int id)
         {
-            return strings.ContainsKey(id);
+            return letters.ContainsKey(id);
         }
 
         public void Add(string s, int i)
         {
             codes[s] = i;
-            strings[i] = s;
+            letters[i] = s;
         }
 
         public int this[string i]
         {
             get
-            {                
+            {
                 int id;
                 codes.TryGetValue(i, out id);
                 return id;
@@ -39,7 +43,7 @@ namespace NLDB
             set
             {
                 codes[i] = value;
-                strings[value] = i;
+                letters[value] = i;
             }
         }
         public string this[int i]
@@ -47,12 +51,12 @@ namespace NLDB
             get
             {
                 string s;
-                strings.TryGetValue(i, out s);
+                letters.TryGetValue(i, out s);
                 return s;
             }
             set
             {
-                strings[i] = value;
+                letters[i] = value;
                 codes[value] = i;
             }
         }
@@ -60,7 +64,7 @@ namespace NLDB
         internal void Clear()
         {
             codes.Clear();
-            strings.Clear();
+            letters.Clear();
         }
     }
 }

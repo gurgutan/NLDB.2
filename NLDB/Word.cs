@@ -8,34 +8,21 @@ using System.Threading.Tasks;
 namespace NLDB
 {
     [Serializable]
-    public class Word : ISerializable
+    public struct Word
     {
         public int id;
         public int rank;
-        public int[] childs = new int[0];
-        public List<int> parents = new List<int>();
+        public int[] childs;
+        public List<int> parents;
         //public int[] parents = new int[0];
 
         public Word(int _id, int _rank, int[] _childs, int[] _parents)
         {
+            if (_childs == null) throw new ArgumentNullException("_childs не может быть равен null. Используйте int[0] вместо null");
             id = _id;
             rank = _rank;
             childs = _childs;
             parents = new List<int>(_parents);
-        }
-
-        protected Word(SerializationInfo info, StreamingContext context)
-        {
-            id = info.GetInt32("Id");
-            childs = (int[])info.GetValue("Childs", typeof(int[]));
-            parents = (List<int>)info.GetValue("Parents", typeof(List<int>));
-        }
-
-        void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            info.AddValue("Id", id);
-            info.AddValue("Childs", childs);
-            info.AddValue("Parents", parents);
         }
 
         public void AddParent(int p)
@@ -82,6 +69,11 @@ namespace NLDB
             for (int i = 0; i < childs.Length; i++)
                 if (childs[i] != w.childs[i]) return false;
             return true;
+        }
+
+        public override string ToString()
+        {
+            return "{" + childs.Aggregate("", (c, n) => c == "" ? n.ToString() : c + "," + n.ToString()) + "}";
         }
     }
 }

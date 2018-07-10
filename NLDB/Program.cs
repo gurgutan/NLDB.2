@@ -9,19 +9,23 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
+
     class Program
     {
         static string splitline = "----------------------------------------------------------------------";
 
         static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
-            Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
-            using (StreamReader reader = File.OpenText(trainfile))
-                l.Create(reader);
-            Console.WriteLine();
-            Console.WriteLine($"Слов: {l.Count}");
-            TestLangConsole(l);
+            Lexicon lex = new Lexicon(1000);
+            Console.ReadKey();
+            
+            //string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
+            //Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
+            //using (StreamReader reader = File.OpenText(trainfile))
+            //    l.Create(reader);
+            //Console.WriteLine();
+            //Console.WriteLine($"Слов: {l.Count}");
+            //TestLangConsole(l);
         }
 
         static void TestLangConsole(Language l)

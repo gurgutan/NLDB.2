@@ -17,76 +17,37 @@ namespace NLDB.Tests
         [TestMethod()]
         public void WordTest()
         {
-            int[] childs = new int[] { 1, 2, 3, 4 };            
-            Word_old word = new Word_old(1, childs);
-            word.AddParent(5, 1);
-            word.AddParent(6, 1);
-            word.AddParent(7, 1);
-            Assert.AreEqual(word.Childs.Count(), 4);
-            Assert.AreEqual(word.Parents.Count(), 3);
+            Assert.Fail();
         }
 
         [TestMethod()]
         public void AddParentTest()
         {
-            Word_old a = new Word_old(1, new int[] { 2 });
-            a.AddParent(3, 1);
-            a.AddParent(4, 2);
-            Assert.AreEqual(a.Parents.Count, 2);
-            Assert.AreEqual(a.Parents[0].Id, 3);
-            Assert.AreEqual(a.Parents[0].Pos, 1);
-            Assert.AreEqual(a.Parents[1].Id, 4);
-            Assert.AreEqual(a.Parents[1].Pos, 2);
+            Assert.Fail();
         }
 
-        //Тест закоментирован, т.к. пока нет нужды в представлении слова в качестве разреженного вектора
-        //[TestMethod()]
-        //public void AsSparseVectorTest()
-        //{
-        //    Assert.Fail();
-        //}
+        [TestMethod()]
+        public void AsSparseVectorTest()
+        {
+            Assert.Fail();
+        }
 
         [TestMethod()]
         public void EqualsTest()
         {
-            Word_old a = new Word_old(1, new int[] { 11, 12, 13 });
-            Word_old b = new Word_old(2, new int[] { 11, 12, 13 });
-            Assert.IsTrue(a.Equals(b));
+            Assert.Fail();
         }
 
         [TestMethod()]
         public void GetHashCodeTest()
         {
-            Word_old a = new Word_old(1, new int[] { 11, 12, 13 });
-            Word_old b = new Word_old(2, new int[] { 11, 12, 13 });
-            Assert.AreEqual(a.GetHashCode(), b.GetHashCode());
-
-            //Один потомок отличается на единицу
-            Word_old c = new Word_old(1, new int[] { 10, 12, 13 });
-            Assert.AreNotEqual(a.GetHashCode(), c.GetHashCode());
+            Assert.Fail();
         }
 
         [TestMethod()]
         public void SerializeTest()
         {
-            string fileName = "TestWordData.dat";
-            IFormatter formatter = new BinaryFormatter();
-            //Сериализуем
-            Word_old a = new Word_old(
-                1, 
-                new int[] { 11, 12, 13 }, 
-                new Link[] { new Link(5,1), new Link(6,1) });
-            FileStream wStream = new FileStream(fileName, FileMode.Create);
-            formatter.Serialize(wStream, a);
-            wStream.Close();
-
-            //Десериализуем
-            FileStream rStream = new FileStream(fileName, FileMode.Open);
-            Word_old b = (Word_old)formatter.Deserialize(rStream);
-            rStream.Close();
-
-            //Проверим результат десериализации
-            Assert.IsTrue(a.Equals(b));
+            Assert.Fail();
         }
     }
 }

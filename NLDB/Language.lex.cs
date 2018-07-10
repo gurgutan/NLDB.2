@@ -9,15 +9,16 @@ namespace NLDB
 {
     public partial class Language
     {
-        public string Name { get; private set; }
-
-        public int Rank { get { return (int)(splitters.Length - 1); } }
-
         public Language(string _name, string[] _splitters)
         {
             this.Name = _name;
             this.Splitters = _splitters;
         }
+
+        public string Name { get; private set; }
+
+        public int Rank { get { return splitters.Length - 1; } }
+
 
         public string[] Splitters
         {
@@ -26,6 +27,8 @@ namespace NLDB
         }
 
         public int Count { get { return i2w.Count; } }
+
+        public Dictionary<int, Word> Words { get { return i2w; } }
 
         public Word Get(int i)
         {
