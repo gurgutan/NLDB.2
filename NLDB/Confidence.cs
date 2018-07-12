@@ -19,6 +19,11 @@ namespace NLDB
             return Confidence.Operations[a.rank](a, b);
         }
 
+        public static double Compare(int a, int b)
+        {
+            return a == b ? 1 : 0;
+        }
+
         /// <summary>
         /// Возвращает отношение количества дочерних слов, вошедших в b и количетсва дочерних слов b. Учитываются точные вхождения
         /// </summary>
@@ -31,10 +36,22 @@ namespace NLDB
             return count / a.Count;
         }
 
+        private static double Inclusive(int[] a, int[] b)
+        {
+            int count = a.Sum(c => b.Contains(c) ? 1 : 0);
+            return count / a.Length;
+        }
+
         private static double SoftInclusive(Term a, Term b)
         {
-            double count = a.childs.Sum(c => b.Contains(c) ? c.confidence : 0);
+            double count = a.childs.Sum(c => b.childs.Max(bc => Confidence.Compare(bc, c)));
             return count / a.Count;
+        }
+
+        private static double SoftInclusive(int[] a, int[] b)
+        {
+            double count = a.Sum(c => b.Max(bc => Confidence.Compare(bc, c)));
+            return count / a.Length;
         }
 
         private static double Cosine(Term a, Term b)
@@ -47,6 +64,16 @@ namespace NLDB
             return s / denominator;
         }
 
+        private static double Cosine(int[] a, int[] b)
+        {
+            int n = a.Length < b.Length ? a.Length : b.Length;
+            double s = 0;
+            for (int i = 0; i < n; i++)
+                s += (a[i] == b[i]) ? 1 : 0;
+            double denominator = Math.Sqrt(a.Length) * Math.Sqrt(b.Length);
+            return s / denominator;
+        }
+
         private static double CosineLeft(Term a, Term b)
         {
             int n = a.Count < b.Count ? a.Count : b.Count;
@@ -54,6 +81,15 @@ namespace NLDB
             for (int i = 0; i < n; i++)
                 s += (a.childs[i].id == b.childs[i].id) ? a.childs[i].confidence : 0;
             return s / a.Count;
+        }
+
+        private static double CosineLeft(int[] a, int[] b)
+        {
+            int n = a.Length < b.Length ? a.Length : b.Length;
+            double s = 0;
+            for (int i = 0; i < n; i++)
+                s += (a[i] == b[i]) ? 1 : 0;
+            return s / a.Length;
         }
 
         private static double SoftCosine(Term a, Term b)
@@ -72,9 +108,35 @@ namespace NLDB
             return s / (Math.Sqrt(da) * Math.Sqrt(db));
         }
 
+        private static double SoftCosine(int[] a, int[] b)
+        {
+            double s = 0;
+            double da = 0, db = 0;
+            for (int i = 0; i < a.Length; i++)
+                for (int j = 0; j < b.Length; j++)
+                    s += Equality(a[i], b[j]);
+            for (int i = 0; i < a.Length; i++)
+                for (int j = 0; j < a.Length; j++)
+                    da += Equality(a[i], a[j]);
+            for (int i = 0; i < b.Length; i++)
+                for (int j = 0; j < b.Length; j++)
+                    db += Equality(b[i], b[j]);
+            return s / (Math.Sqrt(da) * Math.Sqrt(db));
+        }
+
         private static double Equality(Term a, Term b)
         {
             return a.id == b.id ? 1 : 0;
+        }
+
+        private static double Equality(int[] a, int[] b)
+        {
+            return a.SequenceEqual(b) ? 1 : 0;
+        }
+
+        private static double Equality(int a, int b)
+        {
+            return a == b ? 1 : 0;
         }
 
         //----------------------------------------------------------------------------------------------------------------

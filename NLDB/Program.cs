@@ -15,17 +15,14 @@ namespace NLDB
         static string splitline = "----------------------------------------------------------------------";
 
         static void Main(string[] args)
-        {
-            Lexicon lex = new Lexicon(1000);
-            Console.ReadKey();
-            
-            //string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
-            //Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
-            //using (StreamReader reader = File.OpenText(trainfile))
-            //    l.Create(reader);
-            //Console.WriteLine();
-            //Console.WriteLine($"Слов: {l.Count}");
-            //TestLangConsole(l);
+        {            
+            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
+            Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
+            using (StreamReader reader = File.OpenText(trainfile))
+                l.Create(reader);
+            Console.WriteLine();
+            Console.WriteLine($"Слов: {l.Count}");
+            TestLangConsole(l);
         }
 
         static void TestLangConsole(Language l)
@@ -41,7 +38,7 @@ namespace NLDB
                 lines.Enqueue(line);
                 if (lines.Count > 1) lines.Dequeue();
                 string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "." + n);
-                var terms = l.Similars(text, 2, count: 10).ToList();
+                var terms = l.Similars(text, 2, count: 4).ToList();
                 terms.ForEach(term =>
                 {
                     if (term.id >= 0)

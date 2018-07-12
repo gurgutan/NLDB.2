@@ -139,7 +139,7 @@ namespace NLDB
         {
             StringBuilder childs = new StringBuilder("INSERT INTO childs(id, rank, child, pos) VALUES");
             StringBuilder values = new StringBuilder();
-            foreach (var w in i2w.Values)
+            foreach (var w in w2i.Keys)
             {
                 for (int i = 0; i < w.childs.Length; i++)
                     values.Append($"({w.id},{w.rank},{w.childs[i]},{i}),");

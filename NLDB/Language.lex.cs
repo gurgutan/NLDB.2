@@ -9,6 +9,10 @@ namespace NLDB
 {
     public partial class Language
     {
+        private Alphabet alphabet = new Alphabet();
+        private Dictionary<int, Word> i2w = new Dictionary<int, Word>();
+        private Dictionary<Word, int> w2i = new Dictionary<Word, int>();
+
         public Language(string _name, string[] _splitters)
         {
             this.Name = _name;
@@ -42,7 +46,7 @@ namespace NLDB
             w.id = NextId();
             i2w[w.id] = w;
             w2i[w] = w.id;
-            //Добавление родительского слова в каждый из дочерних слов w.childs
+            //Добавление родительского слова в каждое из дочерних слов w.childs
             Array.ForEach(w.childs, c => Get(c).AddParent(w.id));
             //Добавление буквы в алфавит
             if (!string.IsNullOrEmpty(letter) && !alphabet.Contains(letter))
@@ -133,7 +137,7 @@ namespace NLDB
             if (term.rank == 0) return new Term[] { Evaluate(term) };
             //Выделение претендентов на роль ближайшего
             var candidates = term.childs.                // дочерние термы
-                Select(c => Evaluate(c)). // вычисляем все значения confidence
+                Select(c => Evaluate(c)).               // вычисляем все значения confidence
                 Where(c => c.id != 0).                  // отбрасываем термы с id=0, т.к. они не идентифицированы
                 SelectMany(c => Get(c.id).parents.Select(i => Get(i))). // получаем список родительских слов
                 Distinct().                             // без дублей
@@ -153,7 +157,7 @@ namespace NLDB
         /// Вычисляет значение confidence и id для терма term. Меняет переданный по ссылке term
         /// </summary>
         /// <param name="term">изменяемый терм</param>
-        /// <returns>возвращает ссылку на term, сделано для удобства использования в LINQ</returns>
+        /// <returns>возвращает ссылку на term (возврат значения для удобства использования в LINQ)</returns>
         public Term Evaluate(Term term)
         {
             if (term.rank == 0)
@@ -175,7 +179,7 @@ namespace NLDB
                     Distinct().                         // без дублей
                     Select(p => ToTerm(p)).             // переводим слова в термы
                     ToList();
-                //Поиск ближайшего родителя, т.е. родителя с максимумом сonfedence
+                //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
                 candidates.AsParallel().ForAll(p =>
                 {
                     double confidence = Confidence.Compare(term, p);

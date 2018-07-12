@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace NLDB
 {
     [Serializable]
-    public struct Word
+    public class Word
     {
         public int id;
         public int rank;
@@ -18,11 +18,12 @@ namespace NLDB
 
         public Word(int _id, int _rank, int[] _childs, int[] _parents)
         {
-            if (_childs == null) throw new ArgumentNullException("_childs не может быть равен null. Используйте int[0] вместо null");
+            //if (_childs == null) throw new ArgumentNullException("_childs не может быть равен null. Используйте int[0] вместо null");
             id = _id;
             rank = _rank;
             childs = _childs;
-            parents = new List<int>(_parents);
+            if (_parents != null)
+                parents = new List<int>(_parents);
         }
 
         public void AddParent(int p)
@@ -30,18 +31,6 @@ namespace NLDB
             parents.Add(p);
             //Array.Resize(ref parents, parents.Length + 1);
             //parents[parents.Length - 1] = p;
-        }
-
-        public Dictionary<int[], double> AsSparseVector()
-        {
-            Dictionary<int[], double> vector = new Dictionary<int[], double>();
-            int pos = 0;
-            foreach (var c in childs)
-            {
-                vector.Add(new int[] { 0, c * Language.WORD_SIZE + pos }, 1.0);
-                pos++;
-            }
-            return vector;
         }
 
         /// <summary>
@@ -64,11 +53,23 @@ namespace NLDB
         {
             Word w = (Word)obj;
             if (id == w.id) return true;
-            if (childs == null || w.childs == null) return false;
-            if (childs.Length != w.childs.Length) return false;
+            //if (childs == null || w.childs == null) return false;
+            if (childs?.Length != w.childs?.Length) return false;
             for (int i = 0; i < childs.Length; i++)
                 if (childs[i] != w.childs[i]) return false;
             return true;
+        }
+
+        public Dictionary<int[], double> AsSparseVector()
+        {
+            Dictionary<int[], double> vector = new Dictionary<int[], double>();
+            int pos = 0;
+            foreach (var c in childs)
+            {
+                vector.Add(new int[] { 0, c * Language.WORD_SIZE + pos }, 1.0);
+                pos++;
+            }
+            return vector;
         }
 
         public override string ToString()

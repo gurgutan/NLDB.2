@@ -9,6 +9,7 @@ namespace NLDB
 {
     public class Lexicon
     {
+        private int max_attempts = 1024; // максимальное количество попыток выделить новый номер
         private int count = 0;
         public int Count { get { return count; } }
 
@@ -23,9 +24,30 @@ namespace NLDB
             words = new Word[capacity];
         }
 
-        public int Get(Word w)
+        public Word this[int i]
         {
-            return CalcIndex(w);
+            get
+            {
+                return words[i];
+            }
+            set
+            {
+                words[i] = value;
+            }
+        }
+
+        /// <summary>
+        /// Возвращает индекс слова w, если он есть в словаре и 0, если его нет в словаре
+        /// </summary>
+        /// <param name="w"></param>
+        /// <returns></returns>
+        public int this[Word w]
+        {
+            get
+            {
+                int i = CalcIndex(w);
+                return words[i].id > 0 ? i : 0;
+            }
         }
 
         public bool ContainsIndex(int i)
@@ -45,66 +67,62 @@ namespace NLDB
                 throw new ArgumentOutOfRangeException("Словарь полон. Для добавления слова размер словаря должен быть увеличен.");
             if (w.rank == 0)
                 return Register(w, RandomFreeIndex());
-            int i = CalcIndex(w);
-            if (!ContainsIndex(i)) return Register(w, i);
-            var childs_indexes = GetMinors(w);          //получаем всех потомков ранга 0
-            foreach (var prev in childs_indexes)
-            {
-                Word minor = words[prev];   //копируем слово во временное хранилище
-                int next = prev;            //начинаем перебирать индексы со следующего за текущим индексом
-                do
-                {
-                    next = NextFreeIndex(next);         //получаем очередной свободный индекс
-                    if (TryRegister(minor, prev, next)) //попытка зарегистрировать minor под новым индексом
-                        return next;
-                }
-                while (next == prev);       //если перебрали все свободные индексы и вернулись к prev
-            }
+            w.id = CalcIndex(w);
+            if (!ContainsIndex(w.id))
+                return Register(w, w.id);
+            if (RecalculateMinors(ref w))
+                return Register(w, w.id);
             throw new ArgumentOutOfRangeException($"Неуспешная попытка добавления слова {w.ToString()}");
         }
 
-        private bool TryRegister(Word w, int prev, int next)
+        private bool RecalculateMinors(ref Word w)
         {
-            //Проверим, что next не занят
-            if (ContainsIndex(next)) return false;
-            //Перемещаем в словаре слово w с индекса prev, на next
-            Move(w, prev, next);
-            //Если слово w НЕ входит в другие слова, то номер next можно использовать - выходим с успехом. При этом словарь остается измененным.
-            if (words[next].parents == null || words[next].parents.Count == 0) return true;
-            //Если слово входит в другие слова, то готовим стек для записи всех изменений
-            Stack<Tuple<int, int, int>> changes = new Stack<Tuple<int, int, int>>();  //Первый элемент пары - "что меняем", второй - "на что меняем"
-            //Для всех слов, содержащих prev пытаемся пересчитать id и переместить их в новое место (в индекс id)
-            foreach (var parent in words[next].parents)
+            int attempt = 0;
+            //получаем всех потомков ранга 0
+            var minors = GetMinors(w);
+            int i = NextFreeIndex(w.id);
+            Register(w,i);
+            while (ContainsIndex(i) && attempt++ < max_attempts)
             {
-                //Запишем в стек, что будем менять поменяли
-                changes.Push(new Tuple<int, int, int>(parent, prev, next));
-                int parentId = UpdateId(parent, prev, next);
-                //Если замена не получилась по причине коллизии, то откатываем все в зад
-                if (!TryRegister(words[parent], parent, parentId))
-                {
-                    //все изменения для вхождений prev в другие слова откатываем из стека
-                    while (changes.Count > 0)
-                    {
-                        var triplet = changes.Pop();
-                        UpdateId(triplet.Item1, triplet.Item2, triplet.Item2);
-                        ChangeIndex(words[pair.Item2], pair.Item1);
-                    }
-                    //возвращаем на место индексы-аргументы для регистрируемого слова
-                    ChangeIndex(w, prev);
-                    return false;
-                }
+                var parents = minors.SelectMany(c => this[c].parents);
+
             }
-            return true;
+            throw new NotImplementedException();
         }
 
-        private bool TryMove(int prev, int next)
-        {
-            if (ContainsIndex(next)) return false;  //Проверим, что next не занят
-            Move(prev, next);                       //Перемещаем в словаре слово индекса prev, на next
-            //Если слово w НЕ входит в другие слова, то номер next можно использовать - выходим с успехом.
-            if (words[next].parents == null || words[next].parents.Count == 0) return true;
-            words[next].parents.TrueForAll(p=>)
-        }
+        //private bool TryRegister(Word w, int prev, int next)
+        //{
+        //    //Проверим, что next не занят
+        //    if (ContainsIndex(next)) return false;
+        //    //Перемещаем в словаре слово w с индекса prev, на next
+        //    Move(w, prev, next);
+        //    //Если слово w НЕ входит в другие слова, то номер next можно использовать - выходим с успехом. При этом словарь остается измененным.
+        //    if (words[next].parents == null || words[next].parents.Count == 0) return true;
+        //    //Если слово входит в другие слова, то готовим стек для записи всех изменений
+        //    Stack<Tuple<int, int, int>> changes = new Stack<Tuple<int, int, int>>();  //Первый элемент пары - "что меняем", второй - "на что меняем"
+        //    //Для всех слов, содержащих prev пытаемся пересчитать id и переместить их в новое место (в индекс id)
+        //    foreach (var parent in words[next].parents)
+        //    {
+        //        //Запишем в стек, что будем менять поменяли
+        //        changes.Push(new Tuple<int, int, int>(parent, prev, next));
+        //        int parentId = UpdateId(parent, prev, next);
+        //        //Если замена не получилась по причине коллизии, то откатываем все в зад
+        //        if (!TryRegister(words[parent], parent, parentId))
+        //        {
+        //            //все изменения для вхождений prev в другие слова откатываем из стека
+        //            while (changes.Count > 0)
+        //            {
+        //                var triplet = changes.Pop();
+        //                UpdateId(triplet.Item1, triplet.Item2, triplet.Item2);
+        //                ChangeIndex(words[pair.Item2], pair.Item1);
+        //            }
+        //            //возвращаем на место индексы-аргументы для регистрируемого слова
+        //            ChangeIndex(w, prev);
+        //            return false;
+        //        }
+        //    }
+        //    return true;
+        //}
 
         private int UpdateId(int parent, int prev, int next)
         {

@@ -21,7 +21,6 @@ namespace NLDB.Tests
             Word w_r0_1 = new Word(1, 0, new int[0], null);
             Word w_r0_2 = new Word(2, 0, new int[0], null);
             Word w_r0_3 = new Word(3, 0, new int[0], null);
-            lex.
             Assert.AreEqual(64513, lex.Capacity);
         }
     }

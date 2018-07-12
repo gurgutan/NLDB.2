@@ -15,9 +15,6 @@ namespace NLDB
         private string[] splitters;
         private int[] EmptyArray = new int[0];
         private int id_counter = 1;
-        private Alphabet alphabet = new Alphabet();
-        private Dictionary<int, Word> i2w = new Dictionary<int, Word>();
-        private Dictionary<Word, int> w2i = new Dictionary<Word, int>();
         private Parser[] parsers;
 
         //Длина слова, используемая для преобразования лексикона в разреженную матрицу
@@ -28,7 +25,7 @@ namespace NLDB
 
         public void Clear()
         {
-            i2w.Clear();
+            //i2w.Clear();
             w2i.Clear();
             id_counter = 1;
             alphabet.Clear();
@@ -54,8 +51,8 @@ namespace NLDB
                 int current_chars = text.Length;
                 total_chars += current_chars;
                 Console.CursorLeft = 0;
-                Console.Write($"Считано {current_chars}/{total_chars} байт ");
                 count_words += this.Parse(text, this.Rank).Count();
+                Console.Write($"Считано {current_chars} символов.");
             }
             return count_words;
         }
