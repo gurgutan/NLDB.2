@@ -105,6 +105,7 @@
     <Compile Include="Confidence.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="Link.cs" />
+    <Compile Include="Sequence.cs" />
     <Compile Include="Primes.cs" />
     <Compile Include="Language.cs" />
     <Compile Include="Language.db.cs" />
