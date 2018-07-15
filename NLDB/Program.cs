@@ -16,8 +16,9 @@ namespace NLDB
 
         static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
+            string trainfile = @"D:\Data\Wiki\ru\100mb.txt";
             Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
+            Console.WriteLine($"Начало обучения на файле {trainfile}");
             using (StreamReader reader = File.OpenText(trainfile)) l.Create(reader);
             l.BuildSequences();
             Console.WriteLine();
@@ -28,6 +29,7 @@ namespace NLDB
         static void TestLangConsole(Language l)
         {
             Queue<string> lines = new Queue<string>();
+            int que_size = 1;
             string line = "---";
             while (line != "")
             {
@@ -36,13 +38,13 @@ namespace NLDB
                 line = Console.ReadLine();
                 if (line == "") continue;
                 lines.Enqueue(line);
-                if (lines.Count > 1) lines.Dequeue();
+                if (lines.Count > que_size) lines.Dequeue();
                 string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "." + n);
-                var terms = l.Similars(text, 2, count: 4).ToList();
+                //var terms = l.Similars(text, 2, count: 4).ToList();
                 //terms.ForEach(term => { if (term.id >= 0) Console.WriteLine($"{term.confidence}: {term.ToString()}"); });
-                var predicted = l.Predict(text, 2);
-                if (predicted != null)
-                    Console.WriteLine($"{predicted.confidence}: {predicted.ToString()}");
+                var predicted = l.PredictRecurrent(text, 16);
+                if (predicted.Count != 0)
+                    Console.WriteLine(predicted.Aggregate("",(c,n)=>c+" "+n.ToString()));
             }
         }
 

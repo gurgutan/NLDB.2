@@ -38,8 +38,9 @@ namespace NLDB
         /// <returns>количество созданных слов</returns>
         public int Create(StreamReader streamreader)
         {
-            Console.WriteLine();
+            
             this.Clear();
+            InitParsers();
             int count_words = 0;
             char[] buffer = new char[Language.TEXT_BUFFER_SIZE];
             int count_chars = Language.TEXT_BUFFER_SIZE;
@@ -55,6 +56,7 @@ namespace NLDB
                 Console.Write($"Считано {current_chars} символов.");
             }
             return count_words;
+            FinilizeParsers();
         }
 
         /// <summary>
@@ -65,7 +67,10 @@ namespace NLDB
         public int Create(string text)
         {
             this.Clear();
-            return Parse(text, this.Rank).Count();
+            InitParsers();
+            int result = Parse(text, this.Rank).Count();
+            FinilizeParsers();
+            return result;
         }
 
         public void Serialize(string filename)

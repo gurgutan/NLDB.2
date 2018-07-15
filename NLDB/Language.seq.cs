@@ -10,8 +10,8 @@ namespace NLDB
     {
         private const int max_similars = 16;        //максимальное количество похожих слов при поиске
         private const int links_max_count = 1 << 23;// Количество цепочек для инициализации словаря
-        private const int link_max_size = 4;        // Максимальный размер цепочек
-        Dictionary<Sequence, List<Link>> links = new Dictionary<Sequence, List<Link>>(links_max_count);
+        private const int link_max_size = 3;        // Максимальный размер цепочек
+        Dictionary<Sequence, Link[]> links = new Dictionary<Sequence, Link[]>(links_max_count);
 
         public void BuildSequences()
         {
@@ -55,15 +55,15 @@ namespace NLDB
                 int sum = variants.Sum(i => i.Value);
                 var followers = variants.Select(kvp => new Link(kvp.Key, (double)kvp.Value / (double)sum)).ToList();
                 followers.Sort(new Comparison<Link>((t1, t2) => Math.Sign(t2.confidence - t2.confidence)));
-                links[l.Key] = followers;
+                links[l.Key] = followers.ToArray();
             }
             Console.WriteLine($"Построено {links.Count} цепочек");
         }
 
-        private List<Link> Followers(int[] seq)
+        private Link[] Followers(int[] seq)
         {
             Sequence link = new Sequence(seq);
-            List<Link> followers;
+            Link[] followers;
             links.TryGetValue(link, out followers);
             return followers;
         }
@@ -71,7 +71,7 @@ namespace NLDB
         private Link Follower(int[] seq, IEnumerable<Link> constraints)
         {
             Sequence link = new Sequence(seq);
-            List<Link> followers;
+            Link[] followers;
             links.TryGetValue(link, out followers);
             Link result = default(Link);
             if (followers == null) return result;
@@ -107,6 +107,35 @@ namespace NLDB
             return term;
         }
 
+        public List<Term> PredictRecurrent(string text, int max_count = 4)
+        {
+            int rank = 2;
+            var similars = this.Similars(text, rank, max_similars);
+            if (similars.Count() == 0) return null;
+            //Первым в коллекции будет терм с максимальным confidence
+            var best_similar = similars.First();
+            //Получаем ссылки на всех предков similars с confidence пронаследованным от similars
+            var parents = similars.SelectMany(s => Get(s.id).parents.Select(p => new Link(p, s.confidence))).ToList();  //ToList() для отладки
+            //Список взвешенных идентификаторов слов-дочерних к parents
+            var childs = parents.SelectMany(p => Get(p.id).childs.Select(c => new Link(c, p.confidence))).ToList(); //ToList() для отладки
+            var grandchilds = childs.SelectMany(c => Get(c.id).childs.Select(gc => new Link(gc, c.confidence))).ToList();
+            grandchilds.Sort(new Comparison<Link>((t1, t2) => Math.Sign(t2.confidence - t2.confidence)));
+            //Идентификатор следующего слова за best_similar.id, оптимального в смысле произведения веса этого слова на вес слова из constraints
+            List<Term> result = new List<Term>();
+            Queue<Term> seq = new Queue<Term>();
+            var next = new Link(grandchilds.First().id, grandchilds.First().confidence);
+            for (int count = 1; count < max_count && next.id > 0; count++)
+            {
+                Term term = ToTerm(Get(next.id));
+                term.confidence = next.confidence;
+                seq.Enqueue(term);
+                next = Follower(seq.Select(e => e.id).ToArray(), grandchilds);
+                if (next.id == 0) break;
+                result.Add(term);
+                if (seq.Count > link_max_size) seq.Dequeue();
+            }
+            return result;
+        }
 
 
     }

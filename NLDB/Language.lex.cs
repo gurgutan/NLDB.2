@@ -27,7 +27,7 @@ namespace NLDB
         public string[] Splitters
         {
             get { return this.splitters; }
-            set { this.splitters = value; InitParsers(); }
+            set { this.splitters = value; }
         }
 
         public int Count { get { return i2w.Count; } }
@@ -54,7 +54,7 @@ namespace NLDB
             return w.id;
         }
 
-        public IEnumerable<int> Parse(string text, int rank)
+        private IEnumerable<int> Parse(string text, int rank)
         {
             text = this.parsers[rank].Normilize(text);
             var strings = this.parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
@@ -202,6 +202,12 @@ namespace NLDB
         private void InitParsers()
         {
             parsers = splitters.Select(s => new Parser(s)).ToArray();
+        }
+
+        private void FinilizeParsers()
+        {
+            parsers = null;
+            GC.Collect();
         }
     }
 }
