@@ -27,13 +27,18 @@ namespace NLDB
         public string[] Splitters
         {
             get { return this.splitters; }
-            set { this.splitters = value; }
+            set { this.splitters = value; parsers = splitters.Select(s => new Parser(s)).ToArray(); }
         }
 
         public int Count { get { return i2w.Count; } }
 
         public Dictionary<int, Word> Words { get { return i2w; } }
 
+        /// <summary>
+        /// Возвращает слово из словаря по идентификатору.
+        /// </summary>
+        /// <param name="i"></param>
+        /// <returns>Слово из словаря или null, если нет слова с id=i</returns>
         public Word Get(int i)
         {
             Word w;
@@ -100,9 +105,9 @@ namespace NLDB
         {
             text = parsers[rank].Normilize(text);
             if (rank == 0)
-                return new Term(rank, alphabet[text], 1.0, text, null);
+                return new Term(rank, alphabet[text], 1, text, null);
             else
-                return new Term(rank, 0, 0.0, text,
+                return new Term(rank, 0, 0, text,
                     parsers[rank - 1].Split(text).
                     Where(s => !string.IsNullOrWhiteSpace(s)).
                     Select(s => ToTerm(s, rank - 1)));
@@ -111,9 +116,24 @@ namespace NLDB
         public Term ToTerm(Word w)
         {
             if (w.rank == 0)
-                return new Term(w.rank, w.id, _confidence: 1.0, _text: alphabet[w.id], _childs: null);
+                return new Term(w.rank, w.id, _confidence: 1, _text: alphabet[w.id], _childs: null);
             else
-                return new Term(w.rank, w.id, _confidence: 1.0, _text: "", _childs: w.childs.Select(c => ToTerm(i2w[c])));
+                return new Term(w.rank, w.id, _confidence: 1, _text: "", _childs: w.childs.Select(c => ToTerm(i2w[c])));
+        }
+
+        public Term ToTerm(Word w, float _confidence)
+        {
+            if (w.rank == 0)
+                return new Term(w.rank, w.id, _confidence, alphabet[w.id], null);
+            else
+                return new Term(w.rank, w.id, _confidence, "", w.childs.Select(c => ToTerm(i2w[c])));
+        }
+
+        public Term ToTerm(int i)
+        {
+            var word = Get(i);
+            if (word == null) return null;
+            return ToTerm(word);
         }
 
         /// <summary>
@@ -129,12 +149,12 @@ namespace NLDB
             return Evaluate(term);
         }
 
-        public IEnumerable<Term> Similars(string text, int rank, int count = 0)
+        public List<Term> Similars(string text, int rank, int count = 0)
         {
             text = parsers[rank].Normilize(text);
             Term term = ToTerm(text, rank);
             //Для терма нулевого ранга возвращаем результат по наличию соответствующей буквы в алфавите
-            if (term.rank == 0) return new Term[] { Evaluate(term) };
+            if (term.rank == 0) return new List<Term> { Evaluate(term) };
             //Выделение претендентов на роль ближайшего
             var candidates = term.childs.                // дочерние термы
                 Select(c => Evaluate(c)).               // вычисляем все значения confidence
@@ -143,14 +163,12 @@ namespace NLDB
                 Distinct().                             // без дублей
                 Select(p => ToTerm(p)).                 // переводим слова в термы
                 ToList();
+            if (count == 0) count = candidates.Count;
             //Расчет оценок Confidence для каждого из соседей
             candidates.AsParallel().ForAll(p => p.confidence = Confidence.Compare(term, p));
             //Сортировка по убыванию оценки
             candidates.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
-            if (count > 0)
-                return candidates.Take(count);
-            else
-                return candidates;
+            return candidates.Take(count).ToList();
         }
 
         /// <summary>
@@ -182,7 +200,7 @@ namespace NLDB
                 //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
                 candidates.AsParallel().ForAll(p =>
                 {
-                    double confidence = Confidence.Compare(term, p);
+                    float confidence = Confidence.Compare(term, p);
                     if (term.confidence < confidence)
                     {
                         term.id = p.id;
@@ -199,15 +217,5 @@ namespace NLDB
             return id_counter;
         }
 
-        private void InitParsers()
-        {
-            parsers = splitters.Select(s => new Parser(s)).ToArray();
-        }
-
-        private void FinilizeParsers()
-        {
-            parsers = null;
-            GC.Collect();
-        }
     }
 }

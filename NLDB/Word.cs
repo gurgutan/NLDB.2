@@ -60,13 +60,13 @@ namespace NLDB
             return true;
         }
 
-        public Dictionary<int[], double> AsSparseVector()
+        public Dictionary<int[], float> AsSparseVector()
         {
-            Dictionary<int[], double> vector = new Dictionary<int[], double>();
+            Dictionary<int[], float> vector = new Dictionary<int[], float>();
             int pos = 0;
             foreach (var c in childs)
             {
-                vector.Add(new int[] { 0, c * Language.WORD_SIZE + pos }, 1.0);
+                vector.Add(new int[] { 0, c * Language.WORD_SIZE + pos }, 1);
                 pos++;
             }
             return vector;

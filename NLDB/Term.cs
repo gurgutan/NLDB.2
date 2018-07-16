@@ -10,11 +10,11 @@ namespace NLDB
     {
         public int rank;
         public int id;
-        public double confidence;
+        public float confidence;
         public string text;
         public List<Term> childs;
 
-        public Term(int _rank, int _id, double _confidence, string _text, IEnumerable<Term> _childs)
+        public Term(int _rank, int _id, float _confidence, string _text, IEnumerable<Term> _childs)
         {
             rank = _rank;
             id = _id;

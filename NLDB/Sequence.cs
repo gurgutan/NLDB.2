@@ -9,7 +9,7 @@ namespace NLDB
     public struct Sequence
     {
         public int[] sequence;
-        //public double data;
+        //public float data;
 
         public Sequence(int[] _sequence)
         {

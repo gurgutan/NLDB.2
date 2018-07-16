@@ -16,7 +16,7 @@ namespace NLDB
 
         static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\100mb.txt";
+            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
             Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             using (StreamReader reader = File.OpenText(trainfile)) l.Create(reader);
@@ -40,11 +40,11 @@ namespace NLDB
                 lines.Enqueue(line);
                 if (lines.Count > que_size) lines.Dequeue();
                 string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "." + n);
-                //var terms = l.Similars(text, 2, count: 4).ToList();
-                //terms.ForEach(term => { if (term.id >= 0) Console.WriteLine($"{term.confidence}: {term.ToString()}"); });
-                var predicted = l.PredictRecurrent(text, 16);
+                var terms = l.Similars(text, 2, count: 4).ToList();
+                terms.ForEach(term => { if (term.id >= 0) Console.WriteLine($"{term.confidence}: {term.ToString()}"); });
+                var predicted = l.PredictRecurrent(text, 64, 2);
                 if (predicted.Count != 0)
-                    Console.WriteLine(predicted.Aggregate("",(c,n)=>c+" "+n.ToString()));
+                    Console.WriteLine(predicted.Aggregate("", (c, n) => c + " " + n.ToString()));
             }
         }
 

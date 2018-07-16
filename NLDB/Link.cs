@@ -9,9 +9,9 @@ namespace NLDB
     public struct Link
     {
         public int id;
-        public double confidence;
+        public float confidence;
 
-        public Link(int _id, double _conf)
+        public Link(int _id, float _conf)
         {
             id = _id;
             confidence = _conf;
