@@ -149,7 +149,7 @@ namespace NLDB
             return Evaluate(term);
         }
 
-        public List<Term> Similars(string text, int rank, int count = 0)
+        public List<Term> Similars(string text, int count = 0, int rank = 2 )
         {
             text = parsers[rank].Normilize(text);
             Term term = ToTerm(text, rank);

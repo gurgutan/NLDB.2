@@ -93,7 +93,7 @@ namespace NLDB
 
         public Term Predict(string text, int rank = 2)
         {
-            var similars = this.Similars(text, rank, similars_max_count).Where(t => t.confidence > similars_min_confidence);
+            var similars = this.Similars(text, similars_max_count, rank).Where(t => t.confidence > similars_min_confidence);
             if (similars.Count() == 0) return null;
             //Первым в коллекции будет терм с максимальным confidence
             var best_similar = similars.First();
@@ -110,7 +110,7 @@ namespace NLDB
 
         public List<Term> PredictRecurrent(string text, int max_count = 4, int rank = 2)
         {
-            var similars = this.Similars(text, rank, similars_max_count);
+            var similars = this.Similars(text, similars_max_count,rank).Where(t => t.confidence > similars_min_confidence);
             if (similars.Count() == 0) return null;
             //Первым в коллекции будет терм с максимальным confidence
             var best_similar = similars.First();
@@ -122,22 +122,22 @@ namespace NLDB
             extended_childs.Sort(new Comparison<Link>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
             //результат (цепочка термов)
             List<Term> result = new List<Term>();
-            //Стартовое слово: первый среди потомков
-            Link next = new Link(extended_childs.First().id, extended_childs.First().confidence);
             //Очередь термов, используемая для предсказания следующего терма
-            Queue<int> seq = new Queue<int>(best_similar.childs.Select(s=>s.id));
+            Queue<int> seq = new Queue<int>(best_similar.childs.Select(s => s.id));
+            //Стартовое слово: первый среди потомков
+            Link next = new Link(Follower(seq.ToArray(), extended_childs).id,1);
             for (int count = 0; count < max_count; count++)
             {
                 next = Follower(seq.ToArray(), extended_childs);
                 //попытка выйти на ту длину цепочки, которая позволит получить какой-то результат (id!=0)
-                while (seq.Count > 1 && (next.id == 0 || next.confidence < similars_min_confidence))
+                while (seq.Count > 1 && next.id == 0)
                 {
                     seq.Dequeue();
                     next = Follower(seq.ToArray(), extended_childs);
                     //Term term_next = ToTerm(next.id);
                 }
                 //Если результата нет, то выходим с тем что есть
-                if (next.id == 0 || next.confidence < similars_min_confidence) break;
+                if (next.id == 0) break;
                 Term term = ToTerm(Get(next.id), next.confidence);
                 seq.Enqueue(term.id);
                 //next = Follower(seq.Select(e => e.id).ToArray(), grandchilds);
