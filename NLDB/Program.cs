@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
-
     class Program
     {
         static string splitline = "----------------------------------------------------------------------";
@@ -39,18 +38,21 @@ namespace NLDB
                 if (line == "") continue;
                 lines.Enqueue(line);
                 if (lines.Count > que_size) lines.Dequeue();
-                string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "." + n);
-                var terms = l.Similars(text, 4, 2).ToList();
+                string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "\n" + n);
+
                 Console.WriteLine(splitline + "\nРаспознавание ");
+                var terms = l.Similars(text, 4, 2).ToList();
                 terms.ForEach(term => { if (term.id >= 0) Console.WriteLine($"{term.confidence}: {term.ToString()}"); });
+
                 Console.WriteLine(splitline + "\nПредположение о следующем слове: ");
                 var predicted_one = l.Predict(text, 2);
                 if (predicted_one != null)
                     Console.WriteLine(predicted_one.confidence + ": " + predicted_one.ToString());
+
                 Console.WriteLine(splitline + "\nПостроение цепочки");
                 var predicted = l.PredictRecurrent(text, 64, 2);
                 if (predicted.Count != 0)
-                    Console.WriteLine(predicted.Aggregate("", (c, n) => c + " <" + n.confidence + "> " + n.ToString()));
+                    Console.WriteLine(predicted.Aggregate("", (c, n) => c + " " + n.ToString()));
             }
         }
 
