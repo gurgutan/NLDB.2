@@ -24,10 +24,13 @@ namespace NLDB
             childs = _childs;
             if (_parents != null)
                 parents = new List<int>(_parents);
+            else
+                parents = null;
         }
 
         public void AddParent(int p)
         {
+            if (parents == null) parents = new List<int>();
             parents.Add(p);
             //Array.Resize(ref parents, parents.Length + 1);
             //parents[parents.Length - 1] = p;
@@ -39,7 +42,8 @@ namespace NLDB
         /// <returns></returns>
         public override int GetHashCode()
         {
-            if (childs == null || childs.Length == 0) return id;
+            if (id != 0) return id;
+            //if (childs == null || childs.Length == 0) return id;
             int hash = rank * 1664525;
             for (int i = 0; i < childs.Length; i++)
             {
@@ -52,6 +56,7 @@ namespace NLDB
         public override bool Equals(object obj)
         {
             Word w = (Word)obj;
+            if (id != 0 && w.id != 0) return id == w.id;
             if (id == w.id) return true;
             //if (childs == null || w.childs == null) return false;
             if (childs?.Length != w.childs?.Length) return false;
@@ -60,7 +65,12 @@ namespace NLDB
             return true;
         }
 
-        public Dictionary<int[], float> AsSparseVector()
+        public override string ToString()
+        {
+            return "{" + childs.Aggregate("", (c, n) => c == "" ? n.ToString() : c + "," + n.ToString()) + "}";
+        }
+
+        public Dictionary<int[], float> ToSparseVector()
         {
             Dictionary<int[], float> vector = new Dictionary<int[], float>();
             int pos = 0;
@@ -70,11 +80,6 @@ namespace NLDB
                 pos++;
             }
             return vector;
-        }
-
-        public override string ToString()
-        {
-            return "{" + childs.Aggregate("", (c, n) => c == "" ? n.ToString() : c + "," + n.ToString()) + "}";
         }
     }
 }

@@ -26,7 +26,7 @@ namespace NLDB
         public void Clear()
         {
             //i2w.Clear();
-            w2i.Clear();
+            words.Clear();
             id_counter = 1;
             alphabet.Clear();
         }

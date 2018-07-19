@@ -61,6 +61,16 @@ namespace NLDB
             }
         }
 
+        public bool TryGetValue(string s, out int i)
+        {
+            return codes.TryGetValue(s, out i);
+        }
+
+        public bool TryGetValue(int i, out string s)
+        {
+            return letters.TryGetValue(i, out s);
+        }
+
         internal void Clear()
         {
             codes.Clear();

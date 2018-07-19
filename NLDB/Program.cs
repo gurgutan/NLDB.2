@@ -19,9 +19,9 @@ namespace NLDB
             Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             using (StreamReader reader = File.OpenText(trainfile)) l.Create(reader);
+            Console.WriteLine($"Слов: {l.Count}");
             l.BuildSequences();
             Console.WriteLine();
-            Console.WriteLine($"Слов: {l.Count}");
             TestLangConsole(l);
         }
 
