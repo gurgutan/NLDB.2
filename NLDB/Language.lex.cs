@@ -10,6 +10,7 @@ namespace NLDB
     public partial class Language
     {
         private Alphabet alphabet = new Alphabet();
+
         private Dictionary<int, Word> i2w = new Dictionary<int, Word>();
         private Dictionary<Word, int> w2i = new Dictionary<Word, int>();
 
@@ -57,7 +58,7 @@ namespace NLDB
             if (!string.IsNullOrEmpty(letter) && !alphabet.Contains(letter))
                 alphabet.Add(letter, w.id);
             return w.id;
-        }
+        } 
 
         private IEnumerable<int> Parse(string text, int rank)
         {
