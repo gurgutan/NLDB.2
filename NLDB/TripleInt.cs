@@ -20,12 +20,6 @@ namespace NLDB
             this.col = c;
         }
 
-        /// <summary>
-        /// Сравнение для сортировки сначала по строкам, затем по колонкам
-        /// </summary>
-        /// <param name="a"></param>
-        /// <param name="b"></param>
-        /// <returns></returns>
         public static int Compare(TripleInt a, TripleInt b)
         {
             if (a.row > b.row) return 1;

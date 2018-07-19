@@ -9,7 +9,7 @@ namespace NLDB
     public partial class Language
     {
         private const int similars_max_count = 4;           //максимальное количество похожих слов при поиске
-        private const float similars_min_confidence = 0.7F;
+        private const float similars_min_confidence = 0.8F;
         private const float followers_min_confidence = 0.02F;
         private const int followers_max_count = 16;
         private const int link_max_size = 6;                // Максимальный размер цепочек
@@ -21,7 +21,7 @@ namespace NLDB
             //Значения словаря - словари Dictionary<int, int>, ключ - id, значение - количество
             Dictionary<Sequence, Dictionary<int, int>> temp_links = new Dictionary<Sequence, Dictionary<int, int>>(links_max_count);
             Console.WriteLine("\nПостроение цепочек:");
-            var words = this.words.Keys;
+            var words = w2i.Keys;
             for (int size = 1; size < link_max_size; size++)
             {
                 Console.WriteLine($"...длины {size + 1}");
@@ -95,13 +95,13 @@ namespace NLDB
 
         public Term Predict(string text, int rank = 2)
         {
-            var similars = this.Similars(text, similars_max_count, rank).Where(t => t.confidence >= similars_min_confidence).Take(similars_max_count);
+            var similars = this.Similars(text, similars_max_count, rank).Where(t => t.confidence > similars_min_confidence).Take(similars_max_count);
             if (similars.Count() == 0) return null;
             //Первым в коллекции будет терм с максимальным confidence
             var best_similar = similars.First();
             //Получаем ссылки на всех предков similars с confidence пронаследованным от similars
             var parents = similars.
-                SelectMany(s => Get(s.id).parents?.Select(p => new Link(p, s.confidence))).
+                SelectMany(s => Get(s.id).parents.Select(p => new Link(p, s.confidence))).
                 Distinct().
                 ToList();  //ToList() для отладки
             //Список взвешенных идентификаторов слов-дочерних к parents
@@ -124,7 +124,7 @@ namespace NLDB
             //Первым в коллекции будет терм с максимальным confidence
             var best_similar = similars.First();
             //Получаем ссылки на всех предков similars с confidence пронаследованным от similars
-            var parents = similars.SelectMany(s => Get(s.id).parents?.Select(p => new Link(p, s.confidence))).ToList();  //ToList() для отладки
+            var parents = similars.SelectMany(s => Get(s.id).parents.Select(p => new Link(p, s.confidence))).ToList();  //ToList() для отладки
             //"Мешок слов". Список взвешенных идентификаторов слов для пользования при составлении текста
             var constaints = parents.
                 SelectMany(p => Get(p.id).childs.Select(c => new Link(c, p.confidence))).Distinct().
@@ -137,10 +137,9 @@ namespace NLDB
             //var follower = Follower(new int[] { best_similar.id }, constaints);
             //Queue<int> seq = new Queue<int>(new int[] { Get(follower.id).childs.First() });
 
-            //Начальное следующее слово
+            //Стартовое слово: первый среди потомков
             Link next = Follower(seq.ToArray(), constaints);
             int size = seq.Count;
-            //Если начальное следующее слово не найдено, то сокращаем цепочку
             while (next.id == 0)
             {
                 size--;
