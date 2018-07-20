@@ -18,6 +18,7 @@ namespace NLDB
         {
             this.Name = _name;
             this.Splitters = _splitters;
+            data = new DataContainer(splitters, alphabet, i2w, w2i, links);
         }
 
         public string Name { get; private set; }

@@ -37,8 +37,7 @@ namespace NLDB
         /// <param name="streamreader">считыватель потока</param>
         /// <returns>количество созданных слов</returns>
         public int Create(StreamReader streamreader)
-        {
-            
+        {            
             this.Clear();
             int count_words = 0;
             char[] buffer = new char[Language.TEXT_BUFFER_SIZE];

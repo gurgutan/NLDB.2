@@ -22,6 +22,8 @@ namespace NLDB
             l.BuildSequences();
             Console.WriteLine();
             Console.WriteLine($"Слов: {l.Count}");
+            Console.WriteLine("Сохранение в БД:");
+            l.Save("words.db");
             TestLangConsole(l);
         }
 
