@@ -67,10 +67,10 @@ namespace NLDB
         private void SaveWords()
         {
             string[] columns_words = new string[] { "id", "rank" };
-            string[] columns_childs = new string[] { "id", "child_id" };
+            string[] columns_childs = new string[] { "id", "child_id", "pos" };
             string[] columns_parents = new string[] { "id", "parent_id" };
             var words_data = i2w.Values.Select(w => new string[2] { w.id.ToString(), w.rank.ToString() }).Distinct();
-            var childs_data = i2w.Values.SelectMany(w => w.childs.Select(c => new string[2] { w.id.ToString(), c.ToString() }));
+            var childs_data = i2w.Values.SelectMany(w => w.childs.Select((pos,c) => new string[3] { w.id.ToString(), c.ToString(), pos.ToString() }));
             var parents_data = i2w.Values.SelectMany(w => w.parents.Select(p => new string[2] { w.id.ToString(), p.ToString() }));
             //Создаем таблицы
             SQLiteHelper.CreateTable(dbname, "words", columns_words, true);
