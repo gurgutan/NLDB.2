@@ -17,14 +17,36 @@ namespace NLDB
     {
         DataContainer data;
 
+
         public void Save(string filename)
         {
             data.Save(filename);
         }
-       
+
         public void Load(string filename)
         {
             data.Load(filename);
         }
+
+        public void Connect(string dbname)
+        {
+            data.Open(dbname);
+        }
+
+        public void Disconnect()
+        {
+            data.Close();
+        }
+
+        public Word Find(int i)
+        {
+            return data.Get(i);
+        }
+
+        public Word Find(int[] childs)
+        {
+            return data.Get(childs);
+        }
+
     }
 }

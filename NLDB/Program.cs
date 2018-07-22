@@ -22,8 +22,28 @@ namespace NLDB
             l.BuildSequences();
             Console.WriteLine();
             Console.WriteLine($"Слов: {l.Count}");
-            Console.WriteLine("Сохранение в БД:");
+            Console.WriteLine("Сохранение в БД");
             l.Save("words.db");
+            Console.WriteLine("Поиск в БД по id");
+            l.Connect("words.db");
+            List<int[]> childsList = new List<int[]>();
+            for (int i = 64; i < 128; i++)
+            {
+                Word w = l.Find(i);
+                var childs = w.childs;
+                if (childs != null)
+                    childsList.Add(childs);
+                Console.WriteLine(i.ToString() + $"={w.id}<{w.rank}>:" + l.ToTerm(w).ToString());
+            }
+            Console.WriteLine("Поиск в БД по childs");
+            childsList.ForEach(e =>
+            {
+                Word w = l.Find(e);
+                if (w != null)
+                    Console.WriteLine($"{w.id}<{w.rank}>:" + l.ToTerm(w).ToString());
+                else Console.WriteLine("Не найден " + e.Aggregate("", (c, n) => c + "," + n.ToString()));
+            });
+            l.Disconnect();
             TestLangConsole(l);
         }
 

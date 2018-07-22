@@ -10,13 +10,16 @@ namespace NLDB
 {
     public class DataContainer
     {
+        private int block_size = 1 << 16;
+
+        private SQLiteConnection db;
+
         private string[] splitters;
         private Alphabet alphabet = new Alphabet();
         private Dictionary<int, Word> i2w = new Dictionary<int, Word>();
         private Dictionary<Word, int> w2i = new Dictionary<Word, int>();
         private Dictionary<Sequence, Link[]> links = new Dictionary<Sequence, Link[]>();
-
-        private string dbname = "lang.db";
+        private string dbname = "data.db";
 
         public DataContainer(string _dbname)
         {
@@ -66,29 +69,31 @@ namespace NLDB
 
         private void SaveWords()
         {
-            string[] columns_words = new string[] { "id", "rank" };
-            string[] columns_childs = new string[] { "id", "child_id", "pos" };
+            string[] columns_words = new string[] { "id", "rank", "childs" };
             string[] columns_parents = new string[] { "id", "parent_id" };
-            var words_data = i2w.Values.Select(w => new string[2] { w.id.ToString(), w.rank.ToString() }).Distinct();
-            var childs_data = i2w.Values.SelectMany(w => w.childs.Select((pos,c) => new string[3] { w.id.ToString(), c.ToString(), pos.ToString() }));
+            var words_data = i2w.Values.Select(w => new string[3]
+            {
+                w.id.ToString(),            //id
+                w.rank.ToString(),          //rank
+                IntArrayToString(w.childs)  //childs
+            }).Distinct();
             var parents_data = i2w.Values.SelectMany(w => w.parents.Select(p => new string[2] { w.id.ToString(), p.ToString() }));
             //Создаем таблицы
             SQLiteHelper.CreateTable(dbname, "words", columns_words, true);
-            SQLiteHelper.CreateTable(dbname, "childs", columns_childs, true);
             SQLiteHelper.CreateTable(dbname, "parents", columns_parents, true);
             //Добавляем данные
             SQLiteHelper.InsertValues(dbname, "words", columns_words, words_data);
-            SQLiteHelper.InsertValues(dbname, "childs", columns_childs, childs_data);
             SQLiteHelper.InsertValues(dbname, "parents", columns_parents, parents_data);
             //Создаем индексы
             SQLiteHelper.CreateIndex(dbname, "words", "words_id_ind", new string[] { "id" });
-            SQLiteHelper.CreateIndex(dbname, "childs", "childs_id_ind", new string[] { "id" });
+            SQLiteHelper.CreateIndex(dbname, "words", "childs_ind", new string[] { "childs" });
             SQLiteHelper.CreateIndex(dbname, "parents", "parents_id_ind", new string[] { "id" });
         }
 
         private void SaveLinks()
         {
             string[] columns_links = new string[] { "seq", "id", "confidence" };
+            //TODO: Сделать получение данных из словаря порциями по block_size элементов
             var links_data = links.SelectMany(kvp => kvp.Value.
                 Select(l => new string[3]
                     {
@@ -99,7 +104,6 @@ namespace NLDB
             SQLiteHelper.CreateTable(dbname, "links", columns_links, true);
             SQLiteHelper.InsertValues(dbname, "links", columns_links, links_data);
             SQLiteHelper.CreateIndex(dbname, "links", "seq_ind", new string[] { "seq" });
-
         }
 
         public void Load(string _dbname)
@@ -108,147 +112,80 @@ namespace NLDB
             throw new NotImplementedException();
         }
 
-    }
-
-
-
-    public static class SQLiteHelper
-    {
-        private static int records_pack_size = 1 << 16;
-
-        public static void CreateTable(string dbname, string tablename, string[] columns, bool dropifexists = true)
+        public SQLiteConnection Open(string _dbname)
         {
-            StringBuilder cmd_text = new StringBuilder();
-            if (dropifexists) cmd_text.Append($"DROP TABLE IF EXISTS {tablename};");
-            string columns_text = columns.Aggregate("", (c, n) => c == "" ? n : c + " TEXT NOT NULL, " + n);
-            cmd_text.Append($"CREATE TABLE {tablename}({columns_text});");
-            ExecuteNonQuery(dbname, cmd_text.ToString());
+            dbname = _dbname;
+            db = SQLiteHelper.OpenConnection(dbname);
+            return db;
         }
 
-        public static void InsertValues(string dbname, string tablename, string[] columns, IEnumerable<string[]> values)
+        public void Close()
         {
-            StringBuilder cmd_text = new StringBuilder();
-            string columns_text = columns.Aggregate("", (c, n) => c == "" ? n : c + ", " + n);
-            StringBuilder val_text = new StringBuilder();
-            foreach (var v in values)
-            {
-                string t = "(" + 
-                    v.Aggregate("", (cur, next) => cur == "" ? @"""" + next + @"""" : cur + "," + @"""" + next + @"""") + 
-                    ")";
-                if (val_text.Length > 0) val_text.Append(",");
-                val_text.Append(t);
-            }
-            cmd_text.Append($"INSERT INTO {tablename}({columns_text}) VALUES {val_text}");
-            ExecuteNonQuery(dbname, cmd_text.ToString());
+            SQLiteHelper.CloseConnection(db);
         }
 
-        public static List<string[]> SelectValues(string dbname, string tablename, string[] columns = null, string where = "", string order = "")
+        public Word Get(int i)
         {
-            StringBuilder cmd_text = new StringBuilder();
-            string columns_text = "*";
-            if (columns != null)
-                columns_text = columns.Aggregate("", (c, n) => c == "" ? n : c + ", " + n);
-            string where_text = $" WHERE {where}";
-            string order_text = $" ORDER BY {order}";
-            if (!string.IsNullOrEmpty(columns_text)) cmd_text.Append($"SELECT {columns_text} FROM {tablename}");
-            if (!string.IsNullOrEmpty(where)) cmd_text.Append(where_text);
-            if (!string.IsNullOrEmpty(order_text)) cmd_text.Append(order_text);
-            List<string[]> values = new List<string[]>();
-            var db = OpenConnection(dbname);
-            var reader = CreateReader(db, cmd_text.ToString());
-            while (reader.Read())
-            {
-                string[] row = new string[columns.Length];
-                reader.GetValues(row);
-                values.Add(row);
-            }
-            return values;
+            if (db == null || db.State != System.Data.ConnectionState.Open)
+                throw new Exception($"Подключение к БД не установлено");
+            //Поиск в БД
+            var word = SQLiteHelper.SelectValues(db,
+                tablename: "words",
+                columns: "id,rank,childs",
+                where: $"id={i}",
+                limit: "").FirstOrDefault();
+            if (word == null) return null;
+            var rank = int.Parse(word[1]);
+            int[] childs = StringToIntArray(word[2]);
+            //Родительские
+            var parents_qry = SQLiteHelper.SelectValues(db,
+                tablename: "parents",
+                columns: "id,parent_id",
+                where: $"id={i}");
+            int[] parents = parents_qry.Select(s => int.Parse(s[1])).ToArray();
+            //Создание слова
+            Word w = new Word(i, rank, childs, parents);
+            return w;
         }
 
-        public static void CreateIndex(string dbname, string tablename, string indexname, string[] columns, bool unique = false)
+        public Word Get(int[] _childs)
         {
-            StringBuilder cmd_text = new StringBuilder("CREATE");
-            if (unique) cmd_text.Append(" UNIQUE ");
-            string col_text = columns.Aggregate("", (c, n) => c == "" ? n : c + "," + n);
-            cmd_text.Append($" INDEX {indexname} ON {tablename}({col_text})");
-            ExecuteNonQuery(dbname, cmd_text.ToString());
+            if (db == null || db.State != System.Data.ConnectionState.Open)
+                throw new Exception($"Подключение к БД не установлено");
+            if (_childs == null || _childs.Length == 0)
+                return null;
+            //Получаем строкове представление childs
+            var childs_str = @""""+IntArrayToString(_childs)+@"""";
+            //Поиск
+            var word = SQLiteHelper.SelectValues(db,
+                tablename: "words",
+                columns: "id,rank,childs",
+                where: $"childs={childs_str}").FirstOrDefault();
+            if (word == null) return null;
+            //id
+            int id = int.Parse(word[0]);
+            //Ранг
+            int rank = int.Parse(word[1]);
+            //Родительские
+            var parents_qry = SQLiteHelper.SelectValues(db,
+                tablename: "parents",
+                columns: "id,parent_id",
+                where: $"id={id}");
+            int[] parents = parents_qry.Select(s => int.Parse(s[1])).ToArray();
+
+            Word w = new Word(id, rank, _childs, parents);
+            return w;
         }
 
-        private static void ExecuteNonQuery(string dbname, string text)
+        private string IntArrayToString(int[] a)
         {
-            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(dbname))
-                throw new ArgumentException("Имя базы данных и текст запроса не может быть пустым!");
-            using (var db = new SQLiteConnection($"Data Source={dbname}; Version=3;"))
-            {
-                db.Open();
-                SQLiteCommand cmd = db.CreateCommand();
-                try
-                {
-                    cmd.CommandText = text;
-                    cmd.ExecuteNonQuery();
-                }
-                catch (SQLiteException e)
-                {
-                    throw new FileNotFoundException($"Ошибка выполнения запроса {text} БД({dbname}): {e.Message}");
-                }
-                finally
-                {
-                    db.Close();
-                }
-            }
+            return a.Aggregate("", (c, n) => c == "" ? n.ToString() : c + "," + n.ToString());
         }
 
-        private static SQLiteDataReader CreateReader(string dbname, string text)
+        private int[] StringToIntArray(string s)
         {
-            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(dbname))
-                throw new ArgumentException("Имя базы данных и текст запроса не может быть пустым!");
-            var db = new SQLiteConnection($"Data Source={dbname}; Version=3;");
-            db.Open();
-            SQLiteCommand cmd = db.CreateCommand();
-            try
-            {
-                cmd.CommandText = text;
-                var reader = cmd.ExecuteReader();
-                return reader;
-            }
-            catch (SQLiteException e)
-            {
-                db.Close();
-                throw new FileNotFoundException($"Ошибка выполнения запроса {{\n{text}\n}} \nБД({dbname}): {e.Message}");
-            }
-        }
-
-        private static SQLiteDataReader CreateReader(SQLiteConnection db, string text)
-        {
-            if (string.IsNullOrEmpty(text))
-                throw new ArgumentException("Текст запроса не может быть пустым!");
-            if (db.State != System.Data.ConnectionState.Open)
-                throw new ArgumentException("Соединение с БД должно быть открытым!");
-            SQLiteCommand cmd = db.CreateCommand();
-            try
-            {
-                cmd.CommandText = text;
-                var reader = cmd.ExecuteReader();
-                return reader;
-            }
-            catch (SQLiteException e)
-            {
-                throw new FileNotFoundException($"Ошибка выполнения запроса {{\n{text}\n}} \nБД({db.FileName}): {e.Message}");
-            }
-        }
-
-        private static SQLiteConnection OpenConnection(string dbname)
-        {
-            var db = new SQLiteConnection($"Data Source={dbname}; Version=3;");
-            try
-            {
-                db.Open();
-                return db;
-            }
-            catch (Exception e)
-            {
-                throw new Exception($"Ошибка открытия соединения с БД({dbname}): {e.Message}");
-            }
+            return s.Split(separator: new char[] { ',' }, options: StringSplitOptions.RemoveEmptyEntries).Select(e => int.Parse(e)).ToArray();
         }
     }
+    
 }
