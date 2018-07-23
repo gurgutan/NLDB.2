@@ -93,16 +93,23 @@ namespace NLDB
         private void SaveLinks()
         {
             string[] columns_links = new string[] { "seq", "id", "confidence" };
-            //TODO: Сделать получение данных из словаря порциями по block_size элементов
-            var links_data = links.SelectMany(kvp => kvp.Value.
-                Select(l => new string[3]
+            SQLiteHelper.CreateTable(dbname, "links", columns_links, true);
+            for (int i = 0; i < links.Count / block_size + 1; i++)
+            {
+                //"Вырезаем" block_size элементов из links, начиная с элемента, следующего за ранее обработанным блоком
+                var links_data = links.
+                    Skip(i * block_size).
+                    Take(block_size).
+                    SelectMany(kvp => kvp.Value.
+                    Select(l => new string[3]
                     {
                         kvp.Key.sequence.Aggregate("", (c, n) => c == "" ? n.ToString() : c + "," + n.ToString()),  //seq
                         l.id.ToString(),            //id
                         l.confidence.ToString()     //confidence
                     }));
-            SQLiteHelper.CreateTable(dbname, "links", columns_links, true);
-            SQLiteHelper.InsertValues(dbname, "links", columns_links, links_data);
+                SQLiteHelper.InsertValues(dbname, "links", columns_links, links_data);
+            }
+
             SQLiteHelper.CreateIndex(dbname, "links", "seq_ind", new string[] { "seq" });
         }
 
@@ -155,7 +162,7 @@ namespace NLDB
             if (_childs == null || _childs.Length == 0)
                 return null;
             //Получаем строкове представление childs
-            var childs_str = @""""+IntArrayToString(_childs)+@"""";
+            var childs_str = @"""" + IntArrayToString(_childs) + @"""";
             //Поиск
             var word = SQLiteHelper.SelectValues(db,
                 tablename: "words",
@@ -187,5 +194,5 @@ namespace NLDB
             return s.Split(separator: new char[] { ',' }, options: StringSplitOptions.RemoveEmptyEntries).Select(e => int.Parse(e)).ToArray();
         }
     }
-    
+
 }

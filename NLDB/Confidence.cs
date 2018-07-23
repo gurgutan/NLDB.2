@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace NLDB
 {
-    //TODO: Создать модульные тесты для Confidence
+    //TODO: Создать модульные тесты для Confidence для каждой из метрик (осталось: Inclusive, SoftInclusive, CosineLeft, SoftCosine)
     public class Confidence
     {
         public Confidence()
