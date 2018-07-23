@@ -9,7 +9,7 @@ namespace NLDB
 {
     public static class SQLiteHelper
     {
-        private static UInt64 records_block_size = 1 << 12;
+        private static UInt64 records_block_size = 1 << 19;
 
         public static void CreateTable(string dbname, string tablename, string[] columns, bool dropifexists = true)
         {
@@ -35,7 +35,6 @@ namespace NLDB
                 {
                     ExecuteNonQuery(dbname, $"INSERT INTO {tablename}({columns_text}) VALUES {val_text}");
                     val_text.Clear();
-                    GC.Collect();
                 }
             }
             //Если в последней итерации цикла значения не были записаны в БД, то сдлелаем это сейчас

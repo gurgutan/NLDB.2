@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -22,8 +23,13 @@ namespace NLDB
             l.BuildSequences();
             Console.WriteLine();
             Console.WriteLine($"Слов: {l.Count}");
+            
             Console.WriteLine("Сохранение в БД");
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
             l.Save("words.db");
+            sw.Stop();
+            Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
             Console.WriteLine("Поиск в БД по id");
             l.Connect("words.db");
             List<int[]> childsList = new List<int[]>();
@@ -49,6 +55,7 @@ namespace NLDB
 
         static void TestLangConsole(Language l)
         {
+            l.Connect("words.db");
             Queue<string> lines = new Queue<string>();
             int que_size = 1;
             string line = "---";
@@ -63,19 +70,33 @@ namespace NLDB
                 string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "\n" + n);
 
                 Console.WriteLine(splitline + "\nРаспознавание ");
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
                 var terms = l.Similars(text, 4, 2).ToList();
+                sw.Stop();
+                Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
+
+                //var terms = l.Similars(text, 4, 2).ToList();
                 terms.ForEach(term => { if (term.id >= 0) Console.WriteLine($"{term.confidence}: {term.ToString()}"); });
 
                 Console.WriteLine(splitline + "\nПредположение о следующем слове: ");
+                sw.Start();
                 var predicted_one = l.Predict(text, 2);
+                sw.Stop();
+                Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
+                
                 if (predicted_one != null)
                     Console.WriteLine(predicted_one.confidence + ": " + predicted_one.ToString());
 
                 Console.WriteLine(splitline + "\nПостроение цепочки");
+                sw.Start();
                 var predicted = l.PredictRecurrent(text, 64, 2);
+                sw.Stop();
+                Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
                 if (predicted.Count != 0)
                     Console.WriteLine(predicted.Aggregate("", (c, n) => c + " " + n.ToString()));
             }
+            l.Disconnect();
         }
 
         //private static void TestDeserialization()

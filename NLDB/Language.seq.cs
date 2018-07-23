@@ -101,12 +101,12 @@ namespace NLDB
             var best_similar = similars.First();
             //Получаем ссылки на всех предков similars с confidence пронаследованным от similars
             var parents = similars.
-                SelectMany(s => Get(s.id).parents.Select(p => new Link(p, s.confidence))).
+                SelectMany(s => data.Get(s.id).parents.Select(p => new Link(p, s.confidence))).
                 Distinct().
                 ToList();  //ToList() для отладки
             //Список взвешенных идентификаторов слов-дочерних к parents
             var constaints = parents.
-                SelectMany(p => Get(p.id).childs.Select(c => new Link(c, p.confidence))).
+                SelectMany(p => data.Get(p.id).childs.Select(c => new Link(c, p.confidence))).
                 Distinct().
                 ToList(); //ToList() для отладки
             //Идентификатор следующего слова за best_similar.id, оптимального в смысле произведения веса этого слова на вес слова из constraints
@@ -127,8 +127,8 @@ namespace NLDB
             var parents = similars.SelectMany(s => Get(s.id).parents.Select(p => new Link(p, s.confidence))).ToList();  //ToList() для отладки
             //"Мешок слов". Список взвешенных идентификаторов слов для пользования при составлении текста
             var constaints = parents.
-                SelectMany(p => Get(p.id).childs.Select(c => new Link(c, p.confidence))).Distinct().
-                SelectMany(c => Get(c.id).childs.Select(gc => new Link(gc, c.confidence))).Distinct().
+                SelectMany(p => data.Get(p.id).childs.Select(c => new Link(c, p.confidence))).Distinct().
+                SelectMany(c => data.Get(c.id).childs.Select(gc => new Link(gc, c.confidence))).Distinct().
                 ToList();
             //constaints.Sort(new Comparison<Link>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
             //Очередь термов, используемая для предсказания следующего терма
@@ -151,7 +151,7 @@ namespace NLDB
             {
                 //Если результата нет, то выходим с тем что есть
                 if (next.id == 0) break;
-                Term term = ToTerm(Get(next.id), next.confidence);
+                Term term = ToTerm(data.Get(next.id), next.confidence);
                 seq.Enqueue(term.id);
                 result.Add(term);
                 next = Follower(seq.ToArray(), constaints, followers_min_confidence);

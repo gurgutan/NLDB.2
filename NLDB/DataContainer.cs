@@ -10,7 +10,7 @@ namespace NLDB
 {
     public class DataContainer
     {
-        private int block_size = 1 << 16;
+        private int block_size = 1 << 19;
 
         private SQLiteConnection db;
 
@@ -129,6 +129,38 @@ namespace NLDB
         public void Close()
         {
             SQLiteHelper.CloseConnection(db);
+        }
+
+        public int GetSymbol(string s)
+        {
+            if (db == null || db.State != System.Data.ConnectionState.Open)
+                throw new Exception($"Подключение к БД не установлено");
+            var letter = SQLiteHelper.SelectScalar(db,
+                tablename: "alphabet",
+                columns: "code",
+                where: $"letter={s}");
+            return (letter == null) ? 0 : (int)letter;
+        }
+
+        public string GetSymbol(int i)
+        {
+            if (db == null || db.State != System.Data.ConnectionState.Open)
+                throw new Exception($"Подключение к БД не установлено");
+            var code = SQLiteHelper.SelectScalar(db,
+                tablename: "alphabet",
+                columns: "code",
+                where: $"code={i}");
+            return (code == null) ? "" : (string)code;
+        }
+
+        public bool ContainsSymbol(string s)
+        {
+            return GetSymbol(s) != 0;
+        }
+
+        public bool ContainsSymbol(int i)
+        {
+            return GetSymbol(i) != null;
         }
 
         public Word Get(int i)

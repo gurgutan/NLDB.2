@@ -46,6 +46,7 @@ namespace NLDB
             Word w;
             i2w.TryGetValue(i, out w);
             return w;
+            //return data.Get(i);
         }
 
         public int Add(Word w, string letter = "")
@@ -97,6 +98,7 @@ namespace NLDB
         /// <returns></returns>
         public int Find(int[] childs, int rank)
         {
+            //return data.Get(childs).id;
             Word word = new Word(0, rank, childs, new int[0]);
             int id;
             w2i.TryGetValue(word, out id);
