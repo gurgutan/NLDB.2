@@ -14,13 +14,16 @@ namespace NLDB
         public int rank;
         public int[] childs;
         public List<int> parents;
+        public string symbol = null;
+
         //public int[] parents = new int[0];
 
-        public Word(int _id, int _rank, int[] _childs, int[] _parents)
+        public Word(int _id, int _rank, string _symbol, int[] _childs, int[] _parents)
         {
             //if (_childs == null) throw new ArgumentNullException("_childs не может быть равен null. Используйте int[0] вместо null");
             id = _id;
             rank = _rank;
+            symbol = _symbol;
             childs = _childs;
             if (_parents != null)
                 parents = new List<int>(_parents);

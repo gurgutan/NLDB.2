@@ -12,33 +12,29 @@ namespace NLDB
     [Serializable]
     public partial class Language
     {
-        private string[] splitters;
         private int[] EmptyArray = new int[0];
-        private int id_counter = 1;
+        //private int id_counter = 1;
         private Parser[] parsers;
 
         //Длина слова, используемая для преобразования лексикона в разреженную матрицу
         public static readonly int WORD_SIZE = 1024;
         //Размер буфера для чтения текста
-        public static readonly int TEXT_BUFFER_SIZE = 1 << 28;
+        public static readonly int TEXT_BUFFER_SIZE = 1 << 22;
 
-
-        public void Clear()
-        {
-            //i2w.Clear();
-            w2i.Clear();
-            id_counter = 1;
-            alphabet.Clear();
-        }
 
         /// <summary>
         /// Создает словарь из потока
         /// </summary>
         /// <param name="streamreader">считыватель потока</param>
         /// <returns>количество созданных слов</returns>
-        public int Create(StreamReader streamreader)
-        {            
-            this.Clear();
+        public int Build(StreamReader streamreader)
+        {
+            int words_count = BuildWords(streamreader) + BuildSequences();
+            return words_count;
+        }
+
+        private int BuildWords(StreamReader streamreader)
+        {
             int count_words = 0;
             char[] buffer = new char[Language.TEXT_BUFFER_SIZE];
             int count_chars = Language.TEXT_BUFFER_SIZE;
@@ -47,11 +43,11 @@ namespace NLDB
             {
                 count_chars = streamreader.ReadBlock(buffer, 0, Language.TEXT_BUFFER_SIZE);
                 string text = new string(buffer, 0, count_chars);
-                int current_chars = text.Length;
-                total_chars += current_chars;
-                Console.CursorLeft = 0;
+                total_chars += count_chars;
+                Console.Write($"Считано {total_chars} символов."); Console.CursorLeft = 0;
+                data.BeginTransaction();
                 count_words += this.Parse(text, this.Rank).Count();
-                Console.Write($"Считано {current_chars} символов.");
+                data.EndTransaction();
             }
             return count_words;
         }
@@ -61,11 +57,9 @@ namespace NLDB
         /// </summary>
         /// <param name="text">строка текста для анализа и разбиения на слова</param>
         /// <returns>количество добавленных в лексикон слов</returns>
-        public int Create(string text)
+        public int Build(string text)
         {
-            this.Clear();
-            int result = Parse(text, this.Rank).Count();
-            return result;
+            return Parse(text, this.Rank).Count();
         }
 
         public void Serialize(string filename)

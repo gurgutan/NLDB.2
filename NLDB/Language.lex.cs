@@ -9,85 +9,108 @@ namespace NLDB
 {
     public partial class Language
     {
-        private Alphabet alphabet = new Alphabet();
+        //private Alphabet alphabet = new Alphabet();
+        //private Dictionary<int, Word> i2w = new Dictionary<int, Word>();
+        //private Dictionary<Word, int> w2i = new Dictionary<Word, int>();
+        //Dictionary<Sequence, Link[]> links = new Dictionary<Sequence, Link[]>(links_max_count);
 
-        private Dictionary<int, Word> i2w = new Dictionary<int, Word>();
-        private Dictionary<Word, int> w2i = new Dictionary<Word, int>();
 
         public Language(string _name, string[] _splitters)
         {
+            data = new DataContainer(_name, _splitters);
+            parsers = data.Splitters.Select(s => new Parser(s)).ToArray();
             this.Name = _name;
-            this.Splitters = _splitters;
-            data = new DataContainer(splitters, alphabet, i2w, w2i, links);
+            //data = new DataContainer(splitters, alphabet, i2w, w2i, links);
         }
 
         public string Name { get; private set; }
 
-        public int Rank { get { return splitters.Length - 1; } }
+        public int Rank { get { return data.Splitters.Length - 1; } }
 
 
         public string[] Splitters
         {
-            get { return this.splitters; }
-            set { this.splitters = value; parsers = splitters.Select(s => new Parser(s)).ToArray(); }
+            get { return this.data.Splitters; }
         }
 
-        public int Count { get { return i2w.Count; } }
+        public int Count { get { return data.Count(); } }
 
-        public Dictionary<int, Word> Words { get { return i2w; } }
+        //public Dictionary<int, Word> Words { get { return i2w; } }
 
         /// <summary>
         /// Возвращает слово из словаря по идентификатору.
         /// </summary>
         /// <param name="i"></param>
         /// <returns>Слово из словаря или null, если нет слова с id=i</returns>
-        public Word Get(int i)
-        {
-            Word w;
-            i2w.TryGetValue(i, out w);
-            return w;
-            //return data.Get(i);
-        }
+        //public Word Get(int i)
+        //{
+        //    Word w;
+        //    i2w.TryGetValue(i, out w);
+        //    return w;
+        //    //return data.Get(i);
+        //}
 
-        public int Add(Word w, string letter = "")
-        {
-            w.id = NextId();
-            i2w[w.id] = w;
-            w2i[w] = w.id;
-            //Добавление родительского слова в каждое из дочерних слов w.childs
-            Array.ForEach(w.childs, c => Get(c).AddParent(w.id));
-            //Добавление буквы в алфавит
-            if (!string.IsNullOrEmpty(letter) && !alphabet.Contains(letter))
-                alphabet.Add(letter, w.id);
-            return w.id;
-        } 
+        //public int Add(Word w, string letter = "")
+        //{
+        //    w.id = NextId();
+        //    i2w[w.id] = w;
+        //    w2i[w] = w.id;
+        //    //Добавление родительского слова в каждое из дочерних слов w.childs
+        //    Array.ForEach(w.childs, c => Get(c).AddParent(w.id));
+        //    //Добавление буквы в алфавит
+        //    if (!string.IsNullOrEmpty(letter) && !alphabet.Contains(letter))
+        //        alphabet.Add(letter, w.id);
+        //    return w.id;
+        //} 
+
+        //private IEnumerable<int> Parse(string text, int rank)
+        //{
+        //    text = this.parsers[rank].Normilize(text);
+        //    var strings = this.parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
+        //    //Для букв (слов ранга 0) возвращаем id букв, добавляя новые в алфавит, если надо
+        //    if (rank == 0)
+        //    {
+        //        return strings.Select(s =>
+        //        {
+        //            if (alphabet.Contains(s)) return alphabet[s];
+        //            return Add(new Word(0, 0, new int[0], new int[0]), s);
+        //        });
+        //    }
+        //    else
+        //    {
+        //        //Для слов ранга > 0 добавляем слова, которых еще нет
+        //        var ids = strings.Select(s =>
+        //        {
+        //            var childs = Parse(s, rank - 1).ToArray();      //получаем id дочерних слов ранга rank-1
+        //            int id = Find(childs, rank);                    //ищем соответствие в словаре, если нет, то id=0
+        //            if (id == 0)
+        //                id = Add(new Word(0, rank, childs, new int[0]));   //если не нашли, - добавляем
+        //            return id;
+        //        });
+        //        return ids.ToList();
+        //    }
+        //}
 
         private IEnumerable<int> Parse(string text, int rank)
         {
             text = this.parsers[rank].Normilize(text);
             var strings = this.parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
-            //Для букв (слов ранга 0) возвращаем id букв, добавляя новые в алфавит, если надо
-            if (rank == 0)
+            //Для слов ранга > 0 добавляем слова, которых еще нет
+            return strings.Select(s =>
             {
-                return strings.Select(s =>
+                int id;
+                int[] childs = new int[0];
+                Word w = null;
+                if (rank > 0)
                 {
-                    if (alphabet.Contains(s)) return alphabet[s];
-                    return Add(new Word(0, 0, new int[0], new int[0]), s);
-                });
-            }
-            else
-            {
-                //Для слов ранга > 0 добавляем слова, которых еще нет
-                var ids = strings.Select(s =>
-                {
-                    var childs = Parse(s, rank - 1).ToArray();      //получаем id дочерних слов ранга rank-1
-                    int id = Find(childs, rank);                    //ищем соответствие в словаре, если нет, то id=0
-                    if (id == 0)
-                        id = Add(new Word(0, rank, childs, new int[0]));   //если не нашли, - добавляем
-                    return id;
-                });
-                return ids.ToList();
-            }
+                    childs = Parse(s, rank - 1).ToArray();      //получаем id дочерних слов ранга rank-1
+                    w = data.Get(childs);
+                }
+                else
+                    w = data.Get(s);
+                id = (w == null) ? data.Add(new Word(0, rank, rank == 0 ? s : "", childs, new int[0])) : w.id;
+                return id;
+            });
         }
 
         /// <summary>
@@ -96,48 +119,49 @@ namespace NLDB
         /// <param name="childs">набор id дочерних слов</param>
         /// <param name="rank">ранг искомого слова</param>
         /// <returns></returns>
-        public int Find(int[] childs, int rank)
-        {
-            //return data.Get(childs).id;
-            Word word = new Word(0, rank, childs, new int[0]);
-            int id;
-            w2i.TryGetValue(word, out id);
-            return id;
-        }
+        //public int Find(int[] childs, int rank)
+        //{
+        //    //return data.Get(childs).id;
+        //    Word word = new Word(0, rank, childs, new int[0]);
+        //    int id;
+        //    w2i.TryGetValue(word, out id);
+        //    return id;
+        //}
 
         public Term ToTerm(string text, int rank)
         {
             text = parsers[rank].Normilize(text);
-            if (rank == 0)
-                return new Term(rank, alphabet[text], 1, text, null);
-            else
-                return new Term(rank, 0, 0, text,
-                    parsers[rank - 1].Split(text).
-                    Where(s => !string.IsNullOrWhiteSpace(s)).
-                    Select(s => ToTerm(s, rank - 1)));
+            return new Term(rank, 0, 0, text, rank == 0 ?
+                null :
+                parsers[rank - 1].Split(text).
+                Where(s => !string.IsNullOrWhiteSpace(s)).
+                Select(s => ToTerm(s, rank - 1)));
         }
 
         public Term ToTerm(Word w)
         {
-            if (w.rank == 0)
-                return new Term(w.rank, w.id, _confidence: 1, _text: alphabet[w.id], _childs: null);
-            else
-                return new Term(w.rank, w.id, _confidence: 1, _text: "", _childs: w.childs.Select(c => ToTerm(i2w[c])));
+            return new Term(
+                w.rank,
+                w.id,
+                _confidence: 1,
+                _text: w.symbol,
+                _childs: w.rank == 0 ? null : w.childs.Select(c => ToTerm(data.Get(c))));
         }
 
         public Term ToTerm(Word w, float _confidence)
         {
-            if (w.rank == 0)
-                return new Term(w.rank, w.id, _confidence, alphabet[w.id], null);
-            else
-                return new Term(w.rank, w.id, _confidence, "", w.childs.Select(c => ToTerm(i2w[c])));
+            return new Term(
+                w.rank,
+                w.id,
+                _confidence,
+                w.symbol,
+                w.rank == 0 ? null : w.childs.Select(c => ToTerm(data.Get(c))));
         }
 
         public Term ToTerm(int i)
         {
-            var word = Get(i);
-            if (word == null) return null;
-            return ToTerm(word);
+            var word = data.Get(i);
+            return word == null ? null : ToTerm(word);
         }
 
         /// <summary>
@@ -153,7 +177,7 @@ namespace NLDB
             return Evaluate(term);
         }
 
-        public List<Term> Similars(string text, int count = 0, int rank = 2 )
+        public List<Term> Similars(string text, int count = 0, int rank = 2)
         {
             text = parsers[rank].Normilize(text);
             Term term = ToTerm(text, rank);
@@ -163,7 +187,7 @@ namespace NLDB
             var candidates = term.childs.                // дочерние термы
                 Select(c => Evaluate(c)).               // вычисляем все значения confidence
                 Where(c => c.id != 0).                  // отбрасываем термы с id=0, т.к. они не идентифицированы
-                SelectMany(c => Get(c.id).parents.Select(i => Get(i))). // получаем список родительских слов
+                SelectMany(c => data.Get(c.id).parents.Select(i => data.Get(i))). // получаем список родительских слов
                 Distinct().                             // без дублей
                 Select(p => ToTerm(p)).                 // переводим слова в термы
                 ToList();
@@ -185,7 +209,7 @@ namespace NLDB
             if (term.rank == 0)
             {
                 //При нулевом ранге терма, confidence считаем исходя из наличия соответствующей буквы в алфавите
-                term.id = alphabet[term.text];
+                term.id = data.Get(term.text).id;
                 term.confidence = (term.id == 0 ? 0 : 1);
                 return term;
             }
@@ -196,8 +220,8 @@ namespace NLDB
                 var candidates = term.childs.            // дочерние термы
                     Select(c => Evaluate(c)).
                     Where(c => c.id != 0).              // отбрасываем термы с id=0, т.к. они не идентифицированы
-                    Select(c => Get(c.id)).             // переводим термы в слова
-                    SelectMany(w => w.parents.Select(i => Get(i))). // получаем список родительских слов
+                    Select(c => data.Get(c.id)).             // переводим термы в слова
+                    SelectMany(w => w.parents.Select(i => data.Get(i))). // получаем список родительских слов
                     Distinct().                         // без дублей
                     Select(p => ToTerm(p)).             // переводим слова в термы
                     ToList();
@@ -215,11 +239,11 @@ namespace NLDB
             }
         }
 
-        private int NextId()
-        {
-            id_counter++;
-            return id_counter;
-        }
+        //private int NextId()
+        //{
+        //    id_counter++;
+        //    return id_counter;
+        //}
 
     }
 }

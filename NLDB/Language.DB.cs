@@ -42,11 +42,11 @@ namespace NLDB
         {
             return data.Get(i);
         }
-
-        public Word Find(int[] childs)
+        public Word Find(int[] i)
         {
-            return data.Get(childs);
+            return data.Get(i);
         }
+
 
     }
 }
