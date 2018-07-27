@@ -9,10 +9,10 @@ namespace NLDB
 {
     public partial class Language
     {
-        //private Alphabet alphabet = new Alphabet();
+        private Alphabet alphabet = new Alphabet();
         //private Dictionary<int, Word> i2w = new Dictionary<int, Word>();
         //private Dictionary<Word, int> w2i = new Dictionary<Word, int>();
-        //Dictionary<Sequence, Link[]> links = new Dictionary<Sequence, Link[]>(links_max_count);
+        Dictionary<Sequence, int> words_exists = new Dictionary<Sequence, int>(1 << 24);
 
 
         public Language(string _name, string[] _splitters)
@@ -104,11 +104,25 @@ namespace NLDB
                 if (rank > 0)
                 {
                     childs = Parse(s, rank - 1).ToArray();      //получаем id дочерних слов ранга rank-1
-                    w = data.Get(childs);
+                    Sequence childs_seq = new Sequence(childs);
+                    if (!words_exists.TryGetValue(childs_seq, out id))
+                    {
+                        id = data.Add(new Word(0, rank, "", childs, new int[0]));
+                        words_exists[childs_seq] = id;
+                    }
+                    //w = data.Get(childs);
                 }
                 else
-                    w = data.Get(s);
-                id = (w == null) ? data.Add(new Word(0, rank, rank == 0 ? s : "", childs, new int[0])) : w.id;
+                {
+                    if (alphabet.Contains(s))
+                        id = alphabet[s];
+                    else
+                    {
+                        id = data.Add(new Word(0, rank, s, childs, new int[0]));
+                        alphabet.Add(s, id);
+                    }
+                    //w = data.Get(s);
+                }
                 return id;
             });
         }
@@ -184,16 +198,25 @@ namespace NLDB
             //Для терма нулевого ранга возвращаем результат по наличию соответствующей буквы в алфавите
             if (term.rank == 0) return new List<Term> { Evaluate(term) };
             //Выделение претендентов на роль ближайшего
-            var candidates = term.childs.                // дочерние термы
-                Select(c => Evaluate(c)).               // вычисляем все значения confidence
-                Where(c => c.id != 0).                  // отбрасываем термы с id=0, т.к. они не идентифицированы
-                SelectMany(c => data.Get(c.id).parents.Select(i => data.Get(i))). // получаем список родительских слов
-                Distinct().                             // без дублей
-                Select(p => ToTerm(p)).                 // переводим слова в термы
-                ToList();
+            //var candidates = term.childs.                // дочерние термы
+            //    Select(c => Evaluate(c)).               // вычисляем все значения confidence
+            //    Where(c => c.id != 0).                  // отбрасываем термы с id=0, т.к. они не идентифицированы
+            //    SelectMany(c => data.Get(c.id).parents.Select(i => data.Get(i))). // получаем список родительских слов
+            //    Distinct().                             // без дублей
+            //    Select(p => ToTerm(p)).                 // переводим слова в термы
+            //    ToList();
+            var childs = term.
+                childs.
+                Select(c => Evaluate(c)).
+                Where(c => c.id != 0).
+                Select(c => c.id).ToArray();
+            var candidates = data.
+                GetParents(childs).
+                Select(p => ToTerm(p)).ToList();
             if (count == 0) count = candidates.Count;
             //Расчет оценок Confidence для каждого из соседей
-            candidates.AsParallel().ForAll(p => p.confidence = Confidence.Compare(term, p));
+            candidates.AsParallel().
+                ForAll(p => p.confidence = Confidence.Compare(term, p));
             //Сортировка по убыванию оценки
             candidates.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
             return candidates.Take(count).ToList();
@@ -217,15 +240,18 @@ namespace NLDB
             {
                 //Если ранг терма больше нуля, то confidence считаем по набору дочерних элементов
                 //Выделение претендентов на роль ближайшего
-                var candidates = term.childs.            // дочерние термы
-                    Select(c => Evaluate(c)).
-                    Where(c => c.id != 0).              // отбрасываем термы с id=0, т.к. они не идентифицированы
-                    Select(c => data.Get(c.id)).             // переводим термы в слова
-                    SelectMany(w => w.parents.Select(i => data.Get(i))). // получаем список родительских слов
-                    Distinct().                         // без дублей
-                    Select(p => ToTerm(p)).             // переводим слова в термы
-                    ToList();
-                //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
+                //var candidates = term.childs.            // дочерние термы
+                //    Select(c => Evaluate(c)).
+                //    Where(c => c.id != 0).              // отбрасываем термы с id=0, т.к. они не идентифицированы
+                //    Select(c => data.Get(c.id));        // переводим термы в слова
+                //SelectMany(w => w.parents.Select(i => data.Get(i))). // получаем список родительских слов
+                //Distinct().                         // без дублей
+                //Select(p => ToTerm(p)).             // переводим слова в термы
+                //ToList();
+
+                var childs = term.childs.Select(c => Evaluate(c)).Where(c => c.id != 0).Select(c => c.id).ToArray();
+                var candidates = data.GetParents(childs).Select(p => ToTerm(p));
+                //Поиск ближайшего родителя, т.е.родителя с максимумом сonfidence
                 candidates.AsParallel().ForAll(p =>
                 {
                     float confidence = Confidence.Compare(term, p);
@@ -235,6 +261,7 @@ namespace NLDB
                         term.confidence = confidence;
                     }
                 });
+
                 return term;
             }
         }

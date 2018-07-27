@@ -29,7 +29,10 @@ namespace NLDB
         /// <returns>количество созданных слов</returns>
         public int Build(StreamReader streamreader)
         {
+            data.Create();
+            data.Open(Name);
             int words_count = BuildWords(streamreader) + BuildSequences();
+            data.Close();
             return words_count;
         }
 

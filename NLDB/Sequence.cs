@@ -32,7 +32,7 @@ namespace NLDB
         {
             Sequence l = (Sequence)obj;
             if (sequence == null || l.sequence == null) return false;
-            if (sequence?.Length != l.sequence?.Length) return false;
+            if (sequence.Length != l.sequence.Length) return false;
             for (int i = 0; i < sequence.Length; i++)
                 if (sequence[i] != l.sequence[i]) return false;
             return true;

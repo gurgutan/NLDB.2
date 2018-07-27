@@ -16,17 +16,18 @@ namespace NLDB
 
         static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\500kb.txt";
-            Language l = new Language("wikiru.db", new string[] { "", @"[^\w\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
+            string trainfile = @"D:\Data\Wiki\ru\1200kb.txt";
+            Language l = new Language("wikiru.db", new string[] { "", @"[^а-яёa-z\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             Stopwatch sw = new Stopwatch();
             sw.Start();
             using (StreamReader reader = File.OpenText(trainfile))
                 l.Build(reader);
             sw.Stop();
+
+            l.Connect("wikiru.db");
             Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
             Console.WriteLine($"Слов: {l.Count}");
-
             Console.WriteLine("Поиск в БД по id");
             List<int[]> childsList = new List<int[]>();
             for (int i = 64; i < 128; i++)
@@ -45,13 +46,13 @@ namespace NLDB
                     Console.WriteLine($"{w.id}<{w.rank}>:" + l.ToTerm(w).ToString());
                 else Console.WriteLine("Не найден " + e.Aggregate("", (c, n) => c + "," + n.ToString()));
             });
-            TestLangConsole(l);
             l.Disconnect();
+            TestLangConsole(l);
         }
 
         static void TestLangConsole(Language l)
         {
-            l.Connect("words.db");
+            l.Connect(l.Name);
             Queue<string> lines = new Queue<string>();
             int que_size = 1;
             string line = "---";
@@ -80,7 +81,7 @@ namespace NLDB
                 var predicted_one = l.Predict(text, 2);
                 sw.Stop();
                 Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-                
+
                 if (predicted_one != null)
                     Console.WriteLine(predicted_one.confidence + ": " + predicted_one.ToString());
 

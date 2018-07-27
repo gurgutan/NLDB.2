@@ -36,11 +36,17 @@ namespace NLDB
         {
             dbname = _dbname;
             splitters = _splitters;
-            if (File.Exists(dbname)) File.Delete(dbname);
+            db = SQLiteHelper.OpenConnection(dbname);
+        }
+
+        public void Create()
+        {
+            //if (File.Exists(dbname)) File.Delete(dbname);
+            if (db.State != System.Data.ConnectionState.Open)
+                db = SQLiteHelper.OpenConnection(dbname);
             CreateSplittersTable();
             CreateWordsTable();
             CreateLinksTable();
-            db = SQLiteHelper.OpenConnection(dbname);
         }
 
         public void BeginTransaction()
@@ -131,12 +137,12 @@ namespace NLDB
             var rank = int.Parse(word[1]);
             string symbol = word[2];
             int[] childs = StringToIntArray(word[3]);
-            var parents_qry = SQLiteHelper.SelectValues(db,
-                tablename: "parents",
-                columns: "id,parent_id",
-                where: $"id={i}");
-            int[] parents = parents_qry.Select(s => int.Parse(s[1])).ToArray();
-            return new Word(i, rank, symbol, childs, parents);
+            //var parents_qry = SQLiteHelper.SelectValues(db,
+            //    tablename: "parents",
+            //    columns: "id,parent_id",
+            //    where: $"id='{i}'");
+            //int[] parents = parents_qry.Select(s => int.Parse(s[1])).ToArray();
+            return new Word(i, rank, symbol, childs, null /*parents*/);
         }
         public Word Get(string s)
         {
@@ -152,12 +158,9 @@ namespace NLDB
             var rank = int.Parse(word[1]);
             string symbol = word[2];
             int[] childs = StringToIntArray(word[3]);
-            var parents_qry = SQLiteHelper.SelectValues(db,
-                tablename: "parents",
-                columns: "id,parent_id",
-                where: $"id={id}");
-            int[] parents = parents_qry.Select(p => int.Parse(p[1])).ToArray();
-            return new Word(id, rank, symbol, childs, parents);
+            //var parents_qry = SQLiteHelper.SelectValues(db, tablename: "parents", columns: "id,parent_id", where: $"id='{id}'");
+            //int[] parents = parents_qry.Select(p => int.Parse(p[1])).ToArray();
+            return new Word(id, rank, symbol, childs, null /*parents*/);
         }
 
         public Word Get(int[] _childs)
@@ -165,15 +168,35 @@ namespace NLDB
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
             if (_childs == null || _childs.Length == 0) return null;
-            var childs_str = @"'" + IntArrayToString(_childs) + @"'";
-            var word = SQLiteHelper.SelectValues(db, tablename: "words", columns: "id,rank,symbol,childs", where: $"childs={childs_str}").FirstOrDefault();
+            var childs_str = IntArrayToString(_childs);
+            var word = SQLiteHelper.SelectValues(db, tablename: "words", columns: "id,rank,symbol,childs", where: $"childs='{childs_str}'").FirstOrDefault();
             if (word == null) return null;
             int id = int.Parse(word[0]);
             int rank = int.Parse(word[1]);
             string symbol = word[2];
-            var parents_qry = SQLiteHelper.SelectValues(db, tablename: "parents", columns: "id,parent_id", where: $"id={id}");
-            int[] parents = parents_qry.Select(s => int.Parse(s[1])).ToArray();
-            return new Word(id, rank, symbol, _childs, parents);
+            //var parents_qry = SQLiteHelper.SelectValues(db, tablename: "parents", columns: "id,parent_id", where: $"id='{id}'");
+            //int[] parents = parents_qry.Select(s => int.Parse(s[1])).ToArray();
+            return new Word(id, rank, symbol, _childs, null/*parents*/);
+        }
+
+        public IEnumerable<Word> GetParents(int[] i)
+        {
+            if (db == null || db.State != System.Data.ConnectionState.Open)
+                throw new Exception($"Подключение к БД не установлено");
+            string ids = i.Select(e => "'" + e.ToString() + "'").Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
+            var cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs FROM words " +
+                $"WHERE words.id IN (SELECT parents.parent_id FROM parents WHERE parents.id IN ({ids}));";
+            var reader = cmd.ExecuteReader();
+            List<Word> words = new List<Word>();
+            while (reader.Read())
+            {
+                int[] childs = StringToIntArray(reader.GetString(3));
+                Word w = new Word(int.Parse(reader.GetString(0)), int.Parse(reader.GetString(1)), reader.GetString(2), childs, null);
+                words.Add(w);
+            }
+            return words;
         }
 
         public int Add(Word w)
@@ -243,7 +266,7 @@ namespace NLDB
         //Private methods
         //--------------------------------------------------------------------------------------------------------------------------------------
         private string IntArrayToString(int[] a) =>
-            a.Aggregate("", (c, n) => c == "" ? n.ToString() : c + "," + n.ToString());
+            a.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
 
         private int[] StringToIntArray(string s) =>
             s.Split(separator: new char[] { ',' }, options: StringSplitOptions.RemoveEmptyEntries).
@@ -252,7 +275,7 @@ namespace NLDB
 
         private int NextId()
         {
-            Debug.WriteLineIf(current_id % (1 << 12) == 0, current_id);
+            Debug.WriteLineIf(current_id % (1 << 14) == 0, current_id);
             return ++current_id;
         }
 

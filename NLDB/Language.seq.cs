@@ -67,6 +67,7 @@ namespace NLDB
             Console.WriteLine("\nПостроение цепочек:");
             for (int size = 1; size < link_max_size; size++)
             {
+                Dictionary<Sequence, int> exists = new Dictionary<Sequence, int>(1 << 24);
                 Console.WriteLine($"...длины {size + 1}");
                 data.BeginTransaction();    //в транзакции каждый массив цепочек
                 foreach (var word in data)
@@ -77,21 +78,38 @@ namespace NLDB
                     for (int i = 0; i < word.childs.Length - 1; i++)
                     {
                         que.Enqueue(word.childs[i]);
-                        if (que.Count >= size)
+                        if (que.Count < size) continue;
+                        int[] que_array = que.ToArray();
+                        //Создадим и заполним полную цепочку - с (i+1)-м словом
+                        int[] full_que_array = new int[size + 1];
+                        que_array.CopyTo(full_que_array, 0);
+                        full_que_array[size] = word.childs[i + 1];
+                        //Проверим, есть ли полная цепочка в словаре
+                        Sequence full_seq = new Sequence(full_que_array);
+                        int number;
+                        if (exists.TryGetValue(full_seq, out number))
                         {
-                            var seq = que.ToArray();
-                            //TODO: Критическая потеря производительности при работе с БД. Нужно оптимизировать!
-                            var link = data.GetLink(seq, word.childs[i + 1]);
-                            if (link.id == 0)
-                            {
-                                seq_counter++;
-                                Debug.WriteLineIf(seq_counter % (1 << 14) == 0, seq_counter);
-                                data.InsertLink(seq, word.childs[i + 1], 1);
-                            }
-                            else
-                                data.ReplaceLink(seq, word.childs[i + 1], link.number + 1);
-                            que.Dequeue();
+                            number++;
+                            exists[full_seq] = number;
+                            data.ReplaceLink(que_array, word.childs[i + 1], number);
                         }
+                        else
+                        {
+                            seq_counter++;
+                            exists[new Sequence(full_que_array)] = 1;
+                            Debug.WriteLineIf(seq_counter % (1 << 14) == 0, seq_counter);
+                            data.InsertLink(que_array, word.childs[i + 1], 1);
+                        }
+                        //var link = data.GetLink(seq, word.childs[i + 1]);
+                        //if (link.id == 0)
+                        //{
+                        //    seq_counter++;
+                        //    Debug.WriteLineIf(seq_counter % (1 << 14) == 0, seq_counter);
+                        //    data.InsertLink(seq, word.childs[i + 1], 1);
+                        //}
+                        //else
+                        //    data.ReplaceLink(seq, word.childs[i + 1], link.number + 1);
+                        que.Dequeue();
                     }
                 }
                 data.EndTransaction();
@@ -130,7 +148,9 @@ namespace NLDB
 
         public Term Predict(string text, int rank = 2)
         {
-            var similars = this.Similars(text, similars_max_count, rank).Where(t => t.confidence > similars_min_confidence).Take(similars_max_count);
+            var similars = this.Similars(text, similars_max_count, rank).
+                Where(t => t.confidence > similars_min_confidence).
+                Take(similars_max_count);
             if (similars.Count() == 0) return null;
             //Первым в коллекции будет терм с максимальным confidence
             var best_similar = similars.First();
@@ -155,7 +175,7 @@ namespace NLDB
             //результат (цепочка термов)
             List<Term> result = new List<Term>();
             var similars = this.Similars(text, similars_max_count, rank).Where(t => t.confidence > similars_min_confidence).Take(similars_max_count);
-            if (similars.Count() == 0) return null;
+            if (similars.Count() == 0) return result;
             //Первым в коллекции будет терм с максимальным confidence
             var best_similar = similars.First();
             //Получаем ссылки на всех предков similars с confidence пронаследованным от similars
