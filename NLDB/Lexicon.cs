@@ -32,9 +32,10 @@ namespace NLDB
 
         public void Create()
         {
-            string words_table = 
-                $"DROP TABLE words;"+
-                $"CREATE TABLE words(id INTEGER PRIMARY KEY, rank INTEGER NOT NULL, parent INTEGER, pos INTEGER, symbol TEXT);";
+            string words_table =
+                $"DROP TABLE words;" +
+                $"CREATE TABLE words(id INTEGER NOT NULL, rank INTEGER NOT NULL, parent INTEGER, pos INTEGER, symbol TEXT)," +
+                $"PRIMARY KEY (id, parent, pos);";
             string links_table =
                 $"DROP TABLE links;" +
                 $"CREATE TABLE links(seq TEXT PRIMARY KEY, next INTEGER NOT NULL, count INTEGER NOT NULL);";
@@ -55,36 +56,68 @@ namespace NLDB
         //    result.DataTable.
         //}
 
-        public SQLiteDataReader GetChilds(int id)
+        public Term Get(int id)
         {
             var cmd = db.CreateCommand();
             cmd.CommandText =
-                "SELECT words.id, words.rank, words.symbol, words.pos " +
-                "FROM words "+
-                $"WHERE words.parent={id}";
-            throw new NotImplementedException();
+                $"SELECT words.rank, words.symbol " +
+                $"FROM words " +
+                $"WHERE words.id={id} "+
+                $"LIMIT 1";
+            var reader = cmd.ExecuteReader();
+            if(!reader.Read()) return null;
+            int rank = reader.GetInt32(0);
+            string symbol = reader.GetString(1);
+            return new Term(rank, id, 1, symbol, null, null);
         }
 
-        public SQLiteDataReader GetChilds(int[] ids)
+        public List<Term> GetChilds(int id)
+        {
+            var cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"SELECT words.id, words.rank, words.symbol, words.pos " +
+                $"FROM words " +
+                $"WHERE words.parent={id} "+
+                $"ORDER BY words.pos";
+            var reader = cmd.ExecuteReader();
+            return CreateTermsFromReader(reader);
+        }
+
+        public List<Term> GetChilds(int[] ids)
         {
             string str_ids = ids.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
             var cmd = db.CreateCommand();
             cmd.CommandText =
-                "SELECT words.id, words.rank, words.symbol " +
-                "FROM words " +
-                $"WHERE words.parent IN ({str_ids})";
-            throw new NotImplementedException();
+                $"SELECT words.id, words.rank, words.symbol, words.pos " +
+                $"FROM words " +
+                $"words.parent IN ({str_ids}) " +
+                $"ORDER BY words.id, words.pos";
+            var reader = cmd.ExecuteReader();
+            return CreateTermsFromReader(reader);
         }
 
-        public SQLiteDataReader GetSiblings(int[] ids)
+        public SQLiteDataReader GetSiblingsByParents(int[] ids)
         {
             string str_ids = ids.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
             var cmd = db.CreateCommand();
             cmd.CommandText =
-                "SELECT DISTINCT words2.id AS 'child', words2.parent AS 'parent'" +
-                "FROM words words1 inner join words words2 on words2.parent = words1.parent" +
-                $"WHERE words1.id IN ({str_ids})";
+                $"SELECT DISTINCT sibling.id, sibling.parent" +
+                $"FROM words inner join words sibling on sibling.parent = words.parent" +
+                $"WHERE words.id IN ({str_ids})";
             throw new NotImplementedException();
+        }
+
+        private List<Term> CreateTermsFromReader(SQLiteDataReader reader)
+        {
+            List<Term> result = new List<Term>();
+            while (reader.Read())
+            {
+                int id = reader.GetInt32(0);     
+                int rank = reader.GetInt32(1);
+                string symbol = reader.GetString(2);
+                result.Add(new Term(rank, id, 1, symbol));
+            }
+            return result;
         }
 
     }

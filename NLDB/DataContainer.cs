@@ -17,6 +17,8 @@ namespace NLDB
         private SQLiteTransaction transaction;
         private SQLiteConnection db;
 
+        private Dictionary<int, Term> terms = new Dictionary<int, Term>();
+
         private int current_id = 0;
 
         private string[] splitters;
@@ -30,6 +32,7 @@ namespace NLDB
         //private Dictionary<int, Word> i2w = new Dictionary<int, Word>();
         //private Dictionary<Word, int> w2i = new Dictionary<Word, int>();
         //private Dictionary<Sequence, Link[]> links = new Dictionary<Sequence, Link[]>();
+
         private string dbname = "data.db";
 
         public DataContainer(string _dbname, string[] _splitters)
@@ -47,6 +50,30 @@ namespace NLDB
             CreateSplittersTable();
             CreateWordsTable();
             CreateLinksTable();
+        }
+
+        public Term ToTerm(Word w, float confidence = 1)
+        {
+            if (terms.ContainsKey(w.id)) return terms[w.id];
+            Term t = new Term(
+                w.rank,
+                w.id,
+                _confidence: confidence,
+                _text: w.symbol,
+                _childs: w.rank == 0 ? null : w.childs.Select(c => ToTerm(Get(c))));
+            terms[w.id] = t;
+            return t;
+        }
+
+        public Term ToTerm(int i, float confidence = 1)
+        {
+            if (terms.ContainsKey(i))
+            {
+                terms[i].confidence = confidence;
+                return terms[i];
+            }
+            var word = Get(i);
+            return ToTerm(word);
         }
 
         public void BeginTransaction()
@@ -179,6 +206,26 @@ namespace NLDB
             return new Word(id, rank, symbol, _childs, null/*parents*/);
         }
 
+        public IEnumerable<Word> GetParents(int i)
+        {
+            if (db == null || db.State != System.Data.ConnectionState.Open)
+                throw new Exception($"Подключение к БД не установлено");
+            var cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs FROM words " +
+                $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id='{i}'";
+                //$"WHERE words.id IN (SELECT parents.parent_id FROM parents WHERE parents.id = {i});";
+            var reader = cmd.ExecuteReader();
+            List<Word> words = new List<Word>();
+            while (reader.Read())
+            {
+                int[] childs = StringToIntArray(reader.GetString(3));
+                Word w = new Word(int.Parse(reader.GetString(0)), int.Parse(reader.GetString(1)), reader.GetString(2), childs, null);
+                words.Add(w);
+            }
+            return words;
+        }
+
         public IEnumerable<Word> GetParents(int[] i)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
@@ -187,7 +234,8 @@ namespace NLDB
             var cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs FROM words " +
-                $"WHERE words.id IN (SELECT parents.parent_id FROM parents WHERE parents.id IN ({ids}));";
+                $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id IN ({ids})";
+            //$"WHERE words.id IN (SELECT parents.parent_id FROM parents WHERE parents.id IN ({ids}));";
             var reader = cmd.ExecuteReader();
             List<Word> words = new List<Word>();
             while (reader.Read())

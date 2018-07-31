@@ -152,30 +152,14 @@ namespace NLDB
                 Select(s => ToTerm(s, rank - 1)));
         }
 
-        public Term ToTerm(Word w)
+        public Term ToTerm(Word w, float _confidence = 1)
         {
-            return new Term(
-                w.rank,
-                w.id,
-                _confidence: 1,
-                _text: w.symbol,
-                _childs: w.rank == 0 ? null : w.childs.Select(c => ToTerm(data.Get(c))));
+            return data.ToTerm(w, _confidence);
         }
 
-        public Term ToTerm(Word w, float _confidence)
+        public Term ToTerm(int i, float _confidence = 1)
         {
-            return new Term(
-                w.rank,
-                w.id,
-                _confidence,
-                w.symbol,
-                w.rank == 0 ? null : w.childs.Select(c => ToTerm(data.Get(c))));
-        }
-
-        public Term ToTerm(int i)
-        {
-            var word = data.Get(i);
-            return word == null ? null : ToTerm(word);
+            return data.ToTerm(i, _confidence);
         }
 
         /// <summary>
@@ -248,7 +232,6 @@ namespace NLDB
                 //Distinct().                         // без дублей
                 //Select(p => ToTerm(p)).             // переводим слова в термы
                 //ToList();
-
                 var childs = term.childs.Select(c => Evaluate(c)).Where(c => c.id != 0).Select(c => c.id).ToArray();
                 var candidates = data.GetParents(childs).Select(p => ToTerm(p));
                 //Поиск ближайшего родителя, т.е.родителя с максимумом сonfidence

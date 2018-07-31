@@ -10,8 +10,8 @@ namespace NLDB
     [Serializable]
     public class Word
     {
-        public int id;
         public int rank;
+        public int id;
         public int[] childs;
         public List<int> parents;
         public string symbol = null;

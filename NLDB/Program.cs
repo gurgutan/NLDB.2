@@ -16,37 +16,37 @@ namespace NLDB
 
         static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\1200kb.txt";
-            Language l = new Language("wikiru.db", new string[] { "", @"[^а-яёa-z\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
+            string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
+            Language l = new Language("wikiru.db", new string[] { "", @"[^а-яёa-z\%\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
             Console.WriteLine($"Начало обучения на файле {trainfile}");
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            using (StreamReader reader = File.OpenText(trainfile))
-                l.Build(reader);
-            sw.Stop();
-
+            //Stopwatch sw = new Stopwatch();
+            //sw.Start();
+            //using (StreamReader reader = File.OpenText(trainfile))
+            //    l.Build(reader);
+            //sw.Stop();
+            //Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
             l.Connect("wikiru.db");
-            Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
+            
             Console.WriteLine($"Слов: {l.Count}");
-            Console.WriteLine("Поиск в БД по id");
-            List<int[]> childsList = new List<int[]>();
-            for (int i = 64; i < 128; i++)
-            {
-                Word w = l.Find(i);
-                var childs = w.childs;
-                if (childs != null)
-                    childsList.Add(childs);
-                Console.WriteLine(i.ToString() + $"={w.id}<{w.rank}>:" + l.ToTerm(w).ToString());
-            }
-            Console.WriteLine("Поиск в БД по childs");
-            childsList.ForEach(e =>
-            {
-                Word w = l.Find(e);
-                if (w != null)
-                    Console.WriteLine($"{w.id}<{w.rank}>:" + l.ToTerm(w).ToString());
-                else Console.WriteLine("Не найден " + e.Aggregate("", (c, n) => c + "," + n.ToString()));
-            });
-            l.Disconnect();
+            //Console.WriteLine("Поиск в БД по id");
+            //List<int[]> childsList = new List<int[]>();
+            //for (int i = 64; i < 128; i++)
+            //{
+            //    Word w = l.Find(i);
+            //    var childs = w.childs;
+            //    if (childs != null)
+            //        childsList.Add(childs);
+            //    Console.WriteLine(i.ToString() + $"={w.id}<{w.rank}>:" + l.ToTerm(w).ToString());
+            //}
+            //Console.WriteLine("Поиск в БД по childs");
+            //childsList.ForEach(e =>
+            //{
+            //    Word w = l.Find(e);
+            //    if (w != null)
+            //        Console.WriteLine($"{w.id}<{w.rank}>:" + l.ToTerm(w).ToString());
+            //    else Console.WriteLine("Не найден " + e.Aggregate("", (c, n) => c + "," + n.ToString()));
+            //});
+            //l.Disconnect();
             TestLangConsole(l);
         }
 
@@ -72,26 +72,20 @@ namespace NLDB
                 var terms = l.Similars(text, 4, 2).ToList();
                 sw.Stop();
                 Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-
-                //var terms = l.Similars(text, 4, 2).ToList();
                 terms.ForEach(term => { if (term.id >= 0) Console.WriteLine($"{term.confidence}: {term.ToString()}"); });
-
                 Console.WriteLine(splitline + "\nПредположение о следующем слове: ");
-                sw.Start();
+                sw.Restart();
                 var predicted_one = l.Predict(text, 2);
                 sw.Stop();
                 Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-
-                if (predicted_one != null)
-                    Console.WriteLine(predicted_one.confidence + ": " + predicted_one.ToString());
-
+                if (predicted_one != null) Console.WriteLine(predicted_one.confidence + ": " + predicted_one.ToString());
                 Console.WriteLine(splitline + "\nПостроение цепочки");
-                sw.Start();
-                var predicted = l.PredictRecurrent(text, 64, 2);
+                sw.Restart();
+                var predicted = l.PredictRecurrent(text, 32, 2);
                 sw.Stop();
                 Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
                 if (predicted.Count != 0)
-                    Console.WriteLine(predicted.Aggregate("", (c, n) => c + " " + n.ToString()));
+                    Console.WriteLine(predicted.Aggregate("", (c, n) => c + $" [{n.confidence.ToString("F2")}] " + n.ToString()));
             }
             l.Disconnect();
         }

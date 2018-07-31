@@ -16,6 +16,17 @@ namespace NLDB
             sequence = _sequence;
         }
 
+        public int Length
+        {
+            get { return sequence.Length; }
+        }
+
+        public int this[int i]
+        {
+            get { return sequence[i]; }
+            set { sequence[i] = value; }
+        }
+
         public override int GetHashCode()
         {
             if (sequence == null || sequence.Length == 0) return 0;
@@ -37,7 +48,6 @@ namespace NLDB
                 if (sequence[i] != l.sequence[i]) return false;
             return true;
         }
-
-
     }
+
 }

@@ -13,8 +13,9 @@ namespace NLDB
         public float confidence;
         public string text;
         public List<Term> childs;
+        public List<Term> parents;
 
-        public Term(int _rank, int _id, float _confidence, string _text, IEnumerable<Term> _childs)
+        public Term(int _rank, int _id, float _confidence, string _text, IEnumerable<Term> _childs = null, IEnumerable<Term> _parents = null)
         {
             rank = _rank;
             id = _id;
@@ -22,6 +23,8 @@ namespace NLDB
             text = _text;
             if (_childs != null)
                 childs = new List<Term>(_childs);
+            if (_parents != null)
+                parents= new List<Term>(_parents);
         }
 
         public override string ToString()
