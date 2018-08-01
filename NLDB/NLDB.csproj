@@ -105,6 +105,7 @@
     <Compile Include="Confidence.cs" />
     <Compile Include="DataContainer.cs" />
     <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="Grammar.cs" />
     <Compile Include="Lexicon.cs" />
     <Compile Include="Link.cs" />
     <Compile Include="Sequence.cs" />

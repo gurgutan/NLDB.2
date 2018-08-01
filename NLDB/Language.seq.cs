@@ -16,7 +16,9 @@ namespace NLDB
         private const int link_max_size = 8;                // Максимальный размер цепочек
         private const int links_max_count = 1 << 23;        // Количество цепочек для инициализации словаря
 
-        private Dictionary<Sequence, int> sequences = new Dictionary<Sequence, int>(1 << 26);
+        private Dictionary<Sequence, int> sequences = new Dictionary<Sequence, int>(links_max_count);
+
+        private Grammar grammar = new Grammar();
 
         public int BuildSequences()
         {
@@ -54,6 +56,22 @@ namespace NLDB
             }
             return seq_counter;
         }
+
+        public int BuildGrammar()
+        {
+            grammar.Clear();
+            Debug.WriteLine("Построение грамматики");
+            var words = data.Where(w => w.rank > 0);
+            int count = 0;
+            foreach (var w in words)
+            {
+                grammar.Add(w.childs);
+                count++;
+                Debug.WriteLineIf(count % (1 << 16) == 0, count);
+            }
+            return grammar.Count();
+        }
+
 
         private Link Follower(int[] iarray, IEnumerable<Link> constraints, float min_confidence = 1)
         {
@@ -109,7 +127,7 @@ namespace NLDB
             return ToTerm(follower.id, follower.confidence);
         }
 
-        public List<Term> PredictRecurrent(string text, int max_count = 4, int rank = 2)
+        public List<Term> PredictRecurrent(string text, int max_count = 1, int rank = 2)
         {
             //результат (цепочка термов)
             List<Term> result = new List<Term>();
@@ -173,5 +191,26 @@ namespace NLDB
         }
 
 
+        //public List<Term> Next(string text, int max_count = 1, int rank = 2)
+        //{
+        //    //результат (цепочка термов)
+        //    List<Term> result = new List<Term>();
+        //    var terms = Parse(text, rank - 1).Select(i => ToTerm(i)).ToList();
+        //    terms.ForEach(t => Evaluate(t));
+        //    var similars = this.Similars(text, similars_max_count, rank).
+        //        Where(t => t.confidence > similars_min_confidence).
+        //        Take(similars_max_count);
+        //    if (similars.Count() == 0) return result;
+        //    //Первым в коллекции будет терм с максимальным confidence
+        //    var best_similar = similars.First();
+        //    //Получаем ссылки на всех предков similars с confidence пронаследованным от similars
+        //    var constraints = similars.
+        //        SelectMany(s => data.GetParents(s.id).Select(p => new Link(p.id, 0, s.confidence))).
+        //        SelectMany(p => data.Get(p.id).childs.Select(c => new Link(c, 0, p.confidence))).
+        //        SelectMany(c => data.Get(c.id).childs.Select(gc => new Link(gc, 0, c.confidence))).
+        //        Distinct().
+        //        ToList();
+
+        //}
     }
 }

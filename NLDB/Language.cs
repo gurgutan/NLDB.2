@@ -31,7 +31,7 @@ namespace NLDB
         {
             data.Create();
             data.Open(Name);
-            int words_count = BuildWords(streamreader) + BuildSequences();
+            int words_count = BuildWords(streamreader) + BuildGrammar(); //BuildSequences();
             data.Close();
             return words_count;
         }

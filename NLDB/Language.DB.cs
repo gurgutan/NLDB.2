@@ -31,6 +31,7 @@ namespace NLDB
         public void Connect(string dbname)
         {
             data.Open(dbname);
+            //BuildGrammar();
             BuildSequences();
         }
 
