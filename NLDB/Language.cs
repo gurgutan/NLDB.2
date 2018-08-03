@@ -16,6 +16,8 @@ namespace NLDB
         //private int id_counter = 1;
         private Parser[] parsers;
 
+        private string[] splitters;
+
         //Длина слова, используемая для преобразования лексикона в разреженную матрицу
         public static readonly int WORD_SIZE = 1024;
         //Размер буфера для чтения текста
@@ -29,7 +31,7 @@ namespace NLDB
         /// <returns>количество созданных слов</returns>
         public int Build(StreamReader streamreader)
         {
-            data.Create();
+            //data.Create();
             data.Open(Name);
             int words_count = BuildWords(streamreader) + BuildGrammar(); //BuildSequences();
             data.Close();

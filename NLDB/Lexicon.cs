@@ -11,9 +11,7 @@ namespace NLDB
 {
     public class Lexicon
     {
-        private SQLiteTransaction transaction;
         private SQLiteConnection db;
-        private int current_id = 0;
         private string dbname;
         private string[] splitters;
         public string[] Splitters

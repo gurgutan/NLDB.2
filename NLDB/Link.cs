@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -28,7 +29,34 @@ namespace NLDB
         {
             return ((Link)obj).id == this.id;
         }
+
+        public int GetHashCode(object obj)
+        {
+            return id;
+        }
     }
 
-    
+    public class LinkComparer : IEqualityComparer<Link>
+    {
+        public bool Equals(Link x, Link y)
+        {
+            return ((Link)x).id == ((Link)y).id;
+        }
+
+        public new bool Equals(object x, object y)
+        {
+            return ((Link)x).id == ((Link)y).id;
+        }
+
+        public int GetHashCode(Link obj)
+        {
+            return ((Link)obj).id;
+        }
+
+    }
+
+
+
+
+
 }

@@ -30,9 +30,11 @@ namespace NLDB
 
         public void Connect(string dbname)
         {
+            if(data.IsOpen()) data.Close();
+            data = new DataContainer(dbname, splitters);
             data.Open(dbname);
             //BuildGrammar();
-            BuildSequences();
+            //BuildSequences();
         }
 
         public void Disconnect()

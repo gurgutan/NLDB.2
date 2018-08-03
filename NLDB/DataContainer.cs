@@ -39,14 +39,22 @@ namespace NLDB
         {
             dbname = _dbname;
             splitters = _splitters;
-            db = SQLiteHelper.OpenConnection(dbname);
+            current_id = 0;
+            if (!File.Exists(dbname)) Create();
+            //db = SQLiteHelper.OpenConnection(dbname);
+        }
+
+        public bool IsOpen()
+        {
+            return db.State == System.Data.ConnectionState.Open;
         }
 
         public void Create()
         {
-            //if (File.Exists(dbname)) File.Delete(dbname);
-            if (db.State != System.Data.ConnectionState.Open)
-                db = SQLiteHelper.OpenConnection(dbname);
+            current_id = 0;
+            if (File.Exists(dbname)) File.Delete(dbname);
+            //if (db.State != System.Data.ConnectionState.Open)
+            //    db = SQLiteHelper.OpenConnection(dbname);
             CreateSplittersTable();
             CreateWordsTable();
             CreateLinksTable();
@@ -123,7 +131,10 @@ namespace NLDB
         public SQLiteConnection Open(string _dbname)
         {
             dbname = _dbname;
+            //if (db.State == System.Data.ConnectionState.Open) return db;
             db = SQLiteHelper.OpenConnection(dbname);
+            current_id = 0;
+            current_id = this.CurrentId;
             return db;
         }
 
@@ -214,7 +225,7 @@ namespace NLDB
             cmd.CommandText =
                 $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs FROM words " +
                 $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id='{i}'";
-                //$"WHERE words.id IN (SELECT parents.parent_id FROM parents WHERE parents.id = {i});";
+            //$"WHERE words.id IN (SELECT parents.parent_id FROM parents WHERE parents.id = {i});";
             var reader = cmd.ExecuteReader();
             List<Word> words = new List<Word>();
             while (reader.Read())
@@ -324,23 +335,22 @@ namespace NLDB
         private int NextId()
         {
             Debug.WriteLineIf(current_id % (1 << 14) == 0, current_id);
-            return ++current_id;
+            current_id++;
+            return current_id;
         }
-
         private int CurrentId
         {
             get
             {
                 //т.к. id слова не может быть равен 0, current_id==0 говорит о том, что он не инициализирован
-                if (current_id == 0)
-                {
-                    if (db == null || db.State != System.Data.ConnectionState.Open)
-                        throw new Exception($"Подключение к БД не установлено");
-                    current_id = SQLiteHelper.Max(db, "words", "id");
-                }
+                if (current_id != 0) return current_id;
+                if (db == null || db.State != System.Data.ConnectionState.Open)
+                    throw new Exception($"Подключение к БД не установлено");
+                current_id = SQLiteHelper.Max(db, "words", "id");
                 return current_id;
             }
         }
+
 
         private void CreateSplittersTable()
         {
@@ -362,7 +372,7 @@ namespace NLDB
 
         private void CreateWordsTable()
         {
-            string columns_words = "id, rank, symbol, childs";
+            string columns_words = "id PRIMARY KEY, rank, symbol, childs";
             string columns_parents = "id, parent_id";
             //var words_data = i2w.Values.Select(w => new string[3]
             //{

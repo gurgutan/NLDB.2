@@ -10,8 +10,17 @@ namespace NLDB
     public class Rule : IEnumerable, IDisposable
     {
         int id;
-        Dictionary<int, int> transitions;   //Словарь<куда, сколько_раз>
+        Dictionary<int, int> transitions;   //Словарь<куда, сколько_раз> был переход из текущего слова (с id = this.id)
+        public Dictionary<int, int> Transitions
+        {
+            get { return transitions; }
+        }
+
         Dictionary<int, Rule> rules;
+        public Dictionary<int, Rule> Rules
+        {
+            get { return rules; }
+        }
 
         public Rule(int i)
         {
@@ -52,7 +61,7 @@ namespace NLDB
         {
             if (ids.Length == 0) return;
             this.Add(ids.First());
-            this.Add(ids.Skip(1).ToArray());
+            rules[ids.First()].Add(ids.Skip(1).ToArray());
         }
 
         public bool Exists(int i)
@@ -136,13 +145,15 @@ namespace NLDB
         {
             Rule current = root;
             double confidence = 1;
+            int count = 0;
             for (int i = 0; i < ids.Length; i++)
             {
-                confidence *= current.Confidence(ids[0]);
+                count++;
+                confidence += current.Confidence(ids[i]);
                 current = current.Get(ids[i]);
                 if (current == null) break;
             }
-            return confidence;
+            return confidence / count;
         }
 
         public int Count()

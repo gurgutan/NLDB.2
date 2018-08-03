@@ -18,14 +18,15 @@ namespace NLDB
         {
             string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
             Language l = new Language("wikiru.db", new string[] { "", @"[^а-яёa-z\%\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
-            Console.WriteLine($"Начало обучения на файле {trainfile}");
+            //Console.WriteLine($"Начало обучения на файле {trainfile}");
             //Stopwatch sw = new Stopwatch();
             //sw.Start();
             //using (StreamReader reader = File.OpenText(trainfile))
             //    l.Build(reader);
             //sw.Stop();
             //Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-            l.Connect("wikiru.db");
+            //l.Connect("wikiru.db");
+            l.BuildGrammar();
             
             Console.WriteLine($"Слов: {l.Count}");
             //Console.WriteLine("Поиск в БД по id");
@@ -66,26 +67,33 @@ namespace NLDB
                 if (lines.Count > que_size) lines.Dequeue();
                 string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "\n" + n);
 
-                Console.WriteLine(splitline + "\nРаспознавание ");
+                //Console.WriteLine(splitline + "\nРаспознавание ");
                 Stopwatch sw = new Stopwatch();
-                sw.Start();
-                var terms = l.Similars(text, 4, 2).ToList();
-                sw.Stop();
-                Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-                terms.ForEach(term => { if (term.id >= 0) Console.WriteLine($"{term.confidence}: {term.ToString()}"); });
-                Console.WriteLine(splitline + "\nПредположение о следующем слове: ");
-                sw.Restart();
-                var predicted_one = l.Predict(text, 2);
-                sw.Stop();
-                Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-                if (predicted_one != null) Console.WriteLine(predicted_one.confidence + ": " + predicted_one.ToString());
+                //sw.Start();
+                //var terms = l.Similars(text, 4, 2).ToList();
+                //sw.Stop();
+                //Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
+                //terms.ForEach(term => { if (term.id >= 0) Console.WriteLine($"{term.confidence}: {term.ToString()}"); });
+                //Console.WriteLine(splitline + "\nПредположение о следующем слове: ");
+                //sw.Restart();
+                //var predicted_one = l.Predict(text, 2);
+                //sw.Stop();
+                //Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
+                //if (predicted_one != null) Console.WriteLine(predicted_one.confidence + ": " + predicted_one.ToString());
+                //Console.WriteLine(splitline + "\nПостроение цепочки");
+                //sw.Restart();
+                //var predicted = l.PredictRecurrent(text, 32, 2);
+                //sw.Stop();
+                //Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
+                //if (predicted.Count != 0)
+                //    Console.WriteLine(predicted.Aggregate("", (c, n) => c + $" [{n.confidence.ToString("F2")}] " + n.ToString()));
                 Console.WriteLine(splitline + "\nПостроение цепочки");
                 sw.Restart();
-                var predicted = l.PredictRecurrent(text, 32, 2);
+                var next = l.Next(text, 2);
                 sw.Stop();
                 Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-                if (predicted.Count != 0)
-                    Console.WriteLine(predicted.Aggregate("", (c, n) => c + $" [{n.confidence.ToString("F2")}] " + n.ToString()));
+                if (next.Count != 0)
+                    Console.WriteLine(next.Aggregate("", (c, n) => c + $" " + n.ToString()));
             }
             l.Disconnect();
         }

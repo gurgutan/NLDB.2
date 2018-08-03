@@ -191,26 +191,76 @@ namespace NLDB
         }
 
 
-        //public List<Term> Next(string text, int max_count = 1, int rank = 2)
-        //{
-        //    //результат (цепочка термов)
-        //    List<Term> result = new List<Term>();
-        //    var terms = Parse(text, rank - 1).Select(i => ToTerm(i)).ToList();
-        //    terms.ForEach(t => Evaluate(t));
-        //    var similars = this.Similars(text, similars_max_count, rank).
-        //        Where(t => t.confidence > similars_min_confidence).
-        //        Take(similars_max_count);
-        //    if (similars.Count() == 0) return result;
-        //    //Первым в коллекции будет терм с максимальным confidence
-        //    var best_similar = similars.First();
-        //    //Получаем ссылки на всех предков similars с confidence пронаследованным от similars
-        //    var constraints = similars.
-        //        SelectMany(s => data.GetParents(s.id).Select(p => new Link(p.id, 0, s.confidence))).
-        //        SelectMany(p => data.Get(p.id).childs.Select(c => new Link(c, 0, p.confidence))).
-        //        SelectMany(c => data.Get(c.id).childs.Select(gc => new Link(gc, 0, c.confidence))).
-        //        Distinct().
-        //        ToList();
+        public List<Term> Next(string text, int rank = 2)
+        {
+            //результат (цепочка термов)
+            List<Term> result = new List<Term>();
+            var terms = Parse(text, rank).Select(t => ToTerm(t)).ToList();
+            terms.ForEach(t => Evaluate(t));
+            var similars = this.Similars(text, 4, rank).
+                Where(t => t.confidence > similars_min_confidence);
+            if (similars.Count() == 0) return result;
+            //Получаем ссылки на всех предков similars с confidence пронаследованным от similars
+            var constraints = similars.
+                SelectMany(s =>
+                    data.GetParents(s.id).SelectMany(p =>
+                        data.Get(p.id).childs.SelectMany(c =>
+                            data.Get(c).childs.Select(gc =>
+                                new Link(gc, 0, s.confidence))))).
+                Distinct(new LinkComparer()).
+                ToDictionary(link => link.id, link => link);
+            var sequence = FindSequence(grammar.Root, 0, constraints);
+            return sequence.Item2.Select(link => ToTerm(link.id)).ToList();
+        }
 
+        public Tuple<double, Stack<Link>> FindSequence(Rule rule, double max, Dictionary<int, Link> bag)
+        {
+            Stack<Link> path = new Stack<Link>();
+            Tuple<double, Stack<Link>> result = new Tuple<double, Stack<Link>>(max, path);
+            Link found = new Link();
+            foreach (var t in rule.Transitions)
+            {
+                Link link;
+                if (!bag.TryGetValue(t.Key, out link)) continue;
+                var check = FindSequence(rule.Rules[t.Key], max + link.confidence, bag);
+                if (max < check.Item1)
+                {
+                    max = check.Item1;
+                    path = check.Item2;
+                    found = link;
+                }
+            }
+            if (found.id != 0)
+            {
+                path.Push(new Link(found.id, 0, found.confidence));
+                result = new Tuple<double, Stack<Link>>(found.confidence + max, path);
+            }
+            return result;
+        }
+
+        //public Tuple<double, Stack<Link>> FindSequence(Rule rule, double max, IEnumerable<Link> bag)
+        //{
+        //    Stack<Link> path = new Stack<Link>();
+        //    Tuple<double, Stack<Link>> result = new Tuple<double, Stack<Link>>(max, path);
+        //    Link found = new Link();
+        //    if (rule.Transitions.Count == 0) return result;
+        //    foreach (var l in bag)
+        //    {
+        //        if (!rule.Transitions.ContainsKey(l.id)) continue;
+        //        var check = FindSequence(rule.Rules[l.id], max + l.confidence, bag);
+        //        if (max < check.Item1)
+        //        {
+        //            max = check.Item1;
+        //            path = check.Item2;
+        //            found = l;
+        //        }
+        //    }
+        //    if (found.id != 0)
+        //    {
+        //        path.Push(new Link(found.id, 0, found.confidence));
+        //        result = new Tuple<double, Stack<Link>>(found.confidence + max, path);
+        //    }
+        //    return result;
         //}
     }
 }

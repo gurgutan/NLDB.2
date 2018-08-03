@@ -17,10 +17,11 @@ namespace NLDB
 
         public Language(string _name, string[] _splitters)
         {
-            data = new DataContainer(_name, _splitters);
-            parsers = data.Splitters.Select(s => new Parser(s)).ToArray();
             this.Name = _name;
-            //data = new DataContainer(splitters, alphabet, i2w, w2i, links);
+            splitters = _splitters;
+            parsers = splitters.Select(s => new Parser(s)).ToArray();
+            data = new DataContainer(_name, splitters);
+            data.Open(Name);
         }
 
         public string Name { get; private set; }
@@ -100,15 +101,23 @@ namespace NLDB
             {
                 int id;
                 int[] childs = new int[0];
-                Word w = null;
                 if (rank > 0)
                 {
                     childs = Parse(s, rank - 1).ToArray();      //получаем id дочерних слов ранга rank-1
                     Sequence childs_seq = new Sequence(childs);
                     if (!words_exists.TryGetValue(childs_seq, out id))
                     {
-                        id = data.Add(new Word(0, rank, "", childs, new int[0]));
-                        words_exists[childs_seq] = id;
+                        Word w = data.Get(childs);
+                        if (w == null)
+                        {
+                            id = data.Add(new Word(0, rank, "", childs, new int[0]));
+                            words_exists[childs_seq] = id;
+                        }
+                        else
+                        {
+                            id = w.id;
+                            words_exists[childs_seq] = w.id;
+                        }
                     }
                     //w = data.Get(childs);
                 }
@@ -118,8 +127,17 @@ namespace NLDB
                         id = alphabet[s];
                     else
                     {
-                        id = data.Add(new Word(0, rank, s, childs, new int[0]));
-                        alphabet.Add(s, id);
+                        Word w = data.Get(s);
+                        if (w == null)
+                        {
+                            id = data.Add(new Word(0, rank, s, childs, new int[0]));
+                            alphabet.Add(s, id);
+                        }
+                        else
+                        {
+                            id = w.id;
+                            alphabet.Add(w.symbol, w.id);
+                        }
                     }
                     //w = data.Get(s);
                 }
@@ -235,7 +253,8 @@ namespace NLDB
                 var childs = term.childs.Select(c => Evaluate(c)).Where(c => c.id != 0).Select(c => c.id).ToArray();
                 var candidates = data.GetParents(childs).Select(p => ToTerm(p));
                 //Поиск ближайшего родителя, т.е.родителя с максимумом сonfidence
-                candidates.AsParallel().ForAll(p =>
+                //candidates.AsParallel().ForAll(p =>
+                candidates.ToList().ForEach(p =>
                 {
                     float confidence = Confidence.Compare(term, p);
                     if (term.confidence < confidence)

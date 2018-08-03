@@ -119,7 +119,7 @@ namespace NLDB
             int.Parse(ExecuteScalar(db, $"SELECT COUNT(*) FROM {tablename};").ToString());
 
         public static int Max(SQLiteConnection db, string tablename, string column) =>
-            int.Parse(ExecuteScalar(db, $"SELECT MAX({column}) FROM {tablename};").ToString());
+            int.Parse(ExecuteScalar(db, $"SELECT MAX(cast({column} as INTEGER)) FROM {tablename};").ToString());
 
         //---------------------------------------------------------------------------------------------------------------------------
         internal static string ToValueText(string[] value) =>

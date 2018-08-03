@@ -17,11 +17,12 @@ namespace NLDB.Tests
         [TestMethod()]
         public void LexiconTest()
         {
-            Lexicon lex = new Lexicon(1000);
-            Word w_r0_1 = new Word(1, 0, "", new int[0], null);
-            Word w_r0_2 = new Word(2, 0, "", new int[0], null);
-            Word w_r0_3 = new Word(3, 0, "", new int[0], null);
-            Assert.AreEqual(64513, lex.Capacity);
+            //Lexicon lex = new Lexicon(1000);
+            //Word w_r0_1 = new Word(1, 0, "", new int[0], null);
+            //Word w_r0_2 = new Word(2, 0, "", new int[0], null);
+            //Word w_r0_3 = new Word(3, 0, "", new int[0], null);
+            //Assert.AreEqual(64513, lex.Capacity);
+            Assert.Fail();
         }
     }
 }
