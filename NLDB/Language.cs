@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -54,6 +55,7 @@ namespace NLDB
                 count_words += this.Parse(text, this.Rank).Count();
                 data.EndTransaction();
             }
+            words_exists.Clear();
             return count_words;
         }
 

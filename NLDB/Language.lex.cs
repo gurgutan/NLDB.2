@@ -21,7 +21,7 @@ namespace NLDB
             splitters = _splitters;
             parsers = splitters.Select(s => new Parser(s)).ToArray();
             data = new DataContainer(_name, splitters);
-            data.Open(Name);
+            //data.Open(Name);
         }
 
         public string Name { get; private set; }

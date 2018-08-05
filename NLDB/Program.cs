@@ -16,8 +16,9 @@ namespace NLDB
 
         static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
-            Language l = new Language("wikiru.db", new string[] { "", @"[^а-яёa-z\%\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
+            string trainfile = @"D:\Data\Wiki\ru\884mb.txt";
+            Language l = new Language("wikiru.db", new string[] { "", @"[^а-яё\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
+            //l.New();
             //Console.WriteLine($"Начало обучения на файле {trainfile}");
             //Stopwatch sw = new Stopwatch();
             //sw.Start();
@@ -25,10 +26,10 @@ namespace NLDB
             //    l.Build(reader);
             //sw.Stop();
             //Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-            //l.Connect("wikiru.db");
+            l.Connect("wikiru.db");
             l.BuildGrammar();
             
-            Console.WriteLine($"Слов: {l.Count}");
+            Console.WriteLine($"\nСлов: {l.Count}");
             //Console.WriteLine("Поиск в БД по id");
             //List<int[]> childsList = new List<int[]>();
             //for (int i = 64; i < 128; i++)

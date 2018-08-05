@@ -37,6 +37,11 @@ namespace NLDB
             //BuildSequences();
         }
 
+        public void New()
+        {
+            data.Create();
+        }
+
         public void Disconnect()
         {
             data.Close();

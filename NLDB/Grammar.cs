@@ -9,7 +9,7 @@ namespace NLDB
 {
     public class Rule : IEnumerable, IDisposable
     {
-        int id;
+        public int id;
         Dictionary<int, int> transitions;   //Словарь<куда, сколько_раз> был переход из текущего слова (с id = this.id)
         public Dictionary<int, int> Transitions
         {

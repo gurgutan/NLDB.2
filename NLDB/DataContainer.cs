@@ -17,7 +17,11 @@ namespace NLDB
         private SQLiteTransaction transaction;
         private SQLiteConnection db;
 
+        //Кэш термов для быстрого выполнения метода ToTerm
         private Dictionary<int, Term> terms = new Dictionary<int, Term>();
+
+        //Кэш для символов алфавита
+        private Dictionary<string, Word> alphabet = new Dictionary<string, Word>();
 
         private int current_id = 0;
 
@@ -46,6 +50,7 @@ namespace NLDB
 
         public bool IsOpen()
         {
+            if (db == null) return false;
             return db.State == System.Data.ConnectionState.Open;
         }
 
@@ -184,6 +189,9 @@ namespace NLDB
         }
         public Word Get(string s)
         {
+            Word w;
+            //Попытка найти слово в кэше
+            if (alphabet.TryGetValue(s, out w)) return w;
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
             var word = SQLiteHelper.SelectValues(db,
@@ -198,7 +206,10 @@ namespace NLDB
             int[] childs = StringToIntArray(word[3]);
             //var parents_qry = SQLiteHelper.SelectValues(db, tablename: "parents", columns: "id,parent_id", where: $"id='{id}'");
             //int[] parents = parents_qry.Select(p => int.Parse(p[1])).ToArray();
-            return new Word(id, rank, symbol, childs, null /*parents*/);
+            w = new Word(id, rank, symbol, childs, null /*parents*/);
+            //Записываем симво в кэш
+            alphabet[s] = w;
+            return w;
         }
 
         public Word Get(int[] _childs)

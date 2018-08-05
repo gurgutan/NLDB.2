@@ -20,42 +20,42 @@ namespace NLDB
 
         private Grammar grammar = new Grammar();
 
-        public int BuildSequences()
-        {
-            sequences.Clear();
-            int seq_counter = 0;
-            Console.WriteLine("\nПостроение цепочек:");
-            for (int size = 2; size <= link_max_size; size++)
-            {
-                Console.WriteLine($"...длины {size} ");
-                foreach (var word in data)
-                {
-                    if (word.rank == 0) continue;
-                    //"Гусеница" для формирования цепочки
-                    Queue<int> caterpillar = new Queue<int>();
-                    for (int i = 0; i < word.childs.Length - 1; i++)
-                    {
-                        caterpillar.Enqueue(word.childs[i]);
-                        if (caterpillar.Count < size) continue;
-                        //Проверим, есть ли цепочка в словаре
-                        Sequence seq = new Sequence(caterpillar.ToArray());
-                        int number;
-                        if (sequences.TryGetValue(seq, out number))
-                        {
-                            sequences[seq] = number + 1;
-                        }
-                        else
-                        {
-                            seq_counter++;
-                            sequences[seq] = 1;
-                            Debug.WriteLineIf(seq_counter % (1 << 17) == 0, seq_counter);
-                        }
-                        caterpillar.Dequeue();
-                    }
-                }
-            }
-            return seq_counter;
-        }
+        //public int BuildSequences()
+        //{
+        //    sequences.Clear();
+        //    int seq_counter = 0;
+        //    Console.WriteLine("\nПостроение цепочек:");
+        //    for (int size = 2; size <= link_max_size; size++)
+        //    {
+        //        Console.WriteLine($"...длины {size} ");
+        //        foreach (var word in data)
+        //        {
+        //            if (word.rank == 0) continue;
+        //            //"Гусеница" для формирования цепочки
+        //            Queue<int> caterpillar = new Queue<int>();
+        //            for (int i = 0; i < word.childs.Length - 1; i++)
+        //            {
+        //                caterpillar.Enqueue(word.childs[i]);
+        //                if (caterpillar.Count < size) continue;
+        //                //Проверим, есть ли цепочка в словаре
+        //                Sequence seq = new Sequence(caterpillar.ToArray());
+        //                int number;
+        //                if (sequences.TryGetValue(seq, out number))
+        //                {
+        //                    sequences[seq] = number + 1;
+        //                }
+        //                else
+        //                {
+        //                    seq_counter++;
+        //                    sequences[seq] = 1;
+        //                    Debug.WriteLineIf(seq_counter % (1 << 17) == 0, seq_counter);
+        //                }
+        //                caterpillar.Dequeue();
+        //            }
+        //        }
+        //    }
+        //    return seq_counter;
+        //}
 
         public int BuildGrammar()
         {
@@ -195,12 +195,27 @@ namespace NLDB
         {
             //результат (цепочка термов)
             List<Term> result = new List<Term>();
+
+            Stopwatch sw = new Stopwatch(); //!!!
+            sw.Start(); //!!!
             var terms = Parse(text, rank).Select(t => ToTerm(t)).ToList();
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Парсинг: {sw.Elapsed.TotalSeconds}");
+            sw.Restart(); //!!!
             terms.ForEach(t => Evaluate(t));
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Evaluate: {sw.Elapsed.TotalSeconds}");
+            sw.Restart(); //!!!
             var similars = this.Similars(text, 4, rank).
                 Where(t => t.confidence > similars_min_confidence);
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Оапределение similars [{similars.Count()}]: {sw.Elapsed.TotalSeconds}");
             if (similars.Count() == 0) return result;
+            //var constraints = similars.SelectMany(s => s.childs.Select(c => new Link(c.id, 0, s.confidence))).
+            //    Distinct(new LinkComparer()).
+            //    ToDictionary(link => link.id, link => link);
             //Получаем ссылки на всех предков similars с confidence пронаследованным от similars
+            sw.Restart(); //!!!
             var constraints = similars.
                 SelectMany(s =>
                     data.GetParents(s.id).SelectMany(p =>
@@ -209,58 +224,41 @@ namespace NLDB
                                 new Link(gc, 0, s.confidence))))).
                 Distinct(new LinkComparer()).
                 ToDictionary(link => link.id, link => link);
-            var sequence = FindSequence(grammar.Root, 0, constraints);
-            return sequence.Item2.Select(link => ToTerm(link.id)).ToList();
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Определение constraints [{constraints.Count}]: {sw.Elapsed.TotalSeconds}");
+            //Запоминаем словарь допустимых слов, для использования в поиске
+            sw.Restart(); //!!!
+            constraints.Add(grammar.Root.id, new Link(0, 0, 0));
+            var path = FindSequence(grammar.Root, constraints);
+            sw.Stop();  //!!!
+            //Debug.WriteLine($"Определение sequence [{weight.ToString("F4")};{path.Count}]: {sw.Elapsed.TotalSeconds}");
+            return path.Item2.Skip(1).Select(link => ToTerm(link.id)).ToList();
         }
 
-        public Tuple<double, Stack<Link>> FindSequence(Rule rule, double max, Dictionary<int, Link> bag)
+
+        public Tuple<float, Stack<Link>> FindSequence(Rule rule, Dictionary<int, Link> bag)
         {
+            if (!bag.ContainsKey(rule.id)) return null;
+            float head_weight = bag[rule.id].confidence;
+            float tail_weight = 0;
+
             Stack<Link> path = new Stack<Link>();
-            Tuple<double, Stack<Link>> result = new Tuple<double, Stack<Link>>(max, path);
             Link found = new Link();
             foreach (var t in rule.Transitions)
             {
-                Link link;
-                if (!bag.TryGetValue(t.Key, out link)) continue;
-                var check = FindSequence(rule.Rules[t.Key], max + link.confidence, bag);
-                if (max < check.Item1)
+                //if (!bag.ContainsKey(t.Key)) continue;
+                var cur_path = FindSequence(rule.Rules[t.Key], bag);
+                if (cur_path == null) continue;
+                if (tail_weight < cur_path.Item1)
                 {
-                    max = check.Item1;
-                    path = check.Item2;
-                    found = link;
+                    found = new Link(t.Key, 0, bag[t.Key].confidence);
+                    tail_weight = cur_path.Item1;
+                    path = cur_path.Item2;
                 }
             }
-            if (found.id != 0)
-            {
-                path.Push(new Link(found.id, 0, found.confidence));
-                result = new Tuple<double, Stack<Link>>(found.confidence + max, path);
-            }
-            return result;
+            path.Push(new Link(rule.id, 0, head_weight));
+            return new Tuple<float, Stack<Link>>(head_weight + tail_weight, path);
         }
 
-        //public Tuple<double, Stack<Link>> FindSequence(Rule rule, double max, IEnumerable<Link> bag)
-        //{
-        //    Stack<Link> path = new Stack<Link>();
-        //    Tuple<double, Stack<Link>> result = new Tuple<double, Stack<Link>>(max, path);
-        //    Link found = new Link();
-        //    if (rule.Transitions.Count == 0) return result;
-        //    foreach (var l in bag)
-        //    {
-        //        if (!rule.Transitions.ContainsKey(l.id)) continue;
-        //        var check = FindSequence(rule.Rules[l.id], max + l.confidence, bag);
-        //        if (max < check.Item1)
-        //        {
-        //            max = check.Item1;
-        //            path = check.Item2;
-        //            found = l;
-        //        }
-        //    }
-        //    if (found.id != 0)
-        //    {
-        //        path.Push(new Link(found.id, 0, found.confidence));
-        //        result = new Tuple<double, Stack<Link>>(found.confidence + max, path);
-        //    }
-        //    return result;
-        //}
     }
 }
