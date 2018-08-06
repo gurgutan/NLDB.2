@@ -16,7 +16,7 @@ namespace NLDB
 
         static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\884mb.txt";
+            string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
             Language l = new Language("wikiru.db", new string[] { "", @"[^а-яё\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
             //l.New();
             //Console.WriteLine($"Начало обучения на файле {trainfile}");

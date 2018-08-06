@@ -32,7 +32,7 @@ namespace NLDB
         /// <returns>оценка схожести из интервала [0,1], где 0 - не похожи, 1 - максимально похожи</returns>
         private static float Inclusive(Term a, Term b)
         {
-            int count = a.childs.Sum(c => b.Contains(c) ? 1 : 0);
+            int count = a.Childs.Sum(c => b.Contains(c) ? 1 : 0);
             return count / a.Count;
         }
 
@@ -44,7 +44,7 @@ namespace NLDB
 
         private static float SoftInclusive(Term a, Term b)
         {
-            float count = a.childs.Sum(c => b.childs.Max(bc => Confidence.Compare(bc, c)));
+            float count = a.Childs.Sum(c => b.Childs.Max(bc => Confidence.Compare(bc, c)));
             return count / a.Count;
         }
 
@@ -59,7 +59,7 @@ namespace NLDB
             int n = a.Count < b.Count ? a.Count : b.Count;
             float s = 0;
             for (int i = 0; i < n; i++)
-                s += (a.childs[i].id == b.childs[i].id) ? a.childs[i].confidence : 0;
+                s += (a.Childs[i].id == b.Childs[i].id) ? a.Childs[i].confidence : 0;
             float denominator = (float)(Math.Sqrt(a.Count) * Math.Sqrt(b.Count));
             return s / denominator;
         }
@@ -79,7 +79,7 @@ namespace NLDB
             int n = a.Count < b.Count ? a.Count : b.Count;
             float s = 0;
             for (int i = 0; i < n; i++)
-                s += (a.childs[i].id == b.childs[i].id) ? a.childs[i].confidence : 0;
+                s += (a.Childs[i].id == b.Childs[i].id) ? a.Childs[i].confidence : 0;
             return s / a.Count;
         }
 
@@ -98,13 +98,13 @@ namespace NLDB
             float da = 0, db = 0;
             for (int i = 0; i < a.Count; i++)
                 for (int j = 0; j < b.Count; j++)
-                    s += a.childs[i].confidence * b.childs[j].confidence;
+                    s += a.Childs[i].confidence * b.Childs[j].confidence;
             for (int i = 0; i < a.Count; i++)
                 for (int j = 0; j < a.Count; j++)
-                    da += a.childs[i].confidence * a.childs[j].confidence;
+                    da += a.Childs[i].confidence * a.Childs[j].confidence;
             for (int i = 0; i < b.Count; i++)
                 for (int j = 0; j < b.Count; j++)
-                    db += b.childs[i].confidence * b.childs[j].confidence;
+                    db += b.Childs[i].confidence * b.Childs[j].confidence;
             return (float)(s / (Math.Sqrt(da) * Math.Sqrt(db)));
         }
 

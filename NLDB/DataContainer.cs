@@ -67,8 +67,9 @@ namespace NLDB
 
         public Term ToTerm(Word w, float confidence = 1)
         {
-            if (terms.ContainsKey(w.id)) return terms[w.id];
-            Term t = new Term(
+            Term t;
+            if (terms.TryGetValue(w.id, out t)) return t;
+            t = new Term(
                 w.rank,
                 w.id,
                 _confidence: confidence,
@@ -118,21 +119,6 @@ namespace NLDB
             return SQLiteHelper.Count(db, "words");
         }
 
-        public void Save(string _dbname)
-        {
-            dbname = _dbname;
-            //CreateAlphabetTable();
-            CreateSplittersTable();
-            CreateWordsTable();
-            CreateLinksTable();
-        }
-
-        public void Load(string _dbname)
-        {
-            dbname = _dbname;
-            throw new NotImplementedException();
-        }
-
         public SQLiteConnection Open(string _dbname)
         {
             dbname = _dbname;
@@ -140,7 +126,27 @@ namespace NLDB
             db = SQLiteHelper.OpenConnection(dbname);
             current_id = 0;
             current_id = this.CurrentId;
+            CreateCashes();
             return db;
+        }
+
+        //Создание кэша для алфавита
+        private void CreateCashes()
+        {
+            alphabet.Clear();
+            var cmd = db.CreateCommand();
+            cmd.CommandText = "SELECT id, rank, symbol FROM words WHERE rank=0;";
+            SQLiteDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                Word a = new Word(
+                    _id: int.Parse(reader.GetString(0)),
+                    _rank: int.Parse(reader.GetString(1)),
+                    _symbol: reader.GetString(2),
+                    _childs: null,
+                    _parents: null);
+                alphabet[a.symbol] = a;
+            }
         }
 
         public void Close() => SQLiteHelper.CloseConnection(db);
@@ -235,7 +241,7 @@ namespace NLDB
             var cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs FROM words " +
-                $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id='{i}'";
+                $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id='{i}' ;";
             //$"WHERE words.id IN (SELECT parents.parent_id FROM parents WHERE parents.id = {i});";
             var reader = cmd.ExecuteReader();
             List<Word> words = new List<Word>();
@@ -248,23 +254,23 @@ namespace NLDB
             return words;
         }
 
-        public IEnumerable<Word> GetParents(int[] i)
+        public IEnumerable<Tuple<int, Word>> GetParents(int[] i)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
             string ids = i.Select(e => "'" + e.ToString() + "'").Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
             var cmd = db.CreateCommand();
             cmd.CommandText =
-                $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs FROM words " +
+                $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs, parents.id FROM words " +
                 $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id IN ({ids})";
             //$"WHERE words.id IN (SELECT parents.parent_id FROM parents WHERE parents.id IN ({ids}));";
             var reader = cmd.ExecuteReader();
-            List<Word> words = new List<Word>();
+            List<Tuple<int, Word>> words = new List<Tuple<int, Word>>();
             while (reader.Read())
             {
                 int[] childs = StringToIntArray(reader.GetString(3));
                 Word w = new Word(int.Parse(reader.GetString(0)), int.Parse(reader.GetString(1)), reader.GetString(2), childs, null);
-                words.Add(w);
+                words.Add(new Tuple<int, Word>(int.Parse(reader.GetString(4)), w));
             }
             return words;
         }
@@ -385,19 +391,9 @@ namespace NLDB
         {
             string columns_words = "id PRIMARY KEY, rank, symbol, childs";
             string columns_parents = "id, parent_id";
-            //var words_data = i2w.Values.Select(w => new string[3]
-            //{
-            //    w.id.ToString(),            //id
-            //    w.rank.ToString(),          //rank
-            //    IntArrayToString(w.childs)  //childs
-            //}).Distinct();
-            //var parents_data = i2w.Values.SelectMany(w => w.parents.Select(p => new string[2] { w.id.ToString(), p.ToString() }));
             //Создаем таблицы
             SQLiteHelper.CreateTable(dbname, "words", columns_words, true);
             SQLiteHelper.CreateTable(dbname, "parents", columns_parents, true);
-            //Добавляем данные
-            //SQLiteHelper.InsertValues(dbname, "words", columns_words, words_data);
-            //SQLiteHelper.InsertValues(dbname, "parents", columns_parents, parents_data);
             //Создаем индексы
             SQLiteHelper.CreateIndex(dbname, "words", "words_id_ind", "id");
             SQLiteHelper.CreateIndex(dbname, "words", "childs_ind", "childs");

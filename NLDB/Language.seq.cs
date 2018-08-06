@@ -9,8 +9,9 @@ namespace NLDB
 {
     public partial class Language
     {
-        private const int similars_max_count = 4;           //максимальное количество похожих слов при поиске
-        private const float similars_min_confidence = 0.8F;
+        private const int similars_max_count = 8;           //максимальное количество похожих слов при поиске
+        private const float attenuation_coef = 40F;         //количество слов в ответе, которое обнуляет единицу confidence
+        private const float similars_min_confidence = 0.7F;
         private const float followers_min_confidence = 0.02F;
         private const int followers_max_count = 16;
         private const int link_max_size = 8;                // Максимальный размер цепочек
@@ -109,7 +110,7 @@ namespace NLDB
 
         public Term Predict(string text, int rank = 2)
         {
-            var similars = this.Similars(text, similars_max_count, rank).
+            var similars = this.Similars(text, rank).
                 Where(t => t.confidence > similars_min_confidence).
                 Take(similars_max_count);
             if (similars.Count() == 0) return null;
@@ -131,7 +132,7 @@ namespace NLDB
         {
             //результат (цепочка термов)
             List<Term> result = new List<Term>();
-            var similars = this.Similars(text, similars_max_count, rank).
+            var similars = this.Similars(text, rank).
                 Where(t => t.confidence > similars_min_confidence).
                 Take(similars_max_count);
             if (similars.Count() == 0) return result;
@@ -167,14 +168,14 @@ namespace NLDB
             //}
             //TODO: Нужен алгоритм поиска цепочки с максимумом функции качества (? определить функцию)
             //Очередь термов, используемая для предсказания следующего терма
-            Queue<int> seq = new Queue<int>(best_similar.childs.Select(s => s.id));
+            Queue<int> seq = new Queue<int>(best_similar.Childs.Select(s => s.id));
             //Стартовое слово: первый среди потомков
             Link next = Follower(seq.ToArray(), constraints);
             int skip = 0;
-            while (next.id == 0 && skip < best_similar.childs.Count)
+            while (next.id == 0 && skip < best_similar.Childs.Count)
             {
                 skip++;
-                seq = new Queue<int>(best_similar.childs.Skip(skip).Select(s => s.id));
+                seq = new Queue<int>(best_similar.Childs.Skip(skip).Select(s => s.id));
                 next = Follower(seq.ToArray(), constraints);
             }
             do
@@ -202,28 +203,34 @@ namespace NLDB
             sw.Stop();  //!!!
             Debug.WriteLine($"Парсинг: {sw.Elapsed.TotalSeconds}");
             sw.Restart(); //!!!
-            terms.ForEach(t => Evaluate(t));
+            var similars = Similars(text, rank).Where(t => t.confidence >= similars_min_confidence).Take(similars_max_count);
             sw.Stop();  //!!!
-            Debug.WriteLine($"Evaluate: {sw.Elapsed.TotalSeconds}");
-            sw.Restart(); //!!!
-            var similars = this.Similars(text, 4, rank).
-                Where(t => t.confidence > similars_min_confidence);
-            sw.Stop();  //!!!
-            Debug.WriteLine($"Оапределение similars [{similars.Count()}]: {sw.Elapsed.TotalSeconds}");
+            Debug.WriteLine($"Определение similars [{similars.Count()}]: {sw.Elapsed.TotalSeconds}");
+            Debug.WriteLine(similars.Aggregate("", (c, n) => c + (c == "" ? "" : c + "\n" + n.ToString())));
             if (similars.Count() == 0) return result;
             //var constraints = similars.SelectMany(s => s.childs.Select(c => new Link(c.id, 0, s.confidence))).
             //    Distinct(new LinkComparer()).
             //    ToDictionary(link => link.id, link => link);
             //Получаем ссылки на всех предков similars с confidence пронаследованным от similars
             sw.Restart(); //!!!
-            var constraints = similars.
-                SelectMany(s =>
-                    data.GetParents(s.id).SelectMany(p =>
-                        data.Get(p.id).childs.SelectMany(c =>
+            //запоминаем веса 
+            Dictionary<int, float> weights = similars.ToDictionary(s => s.id, s => s.confidence);
+            var constraints = data.
+                GetParents(weights.Keys.ToArray()).
+                    SelectMany(p =>
+                        data.Get(p.Item2.id).childs.SelectMany(c =>
                             data.Get(c).childs.Select(gc =>
-                                new Link(gc, 0, s.confidence))))).
+                                new Link(gc, 0, weights[p.Item1])))).
                 Distinct(new LinkComparer()).
                 ToDictionary(link => link.id, link => link);
+            //var constraints = similars.
+            //    SelectMany(s =>
+            //        data.GetParents(s.id).SelectMany(p =>
+            //            data.Get(p.id).childs.SelectMany(c =>
+            //                data.Get(c).childs.Select(gc =>
+            //                    new Link(gc, 0, s.confidence))))).
+            //    Distinct(new LinkComparer()).
+            //    ToDictionary(link => link.id, link => link);
             sw.Stop();  //!!!
             Debug.WriteLine($"Определение constraints [{constraints.Count}]: {sw.Elapsed.TotalSeconds}");
             //Запоминаем словарь допустимых слов, для использования в поиске
@@ -257,7 +264,7 @@ namespace NLDB
                 }
             }
             path.Push(new Link(rule.id, 0, head_weight));
-            return new Tuple<float, Stack<Link>>(head_weight + tail_weight, path);
+            return new Tuple<float, Stack<Link>>(head_weight + tail_weight - path.Count / attenuation_coef, path);
         }
 
     }

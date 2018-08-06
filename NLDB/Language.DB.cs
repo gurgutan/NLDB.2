@@ -17,17 +17,6 @@ namespace NLDB
     {
         DataContainer data;
 
-
-        public void Save(string filename)
-        {
-            data.Save(filename);
-        }
-
-        public void Load(string filename)
-        {
-            data.Load(filename);
-        }
-
         public void Connect(string dbname)
         {
             if(data.IsOpen()) data.Close();

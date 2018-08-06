@@ -193,7 +193,7 @@ namespace NLDB
             return Evaluate(term);
         }
 
-        public List<Term> Similars(string text, int count = 0, int rank = 2)
+        public List<Term> Similars(string text, int rank = 2)
         {
             text = parsers[rank].Normilize(text);
             Term term = ToTerm(text, rank);
@@ -207,21 +207,23 @@ namespace NLDB
             //    Distinct().                             // без дублей
             //    Select(p => ToTerm(p)).                 // переводим слова в термы
             //    ToList();
-            var childs = term.
-                childs.
+            var childs = term.Childs.
                 Select(c => Evaluate(c)).
                 Where(c => c.id != 0).
-                Select(c => c.id).ToArray();
+                Select(c => c.id).
+                Distinct().
+                ToArray();
             var candidates = data.
                 GetParents(childs).
-                Select(p => ToTerm(p)).ToList();
-            if (count == 0) count = candidates.Count;
+                Select(c => c.Item2).
+                Distinct(new WordComparer()).
+                Select(p => ToTerm(p)).
+                ToList();
             //Расчет оценок Confidence для каждого из соседей
-            candidates.AsParallel().
-                ForAll(p => p.confidence = Confidence.Compare(term, p));
+            candidates.AsParallel().ForAll(p => p.confidence = Confidence.Compare(term, p));
             //Сортировка по убыванию оценки
             candidates.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
-            return candidates.Take(count).ToList();
+            return candidates.ToList();
         }
 
         /// <summary>
@@ -231,11 +233,13 @@ namespace NLDB
         /// <returns>возвращает ссылку на term (возврат значения для удобства использования в LINQ)</returns>
         public Term Evaluate(Term term)
         {
+            //if (term.Evaluated) return term;
             if (term.rank == 0)
             {
                 //При нулевом ранге терма, confidence считаем исходя из наличия соответствующей буквы в алфавите
                 term.id = data.Get(term.text).id;
                 term.confidence = (term.id == 0 ? 0 : 1);
+                term.Evaluated = true;
                 return term;
             }
             else
@@ -250,20 +254,29 @@ namespace NLDB
                 //Distinct().                         // без дублей
                 //Select(p => ToTerm(p)).             // переводим слова в термы
                 //ToList();
-                var childs = term.childs.Select(c => Evaluate(c)).Where(c => c.id != 0).Select(c => c.id).ToArray();
-                var candidates = data.GetParents(childs).Select(p => ToTerm(p));
+                Term comparer = new Term(0, 0, 0, null, null);
+                var childs = term.Childs.
+                    AsParallel().
+                    Select(c => Evaluate(c)).
+                    Where(c => c.id != 0).
+                    Select(c => c.id).
+                    ToArray();
+                var candidates = data.
+                    GetParents(childs).
+                    Select(p => p.Item2).
+                    Distinct(new WordComparer()).
+                    Select(p => ToTerm(p));
                 //Поиск ближайшего родителя, т.е.родителя с максимумом сonfidence
-                //candidates.AsParallel().ForAll(p =>
-                candidates.ToList().ForEach(p =>
-                {
-                    float confidence = Confidence.Compare(term, p);
-                    if (term.confidence < confidence)
+                candidates.AsParallel().ForAll(p =>
                     {
-                        term.id = p.id;
-                        term.confidence = confidence;
-                    }
-                });
-
+                        float confidence = Confidence.Compare(term, p);
+                        if (term.confidence < confidence)
+                        {
+                            term.id = p.id;
+                            term.confidence = confidence;
+                        }
+                    });
+                term.Evaluated = true;
                 return term;
             }
         }

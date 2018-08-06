@@ -55,6 +55,7 @@ namespace NLDB
                 count_words += this.Parse(text, this.Rank).Count();
                 data.EndTransaction();
             }
+            //очищаем кэш
             words_exists.Clear();
             return count_words;
         }

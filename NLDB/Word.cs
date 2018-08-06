@@ -80,4 +80,17 @@ namespace NLDB
             return "{" + childs.Aggregate("", (c, n) => c == "" ? n.ToString() : c + "," + n.ToString()) + "}";
         }
     }
+
+    public class WordComparer : IEqualityComparer<Word>
+    {
+        public bool Equals(Word x, Word y)
+        {
+            return x.id == y.id;
+        }
+
+        public int GetHashCode(Word obj)
+        {
+            return obj.GetHashCode();
+        }
+    }
 }
