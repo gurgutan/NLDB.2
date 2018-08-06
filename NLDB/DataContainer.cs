@@ -21,7 +21,13 @@ namespace NLDB
         private Dictionary<int, Term> terms = new Dictionary<int, Term>();
 
         //Кэш для символов алфавита
-        private Dictionary<string, Word> alphabet = new Dictionary<string, Word>();
+        //private Dictionary<string, Word> alphabet = new Dictionary<string, Word>();
+
+        private Dictionary<string, int> alphabet = new Dictionary<string, int>();
+
+        //Кэш id слов для поиска по childs
+        Dictionary<Sequence, int> words_id = new Dictionary<Sequence, int>(1 << 24);
+
 
         private int current_id = 0;
 
@@ -145,7 +151,7 @@ namespace NLDB
                     _symbol: reader.GetString(2),
                     _childs: null,
                     _parents: null);
-                alphabet[a.symbol] = a;
+                alphabet[a.symbol] = a.id;
             }
         }
 
@@ -193,29 +199,43 @@ namespace NLDB
             //int[] parents = parents_qry.Select(s => int.Parse(s[1])).ToArray();
             return new Word(i, rank, symbol, childs, null /*parents*/);
         }
-        public Word Get(string s)
+
+        //public Word Get(string s)
+        //{
+        //    Word w;
+        //    //Попытка найти слово в кэше
+        //    if (alphabet.TryGetValue(s, out w)) return w;
+        //    if (db == null || db.State != System.Data.ConnectionState.Open)
+        //        throw new Exception($"Подключение к БД не установлено");
+        //    var word = SQLiteHelper.SelectValues(db,
+        //        tablename: "words",
+        //        columns: "id,rank,symbol,childs",
+        //        where: $"symbol='{s}'",
+        //        limit: "1").FirstOrDefault();
+        //    if (word == null) return null;
+        //    int id = int.Parse(word[0]);
+        //    var rank = int.Parse(word[1]);
+        //    string symbol = word[2];
+        //    int[] childs = StringToIntArray(word[3]);
+        //    //var parents_qry = SQLiteHelper.SelectValues(db, tablename: "parents", columns: "id,parent_id", where: $"id='{id}'");
+        //    //int[] parents = parents_qry.Select(p => int.Parse(p[1])).ToArray();
+        //    w = new Word(id, rank, symbol, childs, null /*parents*/);
+        //    //Записываем симво в кэш
+        //    alphabet[s] = w.id;
+        //    return w;
+        //}
+
+        public int GetId(string s)
         {
-            Word w;
-            //Попытка найти слово в кэше
-            if (alphabet.TryGetValue(s, out w)) return w;
-            if (db == null || db.State != System.Data.ConnectionState.Open)
-                throw new Exception($"Подключение к БД не установлено");
-            var word = SQLiteHelper.SelectValues(db,
-                tablename: "words",
-                columns: "id,rank,symbol,childs",
-                where: $"symbol='{s}'",
-                limit: "1").FirstOrDefault();
-            if (word == null) return null;
-            int id = int.Parse(word[0]);
-            var rank = int.Parse(word[1]);
-            string symbol = word[2];
-            int[] childs = StringToIntArray(word[3]);
-            //var parents_qry = SQLiteHelper.SelectValues(db, tablename: "parents", columns: "id,parent_id", where: $"id='{id}'");
-            //int[] parents = parents_qry.Select(p => int.Parse(p[1])).ToArray();
-            w = new Word(id, rank, symbol, childs, null /*parents*/);
-            //Записываем симво в кэш
-            alphabet[s] = w;
-            return w;
+            int id;
+            if (alphabet.TryGetValue(s, out id)) return id;
+            var cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT words.id FROM words WHERE symbol='{s}' LIMIT 1;";
+            object result = cmd.ExecuteScalar();
+            if (result == null) return 0;
+            if (int.TryParse(result.ToString(), out id)) return id;
+            else return 0;
+
         }
 
         public Word Get(int[] _childs)
@@ -232,6 +252,18 @@ namespace NLDB
             //var parents_qry = SQLiteHelper.SelectValues(db, tablename: "parents", columns: "id,parent_id", where: $"id='{id}'");
             //int[] parents = parents_qry.Select(s => int.Parse(s[1])).ToArray();
             return new Word(id, rank, symbol, _childs, null/*parents*/);
+        }
+
+        public int GetId(int[] _childs)
+        {
+            Sequence childs = new Sequence(_childs);
+            int id;
+            if (words_id.TryGetValue(childs, out id)) return id;
+            Word w = Get(_childs);
+            if (w == null) return 0;
+            //запишем в кэш
+            words_id[childs] = w.id;
+            return w.id;
         }
 
         public IEnumerable<Word> GetParents(int i)

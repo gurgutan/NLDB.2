@@ -24,7 +24,7 @@ namespace NLDB
         {
             dbname = _dbname;
             splitters = _splitters;
-            var db = new SQLiteConnection($"Data Source={dbname}; Version=3;");
+            db = new SQLiteConnection($"Data Source={dbname}; Version=3;");
             db.Open();
         }
 

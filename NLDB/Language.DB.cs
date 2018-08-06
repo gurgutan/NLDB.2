@@ -26,10 +26,10 @@ namespace NLDB
             //BuildSequences();
         }
 
-        public void New()
-        {
-            data.Create();
-        }
+        //public void New()
+        //{
+        //    data.Create();
+        //}
 
         public void Disconnect()
         {

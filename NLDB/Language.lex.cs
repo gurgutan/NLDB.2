@@ -9,10 +9,9 @@ namespace NLDB
 {
     public partial class Language
     {
-        private Alphabet alphabet = new Alphabet();
+        //private Alphabet alphabet = new Alphabet();
         //private Dictionary<int, Word> i2w = new Dictionary<int, Word>();
         //private Dictionary<Word, int> w2i = new Dictionary<Word, int>();
-        Dictionary<Sequence, int> words_exists = new Dictionary<Sequence, int>(1 << 24);
 
 
         public Language(string _name, string[] _splitters)
@@ -104,42 +103,15 @@ namespace NLDB
                 if (rank > 0)
                 {
                     childs = Parse(s, rank - 1).ToArray();      //получаем id дочерних слов ранга rank-1
-                    Sequence childs_seq = new Sequence(childs);
-                    if (!words_exists.TryGetValue(childs_seq, out id))
-                    {
-                        Word w = data.Get(childs);
-                        if (w == null)
-                        {
-                            id = data.Add(new Word(0, rank, "", childs, new int[0]));
-                            words_exists[childs_seq] = id;
-                        }
-                        else
-                        {
-                            id = w.id;
-                            words_exists[childs_seq] = w.id;
-                        }
-                    }
-                    //w = data.Get(childs);
+                    id = data.GetId(childs);
+                    if (id == 0)
+                        id = data.Add(new Word(0, rank, "", childs, new int[0]));
                 }
                 else
                 {
-                    if (alphabet.Contains(s))
-                        id = alphabet[s];
-                    else
-                    {
-                        Word w = data.Get(s);
-                        if (w == null)
-                        {
-                            id = data.Add(new Word(0, rank, s, childs, new int[0]));
-                            alphabet.Add(s, id);
-                        }
-                        else
-                        {
-                            id = w.id;
-                            alphabet.Add(w.symbol, w.id);
-                        }
-                    }
-                    //w = data.Get(s);
+                    id = data.GetId(s);
+                    if (id == 0)
+                        id = data.Add(new Word(0, rank, s, childs, new int[0]));
                 }
                 return id;
             });
@@ -237,7 +209,7 @@ namespace NLDB
             if (term.rank == 0)
             {
                 //При нулевом ранге терма, confidence считаем исходя из наличия соответствующей буквы в алфавите
-                term.id = data.Get(term.text).id;
+                term.id = data.GetId(term.text);
                 term.confidence = (term.id == 0 ? 0 : 1);
                 term.Evaluated = true;
                 return term;

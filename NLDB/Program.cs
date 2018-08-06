@@ -12,13 +12,13 @@ namespace NLDB
 {
     class Program
     {
-        static string splitline = "----------------------------------------------------------------------";
+        static string splitline = "---------------------------------------------------------------------------";
 
         static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
             Language l = new Language("wikiru.db", new string[] { "", @"[^а-яё\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
             //l.New();
+            //string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
             //Console.WriteLine($"Начало обучения на файле {trainfile}");
             //Stopwatch sw = new Stopwatch();
             //sw.Start();
@@ -57,7 +57,7 @@ namespace NLDB
             l.Connect(l.Name);
             Queue<string> lines = new Queue<string>();
             int que_size = 1;
-            string line = "---";
+            string line = splitline;
             while (line != "")
             {
                 Console.WriteLine(splitline);
