@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 
 namespace NLDB
 {
@@ -35,62 +36,6 @@ namespace NLDB
 
         public int Count { get { return data.Count(); } }
 
-        //public Dictionary<int, Word> Words { get { return i2w; } }
-
-        /// <summary>
-        /// Возвращает слово из словаря по идентификатору.
-        /// </summary>
-        /// <param name="i"></param>
-        /// <returns>Слово из словаря или null, если нет слова с id=i</returns>
-        //public Word Get(int i)
-        //{
-        //    Word w;
-        //    i2w.TryGetValue(i, out w);
-        //    return w;
-        //    //return data.Get(i);
-        //}
-
-        //public int Add(Word w, string letter = "")
-        //{
-        //    w.id = NextId();
-        //    i2w[w.id] = w;
-        //    w2i[w] = w.id;
-        //    //Добавление родительского слова в каждое из дочерних слов w.childs
-        //    Array.ForEach(w.childs, c => Get(c).AddParent(w.id));
-        //    //Добавление буквы в алфавит
-        //    if (!string.IsNullOrEmpty(letter) && !alphabet.Contains(letter))
-        //        alphabet.Add(letter, w.id);
-        //    return w.id;
-        //} 
-
-        //private IEnumerable<int> Parse(string text, int rank)
-        //{
-        //    text = this.parsers[rank].Normilize(text);
-        //    var strings = this.parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
-        //    //Для букв (слов ранга 0) возвращаем id букв, добавляя новые в алфавит, если надо
-        //    if (rank == 0)
-        //    {
-        //        return strings.Select(s =>
-        //        {
-        //            if (alphabet.Contains(s)) return alphabet[s];
-        //            return Add(new Word(0, 0, new int[0], new int[0]), s);
-        //        });
-        //    }
-        //    else
-        //    {
-        //        //Для слов ранга > 0 добавляем слова, которых еще нет
-        //        var ids = strings.Select(s =>
-        //        {
-        //            var childs = Parse(s, rank - 1).ToArray();      //получаем id дочерних слов ранга rank-1
-        //            int id = Find(childs, rank);                    //ищем соответствие в словаре, если нет, то id=0
-        //            if (id == 0)
-        //                id = Add(new Word(0, rank, childs, new int[0]));   //если не нашли, - добавляем
-        //            return id;
-        //        });
-        //        return ids.ToList();
-        //    }
-        //}
-
         private IEnumerable<int> Parse(string text, int rank)
         {
             text = this.parsers[rank].Normilize(text);
@@ -117,21 +62,6 @@ namespace NLDB
             });
         }
 
-        /// <summary>
-        /// Возвращает id слова, если существует слово с набором id дочерних слов childs, или 0, если такое слово не найдено
-        /// </summary>
-        /// <param name="childs">набор id дочерних слов</param>
-        /// <param name="rank">ранг искомого слова</param>
-        /// <returns></returns>
-        //public int Find(int[] childs, int rank)
-        //{
-        //    //return data.Get(childs).id;
-        //    Word word = new Word(0, rank, childs, new int[0]);
-        //    int id;
-        //    w2i.TryGetValue(word, out id);
-        //    return id;
-        //}
-
         public Term ToTerm(string text, int rank)
         {
             text = parsers[rank].Normilize(text);
@@ -152,12 +82,6 @@ namespace NLDB
             return data.ToTerm(i, _confidence);
         }
 
-        /// <summary>
-        /// Вычисляет ближайший терм ранга rank к тексту text
-        /// </summary>
-        /// <param name="text">искомая строка</param>
-        /// <param name="rank">ранг терма</param>
-        /// <returns></returns>
         public Term Similar(string text, int rank)
         {
             text = parsers[rank].Normilize(text);
@@ -168,9 +92,17 @@ namespace NLDB
         public List<Term> Similars(string text, int rank = 2)
         {
             text = parsers[rank].Normilize(text);
+            Stopwatch sw = new Stopwatch(); //!!!
+            sw.Start(); //!!!
             Term term = ToTerm(text, rank);
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->ToTerm: {sw.Elapsed.TotalSeconds}");
+            sw.Restart(); //!!!
+            Evaluate(term);
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->Evaluate: {sw.Elapsed.TotalSeconds}");
             //Для терма нулевого ранга возвращаем результат по наличию соответствующей буквы в алфавите
-            if (term.rank == 0) return new List<Term> { Evaluate(term) };
+            if (term.rank == 0) return new List<Term> { term };
             //Выделение претендентов на роль ближайшего
             //var candidates = term.childs.                // дочерние термы
             //    Select(c => Evaluate(c)).               // вычисляем все значения confidence
@@ -179,23 +111,32 @@ namespace NLDB
             //    Distinct().                             // без дублей
             //    Select(p => ToTerm(p)).                 // переводим слова в термы
             //    ToList();
+            sw.Restart(); //!!!
             var childs = term.Childs.
-                Select(c => Evaluate(c)).
+                //Select(c => Evaluate(c)).
                 Where(c => c.id != 0).
                 Select(c => c.id).
                 Distinct().
                 ToArray();
-            var candidates = data.
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
+            sw.Restart(); //!!!
+            var context = data.
                 GetParents(childs).
                 Select(c => c.Item2).
                 Distinct(new WordComparer()).
                 Select(p => ToTerm(p)).
                 ToList();
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
             //Расчет оценок Confidence для каждого из соседей
-            candidates.AsParallel().ForAll(p => p.confidence = Confidence.Compare(term, p));
+            sw.Restart(); //!!!
+            context.AsParallel().ForAll(p => p.confidence = Confidence.Compare(term, p));
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->Compare [{context.Count}]: {sw.Elapsed.TotalSeconds}");
             //Сортировка по убыванию оценки
-            candidates.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
-            return candidates.ToList();
+            context.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
+            return context.ToList();
         }
 
         /// <summary>
@@ -226,20 +167,26 @@ namespace NLDB
                 //Distinct().                         // без дублей
                 //Select(p => ToTerm(p)).             // переводим слова в термы
                 //ToList();
-                Term comparer = new Term(0, 0, 0, null, null);
+                Stopwatch sw = new Stopwatch(); //!!!
+                sw.Start(); //!!!
                 var childs = term.Childs.
-                    AsParallel().
+                    Distinct(new TermComparer()).
                     Select(c => Evaluate(c)).
                     Where(c => c.id != 0).
                     Select(c => c.id).
                     ToArray();
-                var candidates = data.
+                sw.Stop();  //!!!
+                Debug.WriteLine($"Evaluate->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
+                sw.Restart(); //!!!
+                var context = data.
                     GetParents(childs).
                     Select(p => p.Item2).
-                    Distinct(new WordComparer()).
-                    Select(p => ToTerm(p));
+                    //Distinct(new WordComparer()).
+                    Select(p => ToTerm(p)).ToList();
+                sw.Stop();  //!!!
+                Debug.WriteLine($"Evaluate->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
                 //Поиск ближайшего родителя, т.е.родителя с максимумом сonfidence
-                candidates.AsParallel().ForAll(p =>
+                context.AsParallel().ForAll(p =>
                     {
                         float confidence = Confidence.Compare(term, p);
                         if (term.confidence < confidence)

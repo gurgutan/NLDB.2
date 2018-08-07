@@ -238,6 +238,21 @@ namespace NLDB
 
         }
 
+        public int GetId(int[] _childs)
+        {
+            Sequence childs = new Sequence(_childs);
+            int id;
+            if (words_id.TryGetValue(childs, out id)) return id;
+            string childs_str = _childs.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
+            var cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT words.id FROM words WHERE childs='{childs_str}' LIMIT 1;";
+            object result = cmd.ExecuteScalar();
+            if (result == null) return 0;
+            //запишем в кэш
+            if (int.TryParse(result.ToString(), out id)) return id;
+            else return 0;
+        }
+
         public Word Get(int[] _childs)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
@@ -252,18 +267,6 @@ namespace NLDB
             //var parents_qry = SQLiteHelper.SelectValues(db, tablename: "parents", columns: "id,parent_id", where: $"id='{id}'");
             //int[] parents = parents_qry.Select(s => int.Parse(s[1])).ToArray();
             return new Word(id, rank, symbol, _childs, null/*parents*/);
-        }
-
-        public int GetId(int[] _childs)
-        {
-            Sequence childs = new Sequence(_childs);
-            int id;
-            if (words_id.TryGetValue(childs, out id)) return id;
-            Word w = Get(_childs);
-            if (w == null) return 0;
-            //запишем в кэш
-            words_id[childs] = w.id;
-            return w.id;
         }
 
         public IEnumerable<Word> GetParents(int i)
@@ -286,6 +289,33 @@ namespace NLDB
             return words;
         }
 
+        public IEnumerable<int> GetGrandchildsId(IEnumerable<int> i)
+        {
+            string i_str = i.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
+            var cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"SELECT DISTINCT words.childs FROM words " +
+                $"WHERE words.id IN '{i_str}' ;";
+            var reader = cmd.ExecuteReader();
+            StringBuilder childs = new StringBuilder();
+            while (reader.Read())
+            {
+                if (childs.Length > 0) childs.Append(",");
+                childs.Append(reader.GetString(0));
+            }
+            cmd.CommandText =
+                $"SELECT DISTINCT parents.id FROM parents" +
+                $"WHERE parents.parent_id IN '{childs.ToString()}'";
+            reader = cmd.ExecuteReader();
+            List<int> result = new List<int>();
+            while (reader.Read())
+            {
+                int id = int.Parse(reader.GetString(0));
+                result.Add(id);
+            }
+            return result;
+        }
+
         public IEnumerable<Tuple<int, Word>> GetParents(int[] i)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
@@ -304,6 +334,21 @@ namespace NLDB
                 Word w = new Word(int.Parse(reader.GetString(0)), int.Parse(reader.GetString(1)), reader.GetString(2), childs, null);
                 words.Add(new Tuple<int, Word>(int.Parse(reader.GetString(4)), w));
             }
+            return words;
+        }
+
+        public IEnumerable<int> GetParentsId(int[] i)
+        {
+            StringBuilder builder = new StringBuilder();
+            Array.ForEach(i, e => { if (builder.Length == 0) builder.Append(","); builder.Append(i); });
+            string ids = builder.ToString();
+            var cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"SELECT DISTINCT words.id FROM words " +
+                $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id IN ({ids})";
+            var reader = cmd.ExecuteReader();
+            List<int> words = new List<int>();
+            while (reader.Read()) words.Add(int.Parse(reader.GetString(0)));
             return words;
         }
 
