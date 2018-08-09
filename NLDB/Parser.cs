@@ -37,11 +37,9 @@ namespace NLDB
 
         public string Normilize(string text)
         {
-            text = text.ToLower().Trim();
-            text = removeRegex.Replace(text, "");
+            return removeRegex.Replace(text.ToLower().Trim(), "");
             //text = replaceNumbersRegex.Replace(text, specSymbolNumber);
             //text = replaceEnglishRegex.Replace(text, specSymbolEnglish);
-            return text;
         }
 
     }

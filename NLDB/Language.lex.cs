@@ -48,6 +48,7 @@ namespace NLDB
                 if (rank > 0)
                 {
                     childs = Parse(s, rank - 1).ToArray();      //получаем id дочерних слов ранга rank-1
+                    if (childs.Length == 0) return 0;
                     id = data.GetId(childs);
                     if (id == 0)
                         id = data.Add(new Word(0, rank, "", childs, new int[0]));
@@ -59,7 +60,7 @@ namespace NLDB
                         id = data.Add(new Word(0, rank, s, null, new int[0]));
                 }
                 return id;
-            });
+            }).Where(i => i != 0);
         }
 
         public Term ToTerm(string text, int rank)
@@ -183,12 +184,6 @@ namespace NLDB
                 return term;
             }
         }
-
-        //private int NextId()
-        //{
-        //    id_counter++;
-        //    return id_counter;
-        //}
 
     }
 }

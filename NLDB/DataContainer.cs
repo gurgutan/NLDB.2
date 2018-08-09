@@ -18,13 +18,13 @@ namespace NLDB
         private SQLiteConnection db;
 
         //Кэш термов для быстрого выполнения метода ToTerm
-        private Dictionary<int, Term> terms = new Dictionary<int, Term>();
+        private Dictionary<int, Term> terms = new Dictionary<int, Term>(1 << 10);
 
         //Кэш для символов алфавита
-        private Dictionary<string, int> alphabet = new Dictionary<string, int>();
+        private Dictionary<string, int> alphabet = new Dictionary<string, int>(1 << 10);
 
         //Кэш id слов для поиска по childs
-        Dictionary<Sequence, int> words_id = new Dictionary<Sequence, int>(1 << 24);
+        Dictionary<Sequence, int> words_id = new Dictionary<Sequence, int>(1 << 10);
 
 
         private int current_id = 0;
@@ -115,12 +115,12 @@ namespace NLDB
             db = SQLiteHelper.OpenConnection(dbname);
             current_id = 0;
             current_id = this.CurrentId;
-            CreateCashes();
+            CreateCashe();
             return db;
         }
 
         //Создание кэша для алфавита
-        private void CreateCashes()
+        internal void CreateCashe()
         {
             alphabet.Clear();
             var cmd = db.CreateCommand();
@@ -136,6 +136,14 @@ namespace NLDB
                     _parents: null);
                 alphabet[a.symbol] = a.id;
             }
+        }
+
+        internal void ClearCash()
+        {
+            alphabet.Clear();
+            terms.Clear();
+            words_id.Clear();
+            GC.Collect();
         }
 
         public void Close() => SQLiteHelper.CloseConnection(db);
@@ -165,7 +173,11 @@ namespace NLDB
             cmd.CommandText = $"SELECT words.id FROM words WHERE symbol='{s}' LIMIT 1;";
             object result = cmd.ExecuteScalar();
             if (result == null) return 0;
-            if (int.TryParse(result.ToString(), out id)) return id;
+            if (int.TryParse(result.ToString(), out id))
+            {
+                alphabet[s] = id;
+                return id;
+            }
             else return 0;
         }
 
@@ -177,7 +189,11 @@ namespace NLDB
             cmd.CommandText = $"SELECT words.id FROM words WHERE symbol='{s}' LIMIT 1;";
             object result = cmd.ExecuteScalar();
             if (result == null) return null;
-            if (int.TryParse(result.ToString(), out id)) return new Word(id, 0, s, null, null);
+            if (int.TryParse(result.ToString(), out id))
+            {
+                alphabet[s] = id;
+                return new Word(id, 0, s, null, null);
+            }
             else return null;
         }
 
@@ -317,7 +333,7 @@ namespace NLDB
             w.id = NextId();
             string childs = IntArrayToString(w.childs);
             string parents = BuildParentsString(w);
-            if (w.id == 1726) throw new Exception("!!!!");
+            //if (w.id == 1726) throw new Exception("!!!!");
             string word = $"('{w.id.ToString()}', '{w.rank.ToString()}', '{w.symbol}', '{childs}')";
             var cmd = db.CreateCommand();
             cmd.CommandText =
@@ -360,6 +376,7 @@ namespace NLDB
             current_id++;
             return current_id;
         }
+
         private int CurrentId
         {
             get

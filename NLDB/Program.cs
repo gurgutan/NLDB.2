@@ -16,10 +16,10 @@ namespace NLDB
 
         static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
-            if (File.Exists("wikiru.db")) File.Delete("wikiru.db");
+            string trainfile = @"D:\Data\Wiki\ru\100mb.txt";
+            
             Language l = new Language("wikiru.db", new string[] { "", @"[^а-яё\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
-            //l.New();
+            l.New();
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             Stopwatch sw = new Stopwatch();
             sw.Start();
@@ -96,6 +96,7 @@ namespace NLDB
                 Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
                 if (next.Count != 0)
                     Console.WriteLine(next.Aggregate("", (c, n) => c + $" " + n.ToString()));
+                l.FreeMemory();
             }
             l.Disconnect();
         }

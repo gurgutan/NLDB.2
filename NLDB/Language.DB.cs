@@ -38,10 +38,23 @@ namespace NLDB
         {
             return data.Get(i);
         }
+
         public Word Find(int[] i)
         {
             return data.Get(i);
         }
+
+        public void FreeMemory()
+        {
+            data.ClearCash();
+        }
+
+        public void New()
+        {
+            if (File.Exists(Name)) File.Delete(Name);
+            data = new DataContainer(Name, splitters);
+        }
+
 
 
     }

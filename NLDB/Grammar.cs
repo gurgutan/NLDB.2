@@ -10,12 +10,7 @@ namespace NLDB
     public class Rule : IEnumerable, IDisposable
     {
         public int id;
-        Dictionary<int, int> transitions;   //Словарь<куда, сколько_раз> был переход из текущего слова (с id = this.id)
-        public Dictionary<int, int> Transitions
-        {
-            get { return transitions; }
-        }
-
+        public int number;
         Dictionary<int, Rule> rules;
         public Dictionary<int, Rule> Rules
         {
@@ -25,36 +20,34 @@ namespace NLDB
         public Rule(int i)
         {
             id = i;
-            transitions = new Dictionary<int, int>();
+            number = 1;
             rules = new Dictionary<int, Rule>();
         }
 
-        public double Confidence(int i)
+        public float Confidence(int i)
         {
-            if (!transitions.ContainsKey(i)) return 0;
-            return (float)transitions[i] / transitions.Count;
+            if (!rules.ContainsKey(i)) return 0;
+            return (float)rules[i].number / rules.Count;
         }
 
         public void Add(Rule rule)
         {
-            if (transitions.ContainsKey(rule.id))
+            if (rules.ContainsKey(rule.id))
             {
-                transitions[rule.id]++;
+                rules[rule.id].number++;
                 return;
             }
             rules.Add(rule.id, rule);
-            transitions.Add(rule.id, 1);
         }
 
         public void Add(int i)
         {
-            if (transitions.ContainsKey(i))
+            if (rules.ContainsKey(i))
             {
-                transitions[i]++;
+                rules[i].number++;
                 return;
             }
             rules.Add(i, new Rule(i));
-            transitions.Add(i, 1);
         }
 
         public void Add(int[] ids)
@@ -66,7 +59,7 @@ namespace NLDB
 
         public bool Exists(int i)
         {
-            return transitions.ContainsKey(i);
+            return rules.ContainsKey(i);
         }
 
         public Rule Get(int i)
@@ -76,18 +69,17 @@ namespace NLDB
             return result;
         }
 
-        public int this[int i]
+        public Rule this[int i]
         {
             get
             {
-                int count;
-                transitions.TryGetValue(i, out count);
-                return count;
+                Rule rule;
+                rules.TryGetValue(i, out rule);
+                return rule;
             }
             set
             {
-                transitions[i] = value;
-                if (!rules.ContainsKey(i)) rules.Add(i, new Rule(i));
+                rules[i] = value;
             }
         }
 
@@ -108,12 +100,10 @@ namespace NLDB
         public void Dispose()
         {
             rules.Clear();
-            transitions.Clear();
         }
 
         public void Clear()
         {
-            transitions.Clear();
             rules.Clear();
         }
     }
