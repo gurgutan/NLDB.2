@@ -22,8 +22,6 @@ namespace NLDB
             if(data.IsOpen()) data.Close();
             data = new DataContainer(dbname, splitters);
             data.Open(dbname);
-            //BuildGrammar();
-            //BuildSequences();
         }
 
         //public void New()

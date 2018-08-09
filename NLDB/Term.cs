@@ -20,11 +20,11 @@ namespace NLDB
         private List<Term> parents;
         public List<Term> Parents { get { return parents; } }
 
-        public bool Evaluated { get; set; }
+        public bool Identified { get; set; }
 
         public Term(int _rank, int _id, float _confidence, string _text, IEnumerable<Term> _childs = null, IEnumerable<Term> _parents = null)
         {
-            Evaluated = false;
+            Identified = false;
             rank = _rank;
             id = _id;
             confidence = _confidence;
@@ -91,9 +91,9 @@ namespace NLDB
         {
             return confidence.CompareTo(obj);
         }
-
     }
 
+    //-------------------------------------------------------------------------------------------------
     public class TermComparer : IEqualityComparer<Term>
     {
         public bool Equals(Term x, Term y)

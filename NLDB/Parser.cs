@@ -25,7 +25,7 @@ namespace NLDB
         {
             this.SplitExpr = splitExpr;
             this.splitRegex = new Regex(this.SplitExpr, RegexOptions.Compiled);
-            this.removeRegex = new Regex(@"[^а-яА-ЯёЁa-z\d\s\n\!\?\.\,\;\:\*\+\-\&\\\/\%\$\^\(\)\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
+            this.removeRegex = new Regex(@"[^а-яА-ЯёЁ\d\s\n\!\?\.\,\;\:\*\+\-\&\\\/\%\$\^\(\)\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
             this.replaceNumbersRegex = new Regex(@"\b\d+((\.|\,)\d+)?");
             this.replaceEnglishRegex = new Regex(@"[a-zA-Z]+");
         }

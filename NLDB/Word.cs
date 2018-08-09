@@ -29,12 +29,12 @@ namespace NLDB
                 parents = new List<int>(_parents);
         }
 
-        public void AddParent(int p)
-        {
-            parents.Add(p);
-            //Array.Resize(ref parents, parents.Length + 1);
-            //parents[parents.Length - 1] = p;
-        }
+        //public void AddParent(int p)
+        //{
+        //    parents.Add(p);
+        //    //Array.Resize(ref parents, parents.Length + 1);
+        //    //parents[parents.Length - 1] = p;
+        //}
 
         /// <summary>
         /// Хэш-код слова зависит от ранга rank, id, childs 

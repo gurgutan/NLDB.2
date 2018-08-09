@@ -16,19 +16,20 @@ namespace NLDB
 
         static void Main(string[] args)
         {
+            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
+            if (File.Exists("wikiru.db")) File.Delete("wikiru.db");
             Language l = new Language("wikiru.db", new string[] { "", @"[^а-яё\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
             //l.New();
-            //string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
-            //Console.WriteLine($"Начало обучения на файле {trainfile}");
-            //Stopwatch sw = new Stopwatch();
-            //sw.Start();
-            //using (StreamReader reader = File.OpenText(trainfile))
-            //    l.Build(reader);
-            //sw.Stop();
-            //Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
+            Console.WriteLine($"Начало обучения на файле {trainfile}");
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            using (StreamReader reader = File.OpenText(trainfile))
+                l.Build(reader);
+            sw.Stop();
+            Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
             l.Connect("wikiru.db");
             l.BuildGrammar();
-            
+
             Console.WriteLine($"\nСлов: {l.Count}");
             //Console.WriteLine("Поиск в БД по id");
             //List<int[]> childsList = new List<int[]>();

@@ -153,37 +153,16 @@ namespace NLDB
             Debug.WriteLine($"Определение similars [{similars.Count()}]: {sw.Elapsed.TotalSeconds}");
             Debug.WriteLine(similars.Aggregate("", (c, n) => c + (c == "" ? "" : c + "\n" + n.ToString())));
             if (similars.Count() == 0) return result;
-            //var constraints = similars.SelectMany(s => s.childs.Select(c => new Link(c.id, 0, s.confidence))).
-            //    Distinct(new LinkComparer()).
-            //    ToDictionary(link => link.id, link => link);
-            //Получаем ссылки на всех предков similars с confidence пронаследованным от similars
-            sw.Restart(); //!!!
             //запоминаем веса 
             Dictionary<int, float> weights = similars.ToDictionary(s => s.id, s => s.confidence);
+            sw.Restart(); //!!!
+            //Получаем контекст
             var context = data.
-                GetParents(weights.Keys.ToArray()).
-                    SelectMany(p =>
-                        data.Get(p.Item2.id).childs.SelectMany(c =>
-                            data.Get(c).childs.Select(gc =>
-                                new Link(gc, 0, weights[p.Item1])))).
+                GetParentsWithChilds(weights.Keys.ToArray()).
+                SelectMany(p => data.GetGrandchildsId(p.Item2.id).
+                Select(gc => new Link(gc, 0, weights[p.Item1]))).
                 Distinct(new LinkComparer()).
                 ToDictionary(link => link.id, link => link);
-            //var context = data.
-            //    GetParents(weights.Keys.ToArray()).
-            //        SelectMany(p =>
-            //            data.Get(p.Item2.id).childs.SelectMany(c =>
-            //                data.Get(c).childs.Select(gc =>
-            //                    new Link(gc, 0, weights[p.Item1])))).
-            //    Distinct(new LinkComparer()).
-            //    ToDictionary(link => link.id, link => link);
-            //var constraints = similars.
-            //    SelectMany(s =>
-            //        data.GetParents(s.id).SelectMany(p =>
-            //            data.Get(p.id).childs.SelectMany(c =>
-            //                data.Get(c).childs.Select(gc =>
-            //                    new Link(gc, 0, s.confidence))))).
-            //    Distinct(new LinkComparer()).
-            //    ToDictionary(link => link.id, link => link);
             sw.Stop();  //!!!
             Debug.WriteLine($"Определение context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
             //Запоминаем словарь допустимых слов, для использования в поиске
@@ -191,7 +170,7 @@ namespace NLDB
             context.Add(grammar.Root.id, new Link(0, 0, 0));
             var path = FindSequence(grammar.Root, context);
             sw.Stop();  //!!!
-            //Debug.WriteLine($"Определение sequence [{weight.ToString("F4")};{path.Count}]: {sw.Elapsed.TotalSeconds}");
+            Debug.WriteLine($"Определение path [{path.Item1.ToString("F4")};{path.Item2.Count}]: {sw.Elapsed.TotalSeconds}");
             return path.Item2.Skip(1).Select(link => ToTerm(link.id)).ToList();
         }
 
