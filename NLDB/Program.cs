@@ -16,17 +16,17 @@ namespace NLDB
 
         static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\100mb.txt";
+            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
             
             Language l = new Language("wikiru.db", new string[] { "", @"[^а-яё\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
-            l.New();
-            Console.WriteLine($"Начало обучения на файле {trainfile}");
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            using (StreamReader reader = File.OpenText(trainfile))
-                l.Build(reader);
-            sw.Stop();
-            Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
+            //l.New();
+            //Console.WriteLine($"Начало обучения на файле {trainfile}");
+            //Stopwatch sw = new Stopwatch();
+            //sw.Start();
+            //using (StreamReader reader = File.OpenText(trainfile))
+            //    l.Build(reader);
+            //sw.Stop();
+            //Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
             l.Connect("wikiru.db");
             l.BuildGrammar();
 

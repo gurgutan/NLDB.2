@@ -15,6 +15,9 @@ namespace NLDB
         public int[] childs;
         public List<int> parents;
         public string symbol = null;
+        //Длина слова, используемая для преобразования лексикона в разреженную матрицу
+        public static readonly int WORD_SIZE = 1024;
+
 
         //public int[] parents = new int[0];
 
@@ -69,7 +72,7 @@ namespace NLDB
             int pos = 0;
             foreach (var c in childs)
             {
-                vector.Add(new int[] { 0, c * Language.WORD_SIZE + pos }, 1);
+                vector.Add(new int[] { 0, c * Word.WORD_SIZE + pos }, 1);
                 pos++;
             }
             return vector;

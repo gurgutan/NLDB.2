@@ -12,20 +12,17 @@ namespace NLDB
 {
     public class DataContainer : IEnumerable<Word>, IDisposable
     {
-        //private int block_size = 1 << 19;
-
         private SQLiteTransaction transaction;
         private SQLiteConnection db;
 
         //Кэш термов для быстрого выполнения метода ToTerm
         private Dictionary<int, Term> terms = new Dictionary<int, Term>(1 << 10);
 
-        //Кэш для символов алфавита
+        //Кэш символов алфавита
         private Dictionary<string, int> alphabet = new Dictionary<string, int>(1 << 10);
 
         //Кэш id слов для поиска по childs
         Dictionary<Sequence, int> words_id = new Dictionary<Sequence, int>(1 << 10);
-
 
         private int current_id = 0;
 
@@ -35,11 +32,6 @@ namespace NLDB
             get { return splitters; }
             set { splitters = value; }
         }
-
-        //private Alphabet alphabet = new Alphabet();
-        //private Dictionary<int, Word> i2w = new Dictionary<int, Word>();
-        //private Dictionary<Word, int> w2i = new Dictionary<Word, int>();
-        //private Dictionary<Sequence, Link[]> links = new Dictionary<Sequence, Link[]>();
 
         private string dbname = "data.db";
 
@@ -64,8 +56,7 @@ namespace NLDB
             if (File.Exists(dbname)) File.Delete(dbname);
             //if (db.State != System.Data.ConnectionState.Open)
             //    db = SQLiteHelper.OpenConnection(dbname);
-            CreateSplittersTable();
-            CreateWordsTable();
+            CreateTables();
         }
 
         public Term ToTerm(Word w, float confidence = 1)
@@ -86,11 +77,10 @@ namespace NLDB
         {
             Term t;
             if (terms.TryGetValue(i, out t))
-            {
                 t.confidence = confidence;
-                return t;
-            }
-            return ToTerm(Get(i));
+            else
+                t = ToTerm(Get(i));
+            return t;
         }
 
         public void BeginTransaction()
@@ -115,16 +105,16 @@ namespace NLDB
             db = SQLiteHelper.OpenConnection(dbname);
             current_id = 0;
             current_id = this.CurrentId;
-            CreateCashe();
+            CreateCash();
             return db;
         }
 
         //Создание кэша для алфавита
-        internal void CreateCashe()
+        internal void CreateCash()
         {
             alphabet.Clear();
             var cmd = db.CreateCommand();
-            cmd.CommandText = "SELECT id, rank, symbol FROM words WHERE rank=0;";
+            cmd.CommandText = "SELECT id, rank, symbol FROM words WHERE rank=0;";   //буквы алфавита, т.е. слова ранга 0
             SQLiteDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
             {
@@ -152,11 +142,15 @@ namespace NLDB
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
-            var word = SQLiteHelper.SelectValues(db, tablename: "words", columns: "id,rank,symbol,childs", where: $"id='{i}'", limit: "").FirstOrDefault();
-            if (word == null) return null;
-            var rank = int.Parse(word[1]);
-            string symbol = word[2];
-            int[] childs = StringToIntArray(word[3]);
+            var cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT id,rank,symbol,childs FROM words WHERE id='{i}' LIMIT 1;";
+            var reader = cmd.ExecuteReader();
+            reader.Read();
+            //var word = SQLiteHelper.SelectValues(db, tablename: "words", columns: "id,rank,symbol,childs", where: $"id='{i}'", limit: "").FirstOrDefault();
+            //if (word == null) return null;
+            var rank = int.Parse(reader.GetString(1));
+            var symbol = reader.GetString(2);
+            int[] childs = StringToIntArray(reader.GetString(3));
             //var parents_qry = SQLiteHelper.SelectValues(db,
             //    tablename: "parents",
             //    columns: "id,parent_id",
@@ -333,15 +327,12 @@ namespace NLDB
             w.id = NextId();
             string childs = IntArrayToString(w.childs);
             string parents = BuildParentsString(w);
-            //if (w.id == 1726) throw new Exception("!!!!");
             string word = $"('{w.id.ToString()}', '{w.rank.ToString()}', '{w.symbol}', '{childs}')";
             var cmd = db.CreateCommand();
             cmd.CommandText =
                 $"INSERT INTO words(id,rank,symbol,childs) VALUES {word};" +
                 (parents == "" ? "" : $"INSERT INTO parents(id,parent_id) VALUES {parents};");
             cmd.ExecuteNonQuery();
-            //SQLiteHelper.InsertValues(db, "words", "id,rank,symbol,childs", word);
-            //SQLiteHelper.InsertValues(db, "parents", "id,parent_id", parents);
             return w.id;
         }
 
@@ -367,12 +358,11 @@ namespace NLDB
 
         private int[] StringToIntArray(string s) =>
             s.Split(separator: new char[] { ',' }, options: StringSplitOptions.RemoveEmptyEntries).
-            Select(e => int.Parse(e)).
-            ToArray();
+            Select(e => int.Parse(e)).ToArray();
 
         private int NextId()
         {
-            Debug.WriteLineIf(current_id % (1 << 14) == 0, current_id);
+            Debug.WriteLineIf(current_id % (1 << 16) == 0, current_id);
             current_id++;
             return current_id;
         }
@@ -390,17 +380,15 @@ namespace NLDB
             }
         }
 
-        private void CreateSplittersTable()
+        private void CreateTables()
         {
             string columns = "rank, expr";
             var data = splitters.Select((s, i) => new string[2] { s, i.ToString() });
             SQLiteHelper.CreateTable(dbname, "splitters", columns, true);
             SQLiteHelper.InsertValues(dbname, "splitters", columns, data);
-        }
-
-        private void CreateWordsTable()
-        {
+            //колонки таблицыа слов
             string columns_words = "id PRIMARY KEY, rank, symbol, childs";
+            //колнки таблицы связей дочернее->родительское id
             string columns_parents = "id, parent_id";
             //Создаем таблицы
             SQLiteHelper.CreateTable(dbname, "words", columns_words, true);
@@ -418,30 +406,25 @@ namespace NLDB
             var rank = int.Parse(s_rank);
             string symbol = s_symbol;
             int[] childs = StringToIntArray(s_childs);
-            int[] parents = s_parents.Select(p => int.Parse(p)).ToArray();
+            int[] parents = s_parents?.Select(p => int.Parse(p)).ToArray();
             return new Word(id, rank, symbol, childs, parents);
         }
 
         public IEnumerator<Word> GetEnumerator()
         {
-            StringBuilder cmd_text = new StringBuilder();
-            cmd_text.Append($"SELECT id,rank,symbol,childs FROM words");
-            var reader = SQLiteHelper.CreateReader(db, cmd_text.ToString());
+            var cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT id,rank,symbol,childs FROM words";
+            var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
                 string[] row = new string[4];
                 reader.GetValues(row);
-                var parents_qry = SQLiteHelper.SelectValues(db,
-                    tablename: "parents",
-                    columns: "parent_id",
-                    where: $"parents.id={row[0]}");
-                IEnumerable<string> parents = parents_qry.Select(p => p[0]);
-                yield return StringsToWord(
-                    s_id: row[0],
-                    s_rank: row[1],
-                    s_symbol: row[2],
-                    s_childs: row[3],
-                    s_parents: parents);
+                //var parents_qry = SQLiteHelper.SelectValues(db,
+                //    tablename: "parents",
+                //    columns: "parent_id",
+                //    where: $"parents.id={row[0]}");
+                //IEnumerable<string> parents = parents_qry.Select(p => p[0]);
+                yield return StringsToWord(s_id: row[0], s_rank: row[1], s_symbol: row[2], s_childs: row[3], s_parents: null/*parents*/);
             }
         }
 

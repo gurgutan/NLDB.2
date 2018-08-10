@@ -10,34 +10,15 @@ namespace NLDB
     public partial class Language
     {
         private const int similars_max_count = 8;           //максимальное количество похожих слов при поиске
-        private const float attenuation = 100F;         //количество слов в ответе, которое обнуляет единицу confidence
-        private const float similars_min_confidence = 0.7F;
+        private const float attenuation = 100F;         //количество слов в ответе, которое обнуляет confidence ответа
+        private const float similars_min_confidence = 0.5F;
         private const float followers_min_confidence = 0.02F;
         private const int followers_max_count = 16;
-
 
         //private const int link_max_size = 8;                // Максимальный размер цепочек
         //private const int links_max_count = 1 << 23;        // Количество цепочек для инициализации словаря
 
         //private Dictionary<Sequence, int> sequences = new Dictionary<Sequence, int>(links_max_count);
-
-        private Grammar grammar = new Grammar();
-
-        public int BuildGrammar()
-        {
-            grammar.Clear();
-            Debug.WriteLine("Построение грамматики");
-            var words = data.Where(w => w.rank > 0);
-            int count = 0;
-            foreach (var w in words)
-            {
-                grammar.Add(w.childs);
-                count++;
-                Debug.WriteLineIf(count % (1 << 16) == 0, count);
-            }
-            return grammar.Count();
-        }
-
 
         //private Link Follower(int[] iarray, IEnumerable<Link> constraints, float min_confidence = 1)
         //{
@@ -139,6 +120,103 @@ namespace NLDB
         //    return result;
         //}
 
+        public List<Term> Similars(string text, int rank = 2)
+        {
+            text = parsers[rank].Normilize(text);
+            Stopwatch sw = new Stopwatch(); //!!!
+            sw.Start(); //!!!
+            Term term = ToTerm(text, rank);
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->ToTerm: {sw.Elapsed.TotalSeconds}");
+            sw.Restart(); //!!!
+            Identify(term);
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->Identify: {sw.Elapsed.TotalSeconds}");
+            //Для терма нулевого ранга возвращаем результат по наличию соответствующей буквы в алфавите
+            if (term.rank == 0) return new List<Term> { term };
+            //Определение контекста по дочерним словам
+            sw.Restart(); //!!!
+            var childs = term.Childs.
+                Where(c => c.id != 0).
+                Select(c => c.id).
+                Distinct().
+                ToArray();
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
+            sw.Restart(); //!!!
+            var context = data.
+                GetParentsId(childs).
+                Distinct().
+                Select(p => ToTerm(p)).
+                ToList();
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
+            //Расчет оценок Confidence для каждого из соседей
+            sw.Restart(); //!!!
+            context.AsParallel().ForAll(p => p.confidence = Confidence.Compare(term, p));
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->Compare [{context.Count}]: {sw.Elapsed.TotalSeconds}");
+            //Сортировка по убыванию оценки
+            context.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
+            return context.ToList();
+        }
+
+        /// <summary>
+        /// Вычисляет значение confidence и id для терма term. Меняет переданный по ссылке term
+        /// </summary>
+        /// <param name="term">изменяемый терм</param>
+        /// <returns>возвращает ссылку на term (возврат значения для удобства использования в LINQ)</returns>
+        public Term Identify(Term term)
+        {
+            if (term.Identified) return term;
+            if (term.rank == 0)
+            {
+                //При нулевом ранге терма, confidence считаем исходя из наличия соответствующей буквы в алфавите
+                term.id = data.GetId(term.text);
+                term.confidence = (term.id == 0 ? 0 : 1);
+                term.Identified = true;
+                return term;
+            }
+            else
+            {
+                //Если ранг терма больше нуля, то confidence считаем по набору дочерних элементов
+                Stopwatch sw = new Stopwatch(); //!!!
+                sw.Start(); //!!!
+                var childs = term.Childs.
+                    Distinct(new TermComparer()).
+                    Select(c => Identify(c)).
+                    Where(c => c.id != 0).
+                    Select(c => c.id).
+                    ToArray();
+                sw.Stop();  //!!!
+                Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
+                sw.Restart(); //!!!
+                var parents = data.GetParentsId(childs).ToList();
+                sw.Stop();  //!!!
+                Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
+                sw.Restart(); //!!!
+                var context = parents.Select(p => ToTerm(p)).ToList();
+                sw.Stop();  //!!!
+                Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
+                //Поиск ближайшего родителя, т.е.родителя с максимумом сonfidence
+                var max = context.AsParallel().Aggregate(
+                    new Link(),
+                    (subtotal, thread_term) =>
+                    {
+                        float confidence = Confidence.Compare(term, thread_term);
+                        if (subtotal.confidence < confidence) return new Link(thread_term.id, 0, confidence);
+                        return subtotal;
+                    },
+                    (total, subtotal) => total.confidence < subtotal.confidence ? subtotal : total,
+                    (final) => final);
+                term.id = max.id;
+                term.confidence = max.confidence;
+                term.Identified = true;
+                return term;
+            }
+        }
+
+
         public List<Term> Next(string text, int rank = 2)
         {
             List<Term> result = new List<Term>();
@@ -153,7 +231,7 @@ namespace NLDB
             var similars = Similars(text, rank).Where(t => t.confidence >= similars_min_confidence).Take(similars_max_count);
             sw.Stop();  //!!!
             Debug.WriteLine($"Определение similars [{similars.Count()}]: {sw.Elapsed.TotalSeconds}");
-            Debug.WriteLine(similars.Aggregate("", (c, n) => c + (c == "" ? "" : c + "\n" + n.ToString())));
+            similars.ToList().ForEach(s => Debug.WriteLine($" [{s.confidence.ToString("F4")}] {s}"));    //!!!
             if (similars.Count() == 0) return result;
             //запоминаем веса 
             Dictionary<int, float> weights = similars.ToDictionary(s => s.id, s => s.confidence);
@@ -176,13 +254,11 @@ namespace NLDB
             return path.Item2.Skip(1).Select(link => ToTerm(link.id)).ToList();
         }
 
-
         public Tuple<float, Stack<Link>> FindSequence(Rule rule, Dictionary<int, Link> context)
         {
             if (!context.ContainsKey(rule.id)) return null;
             float head_weight = context[rule.id].confidence;
             float tail_weight = 0;
-
             Stack<Link> path = new Stack<Link>();
             Link found = new Link();
             foreach (var t in rule.Rules)
@@ -192,13 +268,14 @@ namespace NLDB
                 if (cur_path == null) continue;
                 if (tail_weight < cur_path.Item1)
                 {
+                    //критерий определяется как максимум сумм произведений вероятности слова в цепочке на confidence слова
                     found = new Link(t.Key, 0, context[t.Key].confidence * rule.Confidence(t.Key));
                     tail_weight = cur_path.Item1;
                     path = cur_path.Item2;
                 }
             }
             path.Push(new Link(rule.id, 0, head_weight));
-            return new Tuple<float, Stack<Link>>(head_weight + tail_weight - path.Count / attenuation, path);
+            return new Tuple<float, Stack<Link>>((head_weight + tail_weight) / (path.Count / attenuation), path);
         }
 
     }

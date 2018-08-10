@@ -11,6 +11,7 @@ namespace NLDB
     {
         public int id;
         public int number;
+
         Dictionary<int, Rule> rules;
         public Dictionary<int, Rule> Rules
         {

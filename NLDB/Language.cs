@@ -13,17 +13,68 @@ namespace NLDB
     [Serializable]
     public partial class Language
     {
+        private DataContainer data;
+
         private int[] EmptyArray = new int[0];
         //private int id_counter = 1;
         private Parser[] parsers;
 
         private string[] splitters;
 
-        //Длина слова, используемая для преобразования лексикона в разреженную матрицу
-        public static readonly int WORD_SIZE = 1024;
+        private Grammar grammar = new Grammar();
+
+        public string Name { get; private set; }
+
+        public int Rank { get { return data.Splitters.Length - 1; } }
+
+        public string[] Splitters { get { return this.data.Splitters; } }
+
+        public int Count { get { return data.Count(); } }
+
         //Размер буфера для чтения текста
         public static readonly int TEXT_BUFFER_SIZE = 1 << 22;
 
+        public Language(string _name, string[] _splitters)
+        {
+            this.Name = _name;
+            splitters = _splitters;
+            parsers = splitters.Select(s => new Parser(s)).ToArray();
+            data = new DataContainer(_name, splitters);
+            //data.Open(Name);
+        }
+
+        public void Connect(string dbname)
+        {
+            if (data.IsOpen()) data.Close();
+            data = new DataContainer(dbname, splitters);
+            data.Open(dbname);
+        }
+
+        public void Disconnect()
+        {
+            data.Close();
+        }
+
+        public Word Find(int i)
+        {
+            return data.Get(i);
+        }
+
+        public Word Find(int[] i)
+        {
+            return data.Get(i);
+        }
+
+        public void FreeMemory()
+        {
+            data.ClearCash();
+        }
+
+        public void New()
+        {
+            if (File.Exists(Name)) File.Delete(Name);
+            data = new DataContainer(Name, splitters);
+        }
 
         /// <summary>
         /// Создает словарь из потока
@@ -55,7 +106,24 @@ namespace NLDB
                 count_words += this.Parse(text, this.Rank).Count();
                 data.EndTransaction();
             }
+            //Очистка кэша
+            data.ClearCash();
             return count_words;
+        }
+
+        public int BuildGrammar()
+        {
+            grammar.Clear();
+            Debug.WriteLine("Построение грамматики");
+            var words = data.Where(w => w.rank > 0);
+            int count = 0;
+            foreach (var w in words)
+            {
+                grammar.Add(w.childs);
+                count++;
+                Debug.WriteLineIf(count % (1 << 18) == 0, count);
+            }
+            return grammar.Count();
         }
 
         /// <summary>

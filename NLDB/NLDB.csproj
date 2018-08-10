@@ -111,7 +111,6 @@
     <Compile Include="Sequence.cs" />
     <Compile Include="Primes.cs" />
     <Compile Include="Language.cs" />
-    <Compile Include="Language.db.cs" />
     <Compile Include="Language.lex.cs" />
     <Compile Include="Parser.cs" />
     <Compile Include="Program.cs" />

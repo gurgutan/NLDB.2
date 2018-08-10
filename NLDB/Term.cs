@@ -82,28 +82,14 @@ namespace NLDB
             return hash;
         }
 
-        /// <summary>
-        /// Сравнение по confidence
-        /// </summary>
-        /// <param name="obj"></param>
-        /// <returns></returns>
-        public int CompareTo(object obj)
-        {
-            return confidence.CompareTo(obj);
-        }
+        public int CompareTo(object obj) => confidence.CompareTo(obj);
     }
 
     //-------------------------------------------------------------------------------------------------
     public class TermComparer : IEqualityComparer<Term>
     {
-        public bool Equals(Term x, Term y)
-        {
-            return x.id == y.id;
-        }
+        public bool Equals(Term x, Term y) => x.id == y.id;
 
-        public int GetHashCode(Term obj)
-        {
-            return obj.GetHashCode();
-        }
+        public int GetHashCode(Term obj) => obj.GetHashCode();
     }
 }
