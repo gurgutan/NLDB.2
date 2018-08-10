@@ -252,10 +252,7 @@ namespace NLDB
             var reader = cmd.ExecuteReader();
             List<int> result = new List<int>();
             while (reader.Read())
-            {
-                int id = int.Parse(reader.GetString(0));
-                result.Add(id);
-            }
+                result.Add(int.Parse(reader.GetString(0)));
             return result;
         }
 
@@ -353,7 +350,6 @@ namespace NLDB
             StringBuilder builder = new StringBuilder();
             Array.ForEach(a, e => builder.Append((builder.Length == 0 ? "" : ",") + e.ToString()));
             return builder.ToString();
-            //a.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
         }
 
         private int[] StringToIntArray(string s) =>
