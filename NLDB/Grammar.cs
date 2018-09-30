@@ -2,97 +2,119 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace NLDB
 {
-    public class Rule : IEnumerable, IDisposable
+    //TODO: переделать Rule на движок БД
+    /// <summary>
+    /// Класс, представляющий сущность Правило Грамматики. Содержит идентификатор Слова и список Правил, допустимых как следующие за данным Словом.
+    /// </summary>
+    public class Rule : IEnumerable, IDisposable, IEquatable<Rule>
     {
+        /// <summary>
+        /// Идентификатор Слова и Правила одновременно
+        /// </summary>
         public int id;
+        /// <summary>
+        /// Число упоминаний данного правила по итогам анализа текста
+        /// </summary>
         public int number;
+        //public readonly int pos;
 
-        Dictionary<int, Rule> rules;
-        public Dictionary<int, Rule> Rules
+        private readonly List<Rule> rules;
+        public List<Rule> Rules => this.rules;
+
+        public Rule(int _id, int _n = 1/*, int _pos = 0*/)
         {
-            get { return rules; }
+            this.id = _id;
+            this.number = _n;
+            //this.pos = _pos;
+            this.rules = new List<Rule>();            
         }
 
-        public Rule(int i)
-        {
-            id = i;
-            number = 1;
-            rules = new Dictionary<int, Rule>();
-        }
-
+        /// <summary>
+        /// Вычисляет уверенность в текущем правиле, как отношение числа использований данного правила к общему числу упоминаний 
+        /// любого правила, в данном контексте.
+        /// </summary>
+        /// <param name="i">идентификатор Правила (Слова)</param>
+        /// <returns></returns>
         public float Confidence(int i)
         {
-            if (!rules.ContainsKey(i)) return 0;
-            return (float)rules[i].number / rules.Count;
+            if (!this.Exists(i)) return 0;
+            return (float)this[i].number / this.rules.Count;
         }
 
-        public void Add(Rule rule)
+        /// <summary>
+        /// Метод добавляет следующее за текущим Правило rule, если оно еще не добавлено или увеличивает счетчик упоминаний Правила rule
+        /// </summary>
+        /// <param name="rule"></param>
+        /// <returns></returns>
+        public Rule AddCount(Rule rule)
         {
-            if (rules.ContainsKey(rule.id))
+            Rule actual = this.Get(rule.id);
+            if (actual != null)
             {
-                rules[rule.id].number++;
-                return;
+                actual.number++;
             }
-            rules.Add(rule.id, rule);
+            else
+            {
+                this.rules.Add(rule);
+                actual = rule;
+            }
+            return actual;
         }
 
-        public void Add(int i)
+        public Rule AddCount(int _id)
         {
-            if (rules.ContainsKey(i))
+            Rule actual = this.Get(_id);
+            if (actual != null)
+                actual.number++;
+            else
             {
-                rules[i].number++;
-                return;
+                actual = new Rule(_id, 1/*, this.pos + 1*/);
+                this.rules.Add(actual);
             }
-            rules.Add(i, new Rule(i));
+            return actual;
         }
 
-        public void Add(int[] ids)
+        /// <summary>
+        /// Добавить цепочку Правил ids, следующих за данным (this)
+        /// </summary>
+        /// <param name="ids"></param>
+        public void AddSeq(int[] ids)
         {
             if (ids.Length == 0) return;
-            this.Add(ids.First());
-            rules[ids.First()].Add(ids.Skip(1).ToArray());
+            int first = ids.First();
+            this.AddCount(first).AddSeq(ids.Skip(1).ToArray());
         }
 
         public bool Exists(int i)
         {
-            return rules.ContainsKey(i);
+            return this.Get(i) != null;
         }
 
         public Rule Get(int i)
         {
-            Rule result;
-            rules.TryGetValue(i, out result);
-            return result;
+            Rule rule = new Rule(i);
+            //TODO: критическая для производительности операция! надо что-нибудь придумать. Отказ от словаря для для экономии памяти
+            int index = this.rules.IndexOf(rule);
+            if (index > -1)
+                return this.rules[index];
+            else
+                return null;
         }
 
-        public Rule this[int i]
-        {
-            get
-            {
-                Rule rule;
-                rules.TryGetValue(i, out rule);
-                return rule;
-            }
-            set
-            {
-                rules[i] = value;
-            }
-        }
+        public Rule this[int i] => this.Get(i);
 
         public int Count()
         {
-            return 1 + rules.Values.Sum(r => r.Count());
+            return 1 + this.rules.Sum(r => r.Count());
         }
 
         public IEnumerator GetEnumerator()
         {
             yield return this;
-            foreach (var r in rules)
+            foreach (Rule r in this.rules)
             {
                 yield return r;
             }
@@ -100,41 +122,41 @@ namespace NLDB
 
         public void Dispose()
         {
-            rules.Clear();
+            this.rules.Clear();
         }
 
         public void Clear()
         {
-            rules.Clear();
+            this.rules.Clear();
+        }
+
+        public bool Equals(Rule other)
+        {
+            if (other == null) return false;
+            return (other as Rule).id == this.id;
         }
     }
 
     //----------------------------------------------------------------------------------------------------
     public class Grammar : IEnumerable, IDisposable
     {
-        Rule root = new Rule(0);
+        private readonly Rule root = new Rule(0);
 
-        public Rule Root
-        {
-            get { return root; }
-        }
+        public Rule Root => this.root;
 
         public Grammar() { }
 
-        public Rule this[int i]
-        {
-            get { return root.Get(i); }
-        }
+        public Rule this[int i] => this.root.Get(i);
 
         public void Add(int[] ids)
         {
             if (ids == null || ids.Length == 0) return;
-            root.Add(ids);
+            this.root.AddSeq(ids);
         }
 
         public double Confidence(int[] ids)
         {
-            Rule current = root;
+            Rule current = this.root;
             double confidence = 1;
             int count = 0;
             for (int i = 0; i < ids.Length; i++)
@@ -149,22 +171,22 @@ namespace NLDB
 
         public int Count()
         {
-            return root.Count();
+            return this.root.Count();
         }
 
         public void Clear()
         {
-            root.Clear();
+            this.root.Clear();
         }
 
         public void Dispose()
         {
-            root.Dispose();
+            this.root.Dispose();
         }
 
         public IEnumerator GetEnumerator()
         {
-            return root.GetEnumerator();
+            return this.root.GetEnumerator();
         }
     }
 }

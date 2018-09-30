@@ -16,20 +16,18 @@ namespace NLDB
 
         static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
-            
-            Language l = new Language("wikiru.db", new string[] { "", @"[^а-яё\d]+", @"[\n\r]+", @"\[\[\d+\]\]" });
-            //l.New();
-            //Console.WriteLine($"Начало обучения на файле {trainfile}");
-            //Stopwatch sw = new Stopwatch();
-            //sw.Start();
-            //using (StreamReader reader = File.OpenText(trainfile))
-            //    l.Build(reader);
-            //sw.Stop();
-            //Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-            l.Connect("wikiru.db");
-            l.BuildGrammar();
-
+            string dbname = "wikiru100.db";
+            string trainfile = @"D:\Data\Wiki\ru\100mb.txt";
+            Language l = new Language(dbname, new string[] { "", @"[^а-яё\d\{\}]+", @"[\n\r]+", @"\[\[{число}\]\]" });
+            l.CreateDB();
+            l.ConnectDB();
+            Console.WriteLine($"Начало обучения на файле {trainfile}");
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            using (StreamReader reader = File.OpenText(trainfile))
+                l.BuildLexicon(reader);
+            sw.Stop();
+            Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
             Console.WriteLine($"\nСлов: {l.Count}");
             //Console.WriteLine("Поиск в БД по id");
             //List<int[]> childsList = new List<int[]>();
@@ -55,7 +53,7 @@ namespace NLDB
 
         static void TestLangConsole(Language l)
         {
-            l.Connect(l.Name);
+            if(!l.IsConnected()) l.ConnectDB();
             Queue<string> lines = new Queue<string>();
             int que_size = 1;
             string line = splitline;
@@ -96,9 +94,9 @@ namespace NLDB
                 Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
                 if (next.Count != 0)
                     Console.WriteLine(next.Aggregate("", (c, n) => c + $" " + n.ToString()));
-                l.FreeMemory();
+                //l.FreeMemory();
             }
-            l.Disconnect();
+            l.DisconnectDB();
         }
 
         //private static void TestDeserialization()
