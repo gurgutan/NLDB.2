@@ -1,20 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace NLDB
 {
-    class Program
+    internal class Program
     {
-        static string splitline = "---------------------------------------------------------------------------";
+        private static readonly string splitline = "---------------------------------------------------------------------------";
 
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             string dbname = "wikiru5mb.db";
             string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
@@ -26,7 +21,7 @@ namespace NLDB
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             Stopwatch sw = new Stopwatch();
             sw.Start();
-                l.BuildLexicon(trainfile);
+            l.BuildLexicon(trainfile);
             sw.Stop();
             Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
             Console.WriteLine($"\nСлов: {l.Count}");
@@ -52,9 +47,9 @@ namespace NLDB
             TestLangConsole(l);
         }
 
-        static void TestLangConsole(Language l)
+        private static void TestLangConsole(Language l)
         {
-            if(!l.IsConnected()) l.ConnectDB();
+            if (!l.IsConnected()) l.ConnectDB();
             Queue<string> lines = new Queue<string>();
             int que_size = 1;
             string line = splitline;
@@ -90,7 +85,7 @@ namespace NLDB
                 //    Console.WriteLine(predicted.Aggregate("", (c, n) => c + $" [{n.confidence.ToString("F2")}] " + n.ToString()));
                 Console.WriteLine(splitline + "\nПостроение цепочки");
                 sw.Restart();
-                var next = l.Next(text, 2);
+                List<Term> next = l.Next(text, 2);
                 sw.Stop();
                 Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
                 if (next.Count != 0)
@@ -145,7 +140,7 @@ namespace NLDB
         //    TestLangConsole(l);
         //}
 
-        static void NormilizeTest()
+        private static void NormilizeTest()
         {
             Parser parser = new Parser(@"[^а-яА-ЯёЁ0-9]");
             string result = parser.Normilize("Привет ~~м^^ир/!");
@@ -157,7 +152,7 @@ namespace NLDB
         {
             Parser parser = new Parser(@"\[\[\d+\]\]");
             string[] result = parser.Split("[[324]] sdhjfjkshfjksdhf \n\n[[66]] uiqweuiqw diuhiqw \n\n [[454]] 273hd d7h sh d");
-            foreach (var s in result)
+            foreach (string s in result)
                 Console.Write(s + "\n------------------------------\n");
             Console.ReadKey();
         }
