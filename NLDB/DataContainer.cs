@@ -408,53 +408,6 @@ namespace NLDB
             return w.id;
         }
 
-
-        //public void AddRulesSeq(int[] ids)
-        //{
-        //    int id = 0;
-        //    SQLiteCommand cmd = this.db.CreateCommand();
-        //    for (int pos = 0; pos < ids.Length; pos++)
-        //    {
-        //        cmd.CommandText = $"SELECT count FROM grammar WHERE id={id} and next = {ids[pos]} and pos={pos}";
-        //        object result = cmd.ExecuteScalar();
-        //        int count = result == null ? 0 : (int)result;
-        //        if (count > 0)
-        //            cmd.CommandText = $"UPDATE grammar SET count={count + 1} WHERE id={id} and next = {ids[pos]} and pos={pos}";
-        //        else
-        //            cmd.CommandText = $"INSERT INTO grammar(id,next,pos,count) VALUES ({id},{ids[pos]},{pos},{count + 1});";
-        //        id = ids[pos];  // запоминаем предыдыущий id
-        //        cmd.ExecuteNonQuery();
-        //    }
-        //}
-
-        //public List<Rule> GetNextRules(Rule rule)
-        //{
-        //    SQLiteCommand cmd = this.db.CreateCommand();
-        //    cmd.CommandText = $"SELECT next, pos, count FROM grammar WHERE id={rule.id} and pos={rule.pos}";
-        //    SQLiteDataReader reader = cmd.ExecuteReader();
-        //    List<Rule> rules = new List<Rule>();
-        //    while (reader.Read())
-        //    {
-        //        Rule child = new Rule(reader.GetInt32(0), reader.GetInt32(2));
-        //        rules.Add(child);
-        //    }
-        //    return rules;
-        //}
-
-        //public Rule GetRule(int id, int pos)
-        //{
-        //    SQLiteCommand cmd = this.db.CreateCommand();
-        //    cmd.CommandText = $"SELECT next, pos, count FROM grammar WHERE id={id} and pos={pos}";
-        //    SQLiteDataReader reader = cmd.ExecuteReader();
-        //    Rule rule = new Rule(id, 1, pos - 1);
-        //    while (reader.Read())
-        //    {
-        //        Rule child = new Rule(reader.GetInt32(0), reader.GetInt32(2));
-        //        rule.Rules.Add(child);
-        //    }
-        //    return rule;
-        //}
-
         private string BuildParentsString(Word w)
         {
             if (w.childs == null || w.childs.Length == 0) return "";
@@ -537,6 +490,53 @@ namespace NLDB
         {
             this.db.Close();
         }
+
+
+        //public void AddRulesSeq(int[] ids)
+        //{
+        //    int id = 0;
+        //    SQLiteCommand cmd = this.db.CreateCommand();
+        //    for (int pos = 0; pos < ids.Length; pos++)
+        //    {
+        //        cmd.CommandText = $"SELECT count FROM grammar WHERE id={id} and next = {ids[pos]} and pos={pos}";
+        //        object result = cmd.ExecuteScalar();
+        //        int count = result == null ? 0 : (int)result;
+        //        if (count > 0)
+        //            cmd.CommandText = $"UPDATE grammar SET count={count + 1} WHERE id={id} and next = {ids[pos]} and pos={pos}";
+        //        else
+        //            cmd.CommandText = $"INSERT INTO grammar(id,next,pos,count) VALUES ({id},{ids[pos]},{pos},{count + 1});";
+        //        id = ids[pos];  // запоминаем предыдыущий id
+        //        cmd.ExecuteNonQuery();
+        //    }
+        //}
+
+        //public List<Rule> GetNextRules(Rule rule)
+        //{
+        //    SQLiteCommand cmd = this.db.CreateCommand();
+        //    cmd.CommandText = $"SELECT next, pos, count FROM grammar WHERE id={rule.id} and pos={rule.pos}";
+        //    SQLiteDataReader reader = cmd.ExecuteReader();
+        //    List<Rule> rules = new List<Rule>();
+        //    while (reader.Read())
+        //    {
+        //        Rule child = new Rule(reader.GetInt32(0), reader.GetInt32(2));
+        //        rules.Add(child);
+        //    }
+        //    return rules;
+        //}
+
+        //public Rule GetRule(int id, int pos)
+        //{
+        //    SQLiteCommand cmd = this.db.CreateCommand();
+        //    cmd.CommandText = $"SELECT next, pos, count FROM grammar WHERE id={id} and pos={pos}";
+        //    SQLiteDataReader reader = cmd.ExecuteReader();
+        //    Rule rule = new Rule(id, 1, pos - 1);
+        //    while (reader.Read())
+        //    {
+        //        Rule child = new Rule(reader.GetInt32(0), reader.GetInt32(2));
+        //        rule.Rules.Add(child);
+        //    }
+        //    return rule;
+        //}
     }
 
 }

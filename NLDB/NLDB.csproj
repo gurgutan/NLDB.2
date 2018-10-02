@@ -101,13 +101,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Alphabet.cs" />
     <Compile Include="Confidence.cs" />
     <Compile Include="DataContainer.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="Grammar.cs" />
     <Compile Include="Lexicon.cs" />
     <Compile Include="Link.cs" />
+    <Compile Include="ProgressInformer.cs" />
     <Compile Include="Sequence.cs" />
     <Compile Include="Primes.cs" />
     <Compile Include="Language.cs" />
