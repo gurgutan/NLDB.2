@@ -15,13 +15,13 @@ namespace NLDB
             string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
             string[] splitters = new string[] { "", @"[^а-яё\d\{\}]+", @"[\n\r]+", @"\[\[{число}\]\]" };
             Language l = new Language(dbname, splitters);
-            //l.CreateDB();
+            l.CreateDB();
             l.Connect();
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            //l.BuildLexicon(trainfile);
-            l.BuildGrammar();
+            l.BuildLexicon(trainfile);
+            //l.BuildGrammar();
             sw.Stop();
             Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
             //Console.WriteLine("Поиск в БД по id");

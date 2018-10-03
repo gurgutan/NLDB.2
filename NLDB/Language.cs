@@ -24,18 +24,18 @@ namespace NLDB
 
         //Основные свойства
         public string Name { get; private set; }
-        public int Rank => data.Splitters.Length - 1;
-        public string[] Splitters => data.Splitters;
-        public int Count => data.Count();
+        public int Rank => this.data.Splitters.Length - 1;
+        public string[] Splitters => this.data.Splitters;
+        public int Count => this.data.Count();
         //Размер буфера для чтения текста
         public static readonly int TEXT_BUFFER_SIZE = 1 << 16;
 
         public Language(string _name, string[] _splitters)
         {
             Name = _name;
-            splitters = _splitters;
-            parsers = splitters.Select(s => new Parser(s)).ToArray();
-            data = new DataContainer(_name, splitters);
+            this.splitters = _splitters;
+            this.parsers = this.splitters.Select(s => new Parser(s)).ToArray();
+            this.data = new DataContainer(_name, this.splitters);
         }
 
         //--------------------------------------------------------------------------------------------
@@ -43,19 +43,19 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         public void Connect()
         {
-            if (data.IsOpen()) data.CloseConnection();
-            data = new DataContainer(Name, splitters);
-            data.Connect(Name);
+            if (this.data.IsOpen()) this.data.CloseConnection();
+            this.data = new DataContainer(Name, this.splitters);
+            this.data.Connect(Name);
         }
 
         public void Disconnect()
         {
-            data.CloseConnection();
+            this.data.CloseConnection();
         }
 
         public bool IsConnected()
         {
-            return data.IsOpen();
+            return this.data.IsOpen();
         }
 
         /// <summary>
@@ -63,10 +63,10 @@ namespace NLDB
         /// </summary>
         public void CreateDB()
         {
-            if (data.IsOpen()) data.CloseConnection();
+            if (this.data.IsOpen()) this.data.CloseConnection();
             if (File.Exists(Name)) File.Delete(Name);
-            data = new DataContainer(Name, splitters);
-            data.CreateDB();
+            this.data = new DataContainer(Name, this.splitters);
+            this.data.CreateDB();
         }
 
         /// <summary>
@@ -84,20 +84,20 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         public Word Find(int i)
         {
-            return data.Get(i);
+            return this.data.Get(i);
         }
 
         public Word Find(int[] i)
         {
-            return data.Get(i);
+            return this.data.Get(i);
         }
 
         public Term ToTerm(string text, int rank)
         {
-            text = parsers[rank].Normilize(text);
+            text = this.parsers[rank].Normilize(text);
             return new Term(rank, 0, 0, text,
                 rank == 0 ? null :
-                parsers[rank - 1].
+                this.parsers[rank - 1].
                 Split(text).
                 Where(s => !string.IsNullOrWhiteSpace(s)).
                 Select(s => ToTerm(s, rank - 1)));
@@ -105,12 +105,12 @@ namespace NLDB
 
         public Term ToTerm(Word w, float _confidence = 1)
         {
-            return data.ToTerm(w, _confidence);
+            return this.data.ToTerm(w, _confidence);
         }
 
         public Term ToTerm(int i, float _confidence = 1)
         {
-            return data.ToTerm(i, _confidence);
+            return this.data.ToTerm(i, _confidence);
         }
 
         //--------------------------------------------------------------------------------------------
@@ -118,10 +118,10 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         private IEnumerable<int> Parse(string text, int rank)
         {
-            text = parsers[rank].Normilize(text);
-            IEnumerable<string> strings = parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
+            text = this.parsers[rank].Normilize(text);
+            IEnumerable<string> strings = this.parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
             //Для слов ранга > 0 добавляем слова, которых еще нет
-            return strings.Select(s =>
+            var result = strings.Select(s =>
             {
                 int id;
                 int[] childs = null;
@@ -129,16 +129,17 @@ namespace NLDB
                 {
                     childs = Parse(s, rank - 1).ToArray();      //получаем id дочерних слов ранга rank-1
                     if (childs.Length == 0) return 0;
-                    id = data.GetId(childs);
-                    if (id == 0) id = data.Add(new Word(0, rank, "", childs, new int[0]));
+                    id = this.data.GetId(childs);
+                    if (id == 0) id = this.data.Add(new Word(0, rank, "", childs, new int[0]));
                 }
                 else
                 {
-                    id = data.GetId(s);
-                    if (id == 0) id = data.Add(new Word(0, rank, s, null, new int[0]));
+                    id = this.data.GetId(s);
+                    if (id == 0) id = this.data.Add(new Word(0, rank, s, null, new int[0]));
                 }
                 return id;
-            }).Where(i => i != 0);
+            }).Where(i => i != 0).ToList();
+            return result;
         }
 
 
@@ -153,7 +154,7 @@ namespace NLDB
             if (term.rank == 0)
             {
                 //При нулевом ранге терма, confidence считаем исходя из наличия соответствующей буквы в алфавите
-                term.id = data.GetId(term.text);
+                term.id = this.data.GetId(term.text);
                 term.confidence = (term.id == 0 ? 0 : 1);
                 term.Identified = true;
                 return term;
@@ -172,7 +173,7 @@ namespace NLDB
                 sw.Stop();  //!!!
                 Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
-                List<int> parents = data.GetParentsId(childs).ToList();
+                List<int> parents = this.data.GetParentsId(childs).ToList();
                 sw.Stop();  //!!!
                 Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
@@ -205,7 +206,7 @@ namespace NLDB
         /// <returns></returns>
         public Term Similar(string text, int rank)
         {
-            text = parsers[rank].Normilize(text);
+            text = this.parsers[rank].Normilize(text);
             Term term = ToTerm(text, rank);
             return Identify(term);
         }
@@ -218,7 +219,7 @@ namespace NLDB
         /// <returns></returns>
         public List<Term> Similars(string text, int rank = 2)
         {
-            text = parsers[rank].Normilize(text);
+            text = this.parsers[rank].Normilize(text);
             Stopwatch sw = new Stopwatch(); //!!!
             sw.Start(); //!!!
             Term term = ToTerm(text, rank);
@@ -240,7 +241,7 @@ namespace NLDB
             sw.Stop();  //!!!
             Debug.WriteLine($"Similars->childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
             sw.Restart(); //!!!
-            List<Term> context = data.
+            List<Term> context = this.data.
                 GetParentsId(childs).
                 Distinct().
                 Select(p => ToTerm(p)).
@@ -283,9 +284,9 @@ namespace NLDB
             Dictionary<int, float> weights = similars.ToDictionary(s => s.id, s => s.confidence);
             sw.Restart(); //!!!
             //Получаем контекст
-            Dictionary<int, Link> context = data.
+            Dictionary<int, Link> context = this.data.
                 GetParentsWithChilds(weights.Keys.ToArray()).
-                SelectMany(p => data.GetGrandchildsId(p.Item2.id).
+                SelectMany(p => this.data.GetGrandchildsId(p.Item2.id).
                 Select(gc => new Link(gc, 0, weights[p.Item1]))).
                 Distinct(new LinkComparer()).
                 ToDictionary(link => link.id, link => link);
@@ -293,8 +294,8 @@ namespace NLDB
             Debug.WriteLine($"Определение context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
             //Запоминаем словарь допустимых слов, для использования в поиске
             sw.Restart(); //!!!
-            context.Add(grammar.Root.id, new Link(0, 0, 0));
-            Tuple<float, Stack<Link>> path = FindSequence(grammar.Root, context);
+            context.Add(this.grammar.Root.id, new Link(0, 0, 0));
+            Tuple<float, Stack<Link>> path = FindSequence(this.grammar.Root, context);
             sw.Stop();  //!!!
             Debug.WriteLine($"Определение path [{path.Item1.ToString("F4")};{path.Item2.Count}]: {sw.Elapsed.TotalSeconds}");
             return path.Item2.Skip(1).Select(link => ToTerm(link.id)).ToList();
@@ -335,7 +336,7 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         protected void FreeMemory()
         {
-            data.ClearCash();
+            this.data.ClearCash();
         }
 
         //--------------------------------------------------------------------------------------------
@@ -348,55 +349,52 @@ namespace NLDB
         /// <returns>количество созданных слов</returns>
         public void BuildLexicon(string filename)
         {
-            if (!data.IsOpen())
+            if (!this.data.IsOpen())
                 throw new Exception($"Нет подключения к базе данных!");
             LearnWords(filename);
             BuildGrammar(); //BuildSequences();
         }
 
-        private int LearnWords(string filename)
+        private void LearnWords(string filename)
         {
-            int count_words = 0;
             char[] buffer = new char[Language.TEXT_BUFFER_SIZE];
             int count_chars = Language.TEXT_BUFFER_SIZE;
             using (StreamReader reader = File.OpenText(filename))
             {
-                ProgressInformer informer = new ProgressInformer("Извлечение слов", reader.BaseStream.Length);
+                ProgressInformer informer = new ProgressInformer("Извлечение слов:", reader.BaseStream.Length);
                 while (count_chars == TEXT_BUFFER_SIZE)
                 {
                     count_chars = reader.ReadBlock(buffer, 0, Language.TEXT_BUFFER_SIZE);
                     string text = new string(buffer, 0, count_chars);
-                    data.BeginTransaction();
-                    count_words += Parse(text, Rank).Count();
-                    data.EndTransaction();
+                    this.data.BeginTransaction();
+                    Parse(text, Rank);
+                    this.data.EndTransaction();
                     informer.Current = reader.BaseStream.Position;
                     informer.Show();
                 }
                 //Очистка кэша
-                data.ClearCash();
-                Console.WriteLine($"\nСчитано {informer.Current} символов. Добавлено {count_words} слов.");
+                this.data.ClearCash();
+                Console.WriteLine($"\nСчитано {informer.Current} символов. Добавлено {this.data.Count()} слов.");
             }
-            return count_words;
         }
 
-        public int BuildGrammar()
+        public void BuildGrammar()
         {
-            grammar.Clear();
-            IEnumerable<Word> words = data.Where(w => w.rank > 0);
-            ProgressInformer informer = new ProgressInformer("Построение грамматики", words.Count());
+            this.grammar.Clear();
+            IEnumerable<Word> words = this.data.Where(w => w.rank > 0);
+            ProgressInformer informer = new ProgressInformer("Построение грамматики:", words.Count());
             int count = 0;
             foreach (Word w in words)
             {
-                grammar.Add(w.childs);
+                this.grammar.Add(w.childs);
                 count++;
                 informer.Current = count;
                 if (count % (1 << 8) == 0) informer.Show();
                 //очистка кэша на каждые n слов
-                if (count % (1 << 20) == 0) data.ClearCash();
+                if (count % (1 << 20) == 0) this.data.ClearCash();
                 //Debug.WriteLineIf(count % (1 << 18) == 0, count);
             }
             informer.Set(count);
-            return grammar.Count();
         }
 
         /// <summary>
