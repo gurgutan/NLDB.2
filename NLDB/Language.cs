@@ -39,8 +39,11 @@ namespace NLDB
         }
 
         //--------------------------------------------------------------------------------------------
-        //Методы работы с базой данных
+        //Методы работы с хранилищем данных
         //--------------------------------------------------------------------------------------------
+        /// <summary>
+        /// Подключение к хранилищу
+        /// </summary>
         public void Connect()
         {
             if (this.data.IsOpen()) this.data.CloseConnection();
@@ -61,7 +64,7 @@ namespace NLDB
         /// <summary>
         /// Создает базу данных лексикона с именем Name
         /// </summary>
-        public void CreateDB()
+        public void Create()
         {
             if (this.data.IsOpen()) this.data.CloseConnection();
             if (File.Exists(Name)) File.Delete(Name);
@@ -73,10 +76,10 @@ namespace NLDB
         /// Присваивает Name новое имя dbname и создает одноименную базу данных лексикона
         /// </summary>
         /// <param name="_dbname"></param>
-        public void CreateDB(string _dbname)
+        public void Create(string _dbname)
         {
             Name = _dbname;
-            CreateDB();
+            Create();
         }
 
         //--------------------------------------------------------------------------------------------

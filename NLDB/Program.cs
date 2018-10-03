@@ -15,7 +15,7 @@ namespace NLDB
             string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
             string[] splitters = new string[] { "", @"[^а-яё\d\{\}]+", @"[\n\r]+", @"\[\[{число}\]\]" };
             Language l = new Language(dbname, splitters);
-            l.CreateDB();
+            l.Create();
             l.Connect();
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             Stopwatch sw = new Stopwatch();
