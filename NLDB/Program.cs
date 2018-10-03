@@ -15,16 +15,15 @@ namespace NLDB
             string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
             string[] splitters = new string[] { "", @"[^а-яё\d\{\}]+", @"[\n\r]+", @"\[\[{число}\]\]" };
             Language l = new Language(dbname, splitters);
-            l.CreateDB();
-            l.ConnectDB();
-
+            //l.CreateDB();
+            l.Connect();
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            l.BuildLexicon(trainfile);
+            //l.BuildLexicon(trainfile);
+            l.BuildGrammar();
             sw.Stop();
             Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-            Console.WriteLine($"\nСлов: {l.Count}");
             //Console.WriteLine("Поиск в БД по id");
             //List<int[]> childsList = new List<int[]>();
             //for (int i = 64; i < 128; i++)
@@ -49,14 +48,16 @@ namespace NLDB
 
         private static void TestLangConsole(Language l)
         {
-            if (!l.IsConnected()) l.ConnectDB();
+            int rank = 2;
+            if (!l.IsConnected()) l.Connect();
             Queue<string> lines = new Queue<string>();
             int que_size = 1;
             string line = splitline;
+            Console.WriteLine();
             while (line != "")
             {
                 Console.WriteLine(splitline);
-                Console.Write(">>");
+                Console.Write($"{rank}>>");
                 line = Console.ReadLine();
                 if (line == "") continue;
                 lines.Enqueue(line);
@@ -85,14 +86,14 @@ namespace NLDB
                 //    Console.WriteLine(predicted.Aggregate("", (c, n) => c + $" [{n.confidence.ToString("F2")}] " + n.ToString()));
                 Console.WriteLine(splitline + "\nПостроение цепочки");
                 sw.Restart();
-                List<Term> next = l.Next(text, 2);
+                List<Term> next = l.Next(text, rank);
                 sw.Stop();
                 Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
                 if (next.Count != 0)
                     Console.WriteLine(next.Aggregate("", (c, n) => c + $" " + n.ToString()));
                 //l.FreeMemory();
             }
-            l.DisconnectDB();
+            l.Disconnect();
         }
 
         //private static void TestDeserialization()

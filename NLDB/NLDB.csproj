@@ -105,6 +105,7 @@
     <Compile Include="DataContainer.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="Grammar.cs" />
+    <Compile Include="GrammarDAG.cs" />
     <Compile Include="Lexicon.cs" />
     <Compile Include="Link.cs" />
     <Compile Include="ProgressInformer.cs" />

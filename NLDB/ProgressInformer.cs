@@ -18,7 +18,6 @@ namespace NLDB
             set => this.current = value;
         }
 
-        public int Pos { get; private set; }
         public int LeftBorderPos { get; private set; }
 
         private readonly char[] animationChars = new char[] { '-', '+', '*', 'O', '*', '+' };
@@ -26,6 +25,8 @@ namespace NLDB
         private readonly char leftBorder = '[';
         private readonly char rightBorder = ']';
         private int animateFrame = 0;
+        private readonly int PosY;
+        private readonly int PosX;
 
         public ProgressInformer(string prompt, long max)
         {
@@ -33,9 +34,11 @@ namespace NLDB
             this.Max = max;
             this.ShowProgressBar = true;
             this.ShowPercents = true;
-            this.BarSize = this.DefaultBarSize;
+            this.BarSize = Math.Min(Console.BufferWidth - this.Prompt.Length - 7, this.DefaultBarSize);
             this.LeftBorderPos = this.Prompt.Length + 5;
             this.Current = 0;
+            this.PosX = Console.CursorLeft;
+            this.PosY = Console.CursorTop;
         }
 
         public long Inc(long count)
@@ -48,19 +51,26 @@ namespace NLDB
         {
             double percents = Math.Truncate(100.0 / this.Max * this.Current);
             //int parts = (int)((percents - Math.Truncate(percents)) * this.animationChars.Length);
-            this.Pos = (int)(this.BarSize / (double)this.Max * this.Current);
+            int barPos = (int)(this.BarSize / (double)this.Max * this.Current);
             this.animateFrame++;
             StringBuilder strBuilder = new StringBuilder();
-            if (this.Pos > 0)
-                strBuilder.Append(this.lineChar, this.Pos);
-            if (this.BarSize - this.Pos > 0)
+            if (barPos > 0)
+                strBuilder.Append(this.lineChar, barPos);
+            if (this.BarSize - barPos > 0)
                 strBuilder.Append(this.animationChars[this.animateFrame % this.animationChars.Length]);
-            if (this.BarSize - this.Pos > 0 && this.BarSize - strBuilder.ToString().Length + 1 > 0)
+            if (this.BarSize - barPos > 0 && this.BarSize - strBuilder.ToString().Length + 1 > 0)
                 strBuilder.Append(' ', this.BarSize - strBuilder.ToString().Length + 1);
             string progress = strBuilder.ToString();
             string percentsStr = ((int)percents).ToString().PadLeft(2);
-            Console.CursorLeft = 0;
+            Console.CursorLeft = this.PosX;
+            Console.CursorTop = this.PosY;
             Console.Write($"{this.Prompt} {percentsStr}%{this.leftBorder}{progress}{this.rightBorder}");
+        }
+
+        public void Set(int n)
+        {
+            this.current = n;
+            this.Show();
         }
 
     }

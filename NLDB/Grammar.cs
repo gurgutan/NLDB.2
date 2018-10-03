@@ -138,13 +138,13 @@ namespace NLDB
     }
 
     //----------------------------------------------------------------------------------------------------
-    public class Grammar : IEnumerable, IDisposable
+    public class GrammarTree : IEnumerable, IDisposable
     {
         private readonly Rule root = new Rule(0);
 
         public Rule Root => this.root;
 
-        public Grammar() { }
+        public GrammarTree() { }
 
         public Rule this[int i] => this.root.Get(i);
 
