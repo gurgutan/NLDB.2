@@ -92,7 +92,7 @@ namespace NLDB
 
         public Word Find(int[] i)
         {
-            return this.data.Get(i);
+            return this.data.GetByChilds(i);
         }
 
         public Term ToTerm(string text, int rank)
@@ -106,10 +106,10 @@ namespace NLDB
                 Select(s => ToTerm(s, rank - 1)));
         }
 
-        public Term ToTerm(Word w, float _confidence = 1)
-        {
-            return this.data.ToTerm(w, _confidence);
-        }
+        //public Term ToTerm(Word w, float _confidence = 1)
+        //{
+        //    return this.data.ToTerm(w, _confidence);
+        //}
 
         public Term ToTerm(int i, float _confidence = 1)
         {
@@ -119,7 +119,10 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         //Методы обработки и анализа текста
         //--------------------------------------------------------------------------------------------
-        private IEnumerable<int> Parse(string text, int rank)
+        ///Ищет в Словаре Слово ранга rank, соответствующее линейному тексту text и возвращает 
+        ///идентификатор найденного слова. При отсутствии слова в словаре, и addIfNotExists=true
+        ///добавляет слово в Словарь, иначе возвращает 0.
+        private IEnumerable<int> Parse(string text, int rank, bool addIfNotExists = true)
         {
             text = this.parsers[rank].Normilize(text);
             IEnumerable<string> strings = this.parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
@@ -130,15 +133,24 @@ namespace NLDB
                 int[] childs = null;
                 if (rank > 0)
                 {
-                    childs = Parse(s, rank - 1).ToArray();      //получаем id дочерних слов ранга rank-1
+                    //получаем id дочерних слов ранга rank-1
+                    childs = Parse(s, rank - 1).ToArray();
+                    //Разбиение текста на слова ранга rank-1 не дал результата (нет подслов), 
+                    //значит слово не найдено и не может быть создано - возвращаем 0
                     if (childs.Length == 0) return 0;
-                    id = this.data.GetId(childs);
-                    if (id == 0) id = this.data.Add(new Word(0, rank, "", childs, new int[0]));
+                    //Пытаемся найти в Словаре слово по дочерним
+                    id = this.data.GetIdByChilds(childs);
+                    if (id == 0)
+                        if (addIfNotExists)
+                            id = this.data.Add(new Word(0, rank, "", childs, new int[0]));
                 }
                 else
                 {
+                    //Ищем в Словаре Слово ранга 0 в символьном представлении =s
                     id = this.data.GetId(s);
-                    if (id == 0) id = this.data.Add(new Word(0, rank, s, null, new int[0]));
+                    if (id == 0)
+                        if (addIfNotExists)
+                            id = this.data.Add(new Word(0, rank, s, null, new int[0]));
                 }
                 return id;
             }).Where(i => i != 0).ToList();
@@ -147,16 +159,18 @@ namespace NLDB
 
 
         /// <summary>
-        /// Вычисляет значение confidence и id для терма term. Меняет переданный по ссылке term
+        /// Метод осуществляет идентификацию Терма по тексту term.text.
+        /// Вычисляет значение confidence и id для терма term. Меняет переданный term, проставляя confidence и id
         /// </summary>
         /// <param name="term">изменяемый терм</param>
         /// <returns>возвращает ссылку на term (возврат значения для удобства использования в LINQ)</returns>
         public Term Identify(Term term)
         {
+            //Для данного терма ранее могла быть проведена идентификация
             if (term.Identified) return term;
             if (term.rank == 0)
             {
-                //При нулевом ранге терма, confidence считаем исходя из наличия соответствующей буквы в алфавите
+                //При нулевом ранге терма (т.е. терм - это буква), confidence считаем исходя из наличия соответствующей буквы в алфавите
                 term.id = this.data.GetId(term.text);
                 term.confidence = (term.id == 0 ? 0 : 1);
                 term.Identified = true;
@@ -272,7 +286,7 @@ namespace NLDB
             List<Term> result = new List<Term>();
             Stopwatch sw = new Stopwatch(); //!!!
             sw.Start(); //!!!
-            List<Term> terms = Parse(text, rank).
+            List<Term> terms = Parse(text, rank, addIfNotExists: false).
                 Select(t => ToTerm(t)).
                 ToList();
             sw.Stop();  //!!!

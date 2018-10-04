@@ -18,7 +18,7 @@ namespace NLDB
         private SQLiteConnection db;
 
         //Кэш термов для быстрого выполнения метода ToTerm
-        private readonly Dictionary<int, Term> terms = new Dictionary<int, Term>(1 << 10);
+        private readonly Dictionary<int, Term> terms = new Dictionary<int, Term>(1 << 18);
 
         //Кэш символов алфавита
         private readonly Dictionary<string, int> alphabet = new Dictionary<string, int>(1 << 10);
@@ -169,13 +169,15 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         public Term ToTerm(Word w, float confidence = 1)
         {
-            if (this.terms.TryGetValue(w.id, out Term t)) return t;
-            t = new Term(
+            //if (this.terms.TryGetValue(w.id, out Term t)) return t;
+            if (w == null) return null;
+            Term t = new Term(
                 w.rank,
                 w.id,
                 _confidence: confidence,
                 _text: w.symbol,
                 _childs: w.rank == 0 ? null : w.childs.Select(c => this.ToTerm(c)));
+            //Сохраняем в кэш
             this.terms[w.id] = t;
             return t;
         }
@@ -223,17 +225,10 @@ namespace NLDB
             SQLiteCommand cmd = this.db.CreateCommand();
             cmd.CommandText = $"SELECT id,rank,symbol,childs FROM words WHERE id='{i}' LIMIT 1;";
             SQLiteDataReader reader = cmd.ExecuteReader();
-            reader.Read();
-            //var word = SQLiteHelper.SelectValues(db, tablename: "words", columns: "id,rank,symbol,childs", where: $"id='{i}'", limit: "").FirstOrDefault();
-            //if (word == null) return null;
+            if(!reader.Read()) return null;
             int rank = int.Parse(reader.GetString(1));
             string symbol = reader.GetString(2);
             int[] childs = this.StringToIntArray(reader.GetString(3));
-            //var parents_qry = SQLiteHelper.SelectValues(db,
-            //    tablename: "parents",
-            //    columns: "id,parent_id",
-            //    where: $"id='{i}'");
-            //int[] parents = parents_qry.Select(s => int.Parse(s[1])).ToArray();
             return new Word(i, rank, symbol, childs, null /*parents*/);
         }
 
@@ -267,7 +262,7 @@ namespace NLDB
             else return null;
         }
 
-        public int GetId(int[] _childs)
+        public int GetIdByChilds(int[] _childs)
         {
             Sequence childs = new Sequence(_childs);
             if (this.words_id.TryGetValue(childs, out int id)) return id;
@@ -281,7 +276,7 @@ namespace NLDB
             else return 0;
         }
 
-        public Word Get(int[] _childs)
+        public Word GetByChilds(int[] _childs)
         {
             if (this.db == null || this.db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
