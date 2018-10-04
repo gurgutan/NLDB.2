@@ -191,6 +191,11 @@ namespace NLDB
             return t;
         }
 
+        public IEnumerable<Term> ToTerms(IEnumerable<int> ids)
+        {
+            return this.Get(ids).Select(w => ToTerm(w));
+        }
+
         //Создание кэша для алфавита
         internal void CreateCash()
         {
@@ -232,6 +237,26 @@ namespace NLDB
             return new Word(i, rank, symbol, childs, null /*parents*/);
         }
 
+        public List<Word> Get(IEnumerable<int> ids)
+        {
+            if (this.db == null || this.db.State != System.Data.ConnectionState.Open)
+                throw new Exception($"Подключение к БД не установлено");
+            string ids_str = ids.Distinct().Aggregate("", (c, n) => c + (c == "" ? "" : ",") + "'" + n.ToString() + "'");
+            SQLiteCommand cmd = this.db.CreateCommand();
+            cmd.CommandText = $"SELECT id,rank,symbol,childs FROM words WHERE id IN ({ids_str});";
+            SQLiteDataReader reader = cmd.ExecuteReader();
+            var result = new List<Word>();
+            while (reader.Read())
+            {
+                int i = int.Parse(reader.GetString(0));
+                int rank = int.Parse(reader.GetString(1));
+                string symbol = reader.GetString(2);
+                int[] childs = this.StringToIntArray(reader.GetString(3));
+                result.Add(new Word(i, rank, symbol, childs, null /*parents*/));
+            }
+            return result;
+        }
+
         public int GetId(string s)
         {
             if (this.alphabet.TryGetValue(s, out int id)) return id;
@@ -271,8 +296,12 @@ namespace NLDB
             cmd.CommandText = $"SELECT words.id FROM words WHERE childs='{childs_str}' LIMIT 1;";
             object result = cmd.ExecuteScalar();
             if (result == null) return 0;
-            //запишем в кэш
-            if (int.TryParse(result.ToString(), out id)) return id;
+            //запишем в кэш и вернем
+            if (int.TryParse(result.ToString(), out id))
+            {
+                words_id[childs] = id;
+                return id;
+            }
             else return 0;
         }
 

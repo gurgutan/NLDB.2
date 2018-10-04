@@ -9,8 +9,11 @@ namespace NLDB
     public struct Sequence
     {
         public int[] sequence;
-        //public float data;
 
+        /// <summary>
+        /// Быстрое создание Цепочки из готового массива
+        /// </summary>
+        /// <param name="_sequence"></param>
         public Sequence(int[] _sequence)
         {
             sequence = _sequence;
