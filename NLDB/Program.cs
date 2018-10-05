@@ -62,27 +62,7 @@ namespace NLDB
                 lines.Enqueue(line);
                 if (lines.Count > que_size) lines.Dequeue();
                 string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "\n" + n);
-
-                //Console.WriteLine(splitline + "\nРаспознавание ");
                 Stopwatch sw = new Stopwatch();
-                //sw.Start();
-                //var terms = l.Similars(text, 4, 2).ToList();
-                //sw.Stop();
-                //Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-                //terms.ForEach(term => { if (term.id >= 0) Console.WriteLine($"{term.confidence}: {term.ToString()}"); });
-                //Console.WriteLine(splitline + "\nПредположение о следующем слове: ");
-                //sw.Restart();
-                //var predicted_one = l.Predict(text, 2);
-                //sw.Stop();
-                //Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-                //if (predicted_one != null) Console.WriteLine(predicted_one.confidence + ": " + predicted_one.ToString());
-                //Console.WriteLine(splitline + "\nПостроение цепочки");
-                //sw.Restart();
-                //var predicted = l.PredictRecurrent(text, 32, 2);
-                //sw.Stop();
-                //Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-                //if (predicted.Count != 0)
-                //    Console.WriteLine(predicted.Aggregate("", (c, n) => c + $" [{n.confidence.ToString("F2")}] " + n.ToString()));
                 Console.WriteLine("\nПостроение цепочки");
                 sw.Restart();
                 List<Term> next = l.Next(text, rank);
@@ -94,25 +74,6 @@ namespace NLDB
             }
             l.Disconnect();
         }
-
-        //private static void TestDeserialization()
-        //{
-        //    string filename = @"D:\Data\SerializeLanguageTest.dat";
-        //    Console.WriteLine($"Десериализация из файла {filename}");
-        //    Language l = Language.Deserialize(filename);
-        //    TestLangConsole(l);
-        //}
-
-        //private static void TestDBSave()
-        //{
-        //    string filename = @"D:\Data\SaveLanguageTest.db";
-        //    string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
-        //    Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
-        //    l.CreateFromTextFile(trainfile);
-        //    Console.WriteLine($"Сохранение в БД {filename}");
-        //    l.DBSave(filename);
-        //    Console.ReadKey();
-        //}
 
         //private static void TestSerialization()
         //{
