@@ -75,32 +75,6 @@ namespace NLDB
             l.Disconnect();
         }
 
-        //private static void TestSerialization()
-        //{
-        //    string filename = @"D:\Data\SerializeLanguageTest.dat";
-        //    string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
-        //    Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
-        //    l.CreateFromTextFile(trainfile);
-        //    Console.WriteLine($"Сериализация в файл {filename}");
-        //    l.Serialize(filename);
-        //}
-
-        //static void TestLanguage()
-        //{
-        //    Random rand = new Random((int)DateTime.Now.Ticks);
-        //    string trainfile = @"D:\Data\Wiki\ru\23mb.txt";
-        //    //string trainfile = @"D:\Data\Text\philosoph1.txt";
-        //    Language l = new Language("Wiki.ru", new string[] { "", @"[^\w\d]+", @"[\:\;\.\?\!\n\r]+", @"\[\[\d+\]\]" });
-        //    l.CreateFromTextFile(trainfile);
-        //    foreach (var lex in l.Lexicons)
-        //    {
-        //        Console.WriteLine($"Слов ранга {lex.Rank}: {lex.Count}");
-        //        Console.WriteLine(lex.WordIdToText(rand.Next(lex.Count)));
-        //        Console.WriteLine(splitline);
-        //    }
-        //    TestLangConsole(l);
-        //}
-
         private static void NormilizeTest()
         {
             Parser parser = new Parser(@"[^а-яА-ЯёЁ0-9]");
