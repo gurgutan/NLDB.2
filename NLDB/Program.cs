@@ -7,7 +7,6 @@ namespace NLDB
 {
     internal class Program
     {
-        private static readonly string splitline = "---------------------------------------------------------------------------";
 
         private static void Main(string[] args)
         {
@@ -52,11 +51,11 @@ namespace NLDB
             if (!l.IsConnected()) l.Connect();
             Queue<string> lines = new Queue<string>();
             int que_size = 1;
-            string line = splitline;
+            string line = ">>";
             Console.WriteLine();
             while (line != "")
             {
-                Console.WriteLine(splitline);
+                Console.WriteLine();
                 Console.Write($"{rank}>>");
                 line = Console.ReadLine();
                 if (line == "") continue;
@@ -84,7 +83,7 @@ namespace NLDB
                 //Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
                 //if (predicted.Count != 0)
                 //    Console.WriteLine(predicted.Aggregate("", (c, n) => c + $" [{n.confidence.ToString("F2")}] " + n.ToString()));
-                Console.WriteLine(splitline + "\nПостроение цепочки");
+                Console.WriteLine("\nПостроение цепочки");
                 sw.Restart();
                 List<Term> next = l.Next(text, rank);
                 sw.Stop();
