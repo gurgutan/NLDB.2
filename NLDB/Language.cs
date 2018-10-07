@@ -17,16 +17,16 @@ namespace NLDB
     public partial class Language
     {
         //Данные
-        private DataContainer data;
-        private Parser[] parsers;
-        private string[] splitters;
+        private DataContainer data = null;
+        private Parser[] parsers = null;
+        private string[] splitters = null;
         private GrammarTree grammar = new GrammarTree();
 
         //Основные свойства
         public string Name { get; private set; }
         public int Rank => data.Splitters.Length - 1;
         public string[] Splitters => data.Splitters;
-        public int Count => data.Count();
+        public int Count => data.CountWords();
         //Размер буфера для чтения текста
         public static readonly int TEXT_BUFFER_SIZE = 1 << 16;
 
@@ -38,6 +38,11 @@ namespace NLDB
             data = new DataContainer(_name, splitters);
         }
 
+        public Language(string _name)
+        {
+            Name = _name;
+        }
+
         //--------------------------------------------------------------------------------------------
         //Методы работы с хранилищем данных
         //--------------------------------------------------------------------------------------------
@@ -46,19 +51,24 @@ namespace NLDB
         /// </summary>
         public void Connect()
         {
-            if (data.IsOpen()) data.CloseConnection();
-            data = new DataContainer(Name, splitters);
+            if (data!=null && data.IsConnected()) data.Disconnect();
+            data = new DataContainer(Name);
+            //Считаем разделители из БД
             data.Connect(Name);
+            //Разделители Словаря 
+            splitters = data.Splitters;
+            //Создадим парсеры из разделителей
+            parsers = splitters.Select(s => new Parser(s)).ToArray();
         }
 
         public void Disconnect()
         {
-            data.CloseConnection();
+            data.Disconnect();
         }
 
         public bool IsConnected()
         {
-            return data.IsOpen();
+            return data.IsConnected();
         }
 
         /// <summary>
@@ -66,7 +76,7 @@ namespace NLDB
         /// </summary>
         public void Create()
         {
-            if (data.IsOpen()) data.CloseConnection();
+            if (data.IsConnected()) data.Disconnect();
             if (File.Exists(Name)) File.Delete(Name);
             data = new DataContainer(Name, splitters);
             data.CreateDB();
@@ -100,6 +110,12 @@ namespace NLDB
             return data.GetByChilds(i);
         }
 
+        /// <summary>
+        /// Преобразует текстовую строку в Терм ранга rank
+        /// </summary>
+        /// <param name="text"></param>
+        /// <param name="rank"></param>
+        /// <returns></returns>
         public Term ToTerm(string text, int rank)
         {
             text = parsers[rank].Normilize(text);
@@ -143,7 +159,7 @@ namespace NLDB
                     //Разбиение текста на слова ранга rank-1 не дал результата (нет подслов), 
                     //значит слово не найдено и не может быть создано - возвращаем 0
                     if (childs.Length == 0) return 0;
-                    //Пытаемся найти в Словаре слово по дочерним
+                    //Пытаемся найти в Словаре Слово по дочерним
                     id = data.GetIdByChilds(childs);
                     if (id == 0)
                         if (addIfNotExists)
@@ -159,6 +175,23 @@ namespace NLDB
                 }
                 return id;
             }).Where(i => i != 0).ToList();
+            return result;
+        }
+
+        /// <summary>
+        /// Метод-обертка метода Parse для включения его в транзакцию
+        /// </summary>
+        /// <param name="text"></param>
+        /// <param name="rank"></param>
+        /// <param name="addIfNotExists"></param>
+        /// <returns></returns>
+        public IEnumerable<int> Analize(string text, int rank, bool addIfNotExists = true)
+        {
+            if (data == null)
+                throw new Exception("Не инициализировано хранилище данных!");
+            data.BeginTransaction();
+            IEnumerable<int> result = Parse(text, rank, addIfNotExists);
+            data.EndTransaction();
             return result;
         }
 
@@ -238,8 +271,9 @@ namespace NLDB
         /// </summary>
         /// <param name="text"></param>
         /// <param name="rank"></param>
+        /// <param name="count">количество термов для возвращения. 0 - все </param>
         /// <returns></returns>
-        public List<Term> Similars(string text, int rank = 2)
+        public List<Term> Similars(string text, int rank = 2, int count = 0)
         {
             text = parsers[rank].Normilize(text);
             Stopwatch sw = new Stopwatch(); //!!!
@@ -277,7 +311,11 @@ namespace NLDB
             Debug.WriteLine($"Similars->Compare [{context.Count}]: {sw.Elapsed.TotalSeconds}");
             //Сортировка по убыванию оценки
             context.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
-            return context.ToList();
+            if (count == 0) return context.ToList();
+            else
+            if (count > 0) return context.Take(count).ToList();
+            else
+                throw new ArgumentException("Количество возращаемых значений не может быть отрицательным");
         }
 
         /// <summary>
@@ -375,7 +413,7 @@ namespace NLDB
         /// <returns>количество созданных слов</returns>
         public void BuildLexicon(string filename)
         {
-            if (!data.IsOpen())
+            if (!data.IsConnected())
                 throw new Exception($"Нет подключения к базе данных!");
             ExtractWords(filename);
             BuildGrammar(); //BuildSequences();
@@ -391,22 +429,22 @@ namespace NLDB
             int count_chars = Language.TEXT_BUFFER_SIZE;
             using (StreamReader reader = File.OpenText(filename))
             {
-                ProgressInformer informer = new ProgressInformer("Извлечение слов:", reader.BaseStream.Length);
-                informer.BarSize = 64;
-                informer.UnitsOfMeasurment = "байт";
+                ProgressInformer informer = new ProgressInformer("Извлечение слов:", reader.BaseStream.Length)
+                {
+                    BarSize = 64,
+                    UnitsOfMeasurment = "байт"
+                };
                 while (count_chars == TEXT_BUFFER_SIZE)
                 {
                     count_chars = reader.ReadBlock(buffer, 0, Language.TEXT_BUFFER_SIZE);
                     string text = new string(buffer, 0, count_chars);
-                    data.BeginTransaction();
-                    Parse(text, Rank);
-                    data.EndTransaction();
+                    Analize(text, Rank);
                     informer.Current = reader.BaseStream.Position;
                     informer.Show();
                 }
                 //Очистка кэша
                 data.ClearCash();
-                Console.WriteLine($"\nСчитано {informer.Current} символов. Добавлено {data.Count()} слов.");
+                Console.WriteLine($"\nСчитано {informer.Current} символов. Добавлено {data.CountWords()} слов.");
             }
         }
 
@@ -415,7 +453,7 @@ namespace NLDB
         /// </summary>
         public void BuildGrammar()
         {
-            grammar.Clear();
+            //grammar.Clear();
             IEnumerable<Word> words = data.Where(w => w.rank > 0);
             ProgressInformer informer = new ProgressInformer("Построение грамматики:", words.Count());
             int count = 0;

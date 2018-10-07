@@ -42,32 +42,51 @@ namespace NLDB
             dbname = _dbname;
             splitters = _splitters;
             current_id = 0;
-            //this.Create();
-            //db = SQLiteHelper.OpenConnection(dbname);
         }
 
-        /// <summary>
-        /// Возвращает количество слов в базе данных
-        /// </summary>
-        /// <returns></returns>
-        public int Count()
+        public DataContainer(string _dbname)
         {
-            return int.Parse(ExecuteScalar($"SELECT COUNT(*) FROM words;").ToString());
+            dbname = _dbname;
+            splitters = null;
+            current_id = 0;
         }
 
         //--------------------------------------------------------------------------------------------
         //Работа с базой данных SQLite
         //--------------------------------------------------------------------------------------------
-        public bool IsOpen()
+        public bool IsConnected()
         {
             if (db == null) return false;
             return db.State == System.Data.ConnectionState.Open;
         }
 
+        public SQLiteConnection Connect(string _dbname)
+        {
+            //if (db.State == System.Data.ConnectionState.Open) return db;
+            //TODO: переделать для безопасного использования (try catch и т.п.)
+            if (!File.Exists(_dbname))
+            {
+                throw new FileNotFoundException($"База данных не найдена по пути '{_dbname}'");
+            }
+            dbname = _dbname;
+            db = new SQLiteConnection($"Data Source={dbname}; Version=3;");
+            db.Open();
+            current_id = CurrentId;
+            ReadSplitters();
+            CreateCash();
+            return db;
+        }
+
+        public void Disconnect()
+        {
+            if (db.State == System.Data.ConnectionState.Open)
+                db.Close();
+        }
+
         public void CreateDB()
         {
             current_id = 0;
-            if (IsOpen()) CloseConnection();                        // Закрываем
+            if (IsConnected()) Disconnect();                        // Закрываем
             if (File.Exists(dbname)) File.Delete(dbname); // Удаляем БД
             db = new SQLiteConnection($"Data Source={dbname}; Version=3;");  // Создаем новую БД
             db.Open();     // Открываем соединение
@@ -97,63 +116,6 @@ namespace NLDB
             db.Close();
         }
 
-        public SQLiteConnection Connect(string _dbname)
-        {
-            dbname = _dbname;
-            //if (db.State == System.Data.ConnectionState.Open) return db;
-            //TODO: переделать для безопасного использования (try catch и т.п.)
-            db = new SQLiteConnection($"Data Source={dbname}; Version=3;");  // Создаем новую БД
-            db.Open();
-            current_id = 0;
-            current_id = CurrentId;
-            CreateCash();
-            return db;
-        }
-
-        public void CloseConnection()
-        {
-            if (db.State == System.Data.ConnectionState.Open)
-                db.Close();
-        }
-
-        public List<string[]> SelectValues(string tablename, string columns = "*", string where = "", string limit = "", string order = "")
-        {
-            string cmd_text = $"SELECT {columns} FROM {tablename}" +
-                 (where == "" ? "" : " WHERE " + where) +
-                 (limit == "" ? "" : " LIMIT " + limit) +
-                 (order == "" ? "" : " ORDER BY " + order);
-            List<string[]> values = new List<string[]>();
-            SQLiteDataReader reader = ExecuteQuery(cmd_text);
-            while (reader.Read())
-            {
-                string[] row = new string[columns.Length];
-                reader.GetValues(row);
-                values.Add(row);
-            }
-            return values;
-        }
-
-        public int Max(string tablename, string column)
-        {
-            string str = ExecuteScalar($"SELECT MAX(cast({column} as INTEGER)) FROM {tablename};").ToString();
-            return str == "" ? 0 : int.Parse(str);
-        }
-
-        private SQLiteDataReader ExecuteQuery(string text)
-        {
-            SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText = text;
-            try { return cmd.ExecuteReader(); }
-            catch (SQLiteException e) { throw new SQLiteException($"Ошибка выполнения запроса {text} БД({db.FileName}): {e.Message}"); }
-        }
-
-        private object ExecuteScalar(string text)
-        {
-            SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText = text;
-            return cmd.ExecuteScalar();
-        }
-
         public void BeginTransaction()
         {
             transaction = db.BeginTransaction();
@@ -162,6 +124,21 @@ namespace NLDB
         public void EndTransaction()
         {
             transaction.Commit();
+        }
+
+        /// <summary>
+        /// Возвращает количество слов в базе данных
+        /// </summary>
+        /// <returns></returns>
+        public int CountWords()
+        {
+            return int.Parse(ExecuteScalar($"SELECT COUNT(*) FROM words;").ToString());
+        }
+
+        public int Max(string tablename, string column)
+        {
+            string str = ExecuteScalar($"SELECT MAX(cast({column} as INTEGER)) FROM {tablename};").ToString();
+            return str == "" ? 0 : int.Parse(str);
         }
 
         //--------------------------------------------------------------------------------------------
@@ -196,37 +173,24 @@ namespace NLDB
             return Get(ids).Select(w => ToTerm(w));
         }
 
-        /// <summary>
-        /// Инициализирует кэш для Алфавита считывая Слова из хранилища
-        /// </summary>
-        internal void CreateCash()
+        internal void ReadSplitters()
         {
-            terms.Clear();
-            words_id.Clear();
-            alphabet.Clear();
             SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText = "SELECT id, rank, symbol FROM words WHERE rank=0;";   //буквы алфавита, т.е. слова ранга 0
+            cmd.CommandText = $"SELECT rank, expr FROM splitters;";
             SQLiteDataReader reader = cmd.ExecuteReader();
+            List<Tuple<int, string>> db_splitters = new List<Tuple<int, string>>();
             while (reader.Read())
             {
-                Word a = new Word(
-                    _id: int.Parse(reader.GetString(0)),
-                    _rank: int.Parse(reader.GetString(1)),
-                    _symbol: reader.GetString(2),
-                    _childs: null,
-                    _parents: null);
-                alphabet[a.symbol] = a.id;
+                int rank = int.Parse(reader.GetString(0));
+                string expr = reader.GetString(1);
+                db_splitters.Add(new Tuple<int, string>(rank, expr));
             }
+            Splitters = db_splitters.OrderBy(t => t.Item1).Select(t => t.Item2).ToArray();
         }
 
-        internal void ClearCash()
-        {
-            alphabet.Clear();
-            terms.Clear();
-            words_id.Clear();
-            GC.Collect();
-        }
-
+        //--------------------------------------------------------------------------------------------
+        //Работа со Словами в БД
+        //--------------------------------------------------------------------------------------------
         /// <summary>
         /// Возвращает слово по идентификатору i
         /// </summary>
@@ -516,8 +480,75 @@ namespace NLDB
         }
 
         //-------------------------------------------------------------------------------------------------------------------------
-        //Private methods
+        //Работа с кэшем
         //-------------------------------------------------------------------------------------------------------------------------
+        /// <summary>
+        /// Инициализирует кэш для Алфавита считывая Слова из хранилища
+        /// </summary>
+        internal void CreateCash()
+        {
+            terms.Clear();
+            words_id.Clear();
+            alphabet.Clear();
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = "SELECT id, rank, symbol FROM words WHERE rank=0;";   //буквы алфавита, т.е. слова ранга 0
+            SQLiteDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                Word a = new Word(
+                    _id: int.Parse(reader.GetString(0)),
+                    _rank: int.Parse(reader.GetString(1)),
+                    _symbol: reader.GetString(2),
+                    _childs: null,
+                    _parents: null);
+                alphabet[a.symbol] = a.id;
+            }
+        }
+
+        internal void ClearCash()
+        {
+            alphabet.Clear();
+            terms.Clear();
+            words_id.Clear();
+            GC.Collect();
+        }
+
+        //-------------------------------------------------------------------------------------------------------------------------
+        //Запросы к БД с минимум параметров
+        //-------------------------------------------------------------------------------------------------------------------------
+        private SQLiteDataReader ExecuteQuery(string text)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = text;
+            try { return cmd.ExecuteReader(); }
+            catch (SQLiteException e) { throw new SQLiteException($"Ошибка выполнения запроса {text} БД({db.FileName}): {e.Message}"); }
+        }
+
+        private object ExecuteScalar(string text)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = text;
+            return cmd.ExecuteScalar();
+        }
+
+        private List<string[]> SelectValues(string tablename, string columns = "*", string where = "", string limit = "", string order = "")
+        {
+            string cmd_text = $"SELECT {columns} FROM {tablename}" +
+                 (where == "" ? "" : " WHERE " + where) +
+                 (limit == "" ? "" : " LIMIT " + limit) +
+                 (order == "" ? "" : " ORDER BY " + order);
+            List<string[]> values = new List<string[]>();
+            SQLiteDataReader reader = ExecuteQuery(cmd_text);
+            while (reader.Read())
+            {
+                string[] row = new string[columns.Length];
+                reader.GetValues(row);
+                values.Add(row);
+            }
+            return values;
+        }
+
+
         private string IntArrayToString(int[] a)
         {
             if (a == null || a.Length == 0) return "";

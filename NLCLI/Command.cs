@@ -7,15 +7,15 @@ using System.Threading.Tasks;
 
 namespace NLDB.NLCLI
 {
-    public enum CommandTypes { Empty, Help, Create, Clear, Load, Save, Find, Quit };
+    public enum CommandTypes { Empty, Help, Create, Build, Connect, Quit, Find };
 
     public class Command
     {
         public static readonly List<string> ptrns = new List<string>
         {
             @"^(?'CMD'create)\s+(?'NAMEKEY'name):(?'NAMEVAL'[\w]+)\s+(?'SPLKEY'splitters):(?'SPLVAL'"".+""\,?)+",
-            @"^(?'CMD'add)\s+(?'FROM'(file|folder|string)):(?'SRC'.+)",
-            @"^(?'CMD'load)\s+(?'FROM'file):(?'SRC'.+)",
+            @"^(?'CMD'build)\s+(?'LEX'fromfile):(?'SRC'.+)",
+            @"^(?'CMD'connect)\s+(?'TO'db):(?'SRC'.+)",
             @"^(?'CMD'save)\s+(?'TO'(file|folder|string)):(?'SRC'.+)",
             @"^(?'CMD'find)\s+((?'RANK'rank):(?'RANKVAL'\d{1,4})\s+)?((?'TOP'top):(?'TOPVAL'\d{1,15})\s+)?((?'TEXT'text):(?'TEXTVAL'.+))",
             @"^(?'CMD'clear)",
@@ -26,12 +26,12 @@ namespace NLDB.NLCLI
         public static readonly List<string> helpstrings = new List<string>
         {
             @"create name:<name> splitters:""<split_expr1>"" ""<split_expr2>"" ""<split_exprN>""",
-            @"add (file|folder|string):<path>",
-            @"load file:<path>",
-            @"save file:<path>",
+            @"build fromfile:<path>",
+            @"connect db:<path>",
+            //@"save file:<path>",
             @"find [rank:<r>] [top:<n>] text:<string>",
-            @"clear",
-            @"help",
+            //@"clear",
+            //@"help",
             @"quit"
         };
 
@@ -58,27 +58,16 @@ namespace NLDB.NLCLI
                             Parameters.Add(match.Groups[4].Value, match.Groups[5].Value);
                             return true;
                         };
-                    case "add":
+                    case "build":
                         {
-                            CommandType = CommandTypes.Load;
+                            CommandType = CommandTypes.Build;
                             Parameters.Add(match.Groups[2].Value, match.Groups[3].Value);
                             return true;
                         };
-                    case "load":
+                    case "connect":
                         {
-                            CommandType = CommandTypes.Load;
+                            CommandType = CommandTypes.Connect;
                             Parameters.Add(match.Groups[2].Value, match.Groups[3].Value);
-                            return true;
-                        };
-                    case "save":
-                        {
-                            CommandType = CommandTypes.Save;
-                            Parameters.Add(match.Groups[2].Value, match.Groups[3].Value);
-                            return true;
-                        };
-                    case "clear":
-                        {
-                            CommandType = CommandTypes.Clear;
                             return true;
                         };
                     case "quit":
@@ -98,7 +87,11 @@ namespace NLDB.NLCLI
                             CommandType = CommandTypes.Help;
                             return true;
                         }
-                    default: throw new ArgumentException("Необработанный тип команды: " + cmdType);
+                    default:
+                        {
+                            Console.WriteLine("Неизвестная команда: " + cmdType);
+                            return false;
+                        }
                 }
             }
             return false;
