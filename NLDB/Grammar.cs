@@ -22,14 +22,14 @@ namespace NLDB
         //public readonly int pos;
 
         private readonly List<Rule> rules;
-        public List<Rule> Rules => this.rules;
+        public List<Rule> Rules => rules;
 
         public Rule(int _id, int _n = 1/*, int _pos = 0*/)
         {
-            this.id = _id;
-            this.number = _n;
+            id = _id;
+            number = _n;
             //this.pos = _pos;
-            this.rules = new List<Rule>();            
+            rules = new List<Rule>();
         }
 
         /// <summary>
@@ -40,8 +40,8 @@ namespace NLDB
         /// <returns></returns>
         public float Confidence(int i)
         {
-            if (!this.Exists(i)) return 0;
-            return (float)this[i].number / this.rules.Count;
+            if (!Exists(i)) return 0;
+            return (float)this[i].number / rules.Count;
         }
 
         /// <summary>
@@ -51,14 +51,14 @@ namespace NLDB
         /// <returns></returns>
         public Rule AddCount(Rule rule)
         {
-            Rule actual = this.Get(rule.id);
+            Rule actual = Get(rule.id);
             if (actual != null)
             {
                 actual.number++;
             }
             else
             {
-                this.rules.Add(rule);
+                rules.Add(rule);
                 actual = rule;
             }
             return actual;
@@ -66,13 +66,13 @@ namespace NLDB
 
         public Rule AddCount(int _id)
         {
-            Rule actual = this.Get(_id);
+            Rule actual = Get(_id);
             if (actual != null)
                 actual.number++;
             else
             {
                 actual = new Rule(_id, 1/*, this.pos + 1*/);
-                this.rules.Add(actual);
+                rules.Add(actual);
             }
             return actual;
         }
@@ -85,36 +85,36 @@ namespace NLDB
         {
             if (ids.Length == 0) return;
             int first = ids.First();
-            this.AddCount(first).AddSeq(ids.Skip(1).ToArray());
+            AddCount(first).AddSeq(ids.Skip(1).ToArray());
         }
 
         public bool Exists(int i)
         {
-            return this.Get(i) != null;
+            return Get(i) != null;
         }
 
         public Rule Get(int i)
         {
             Rule rule = new Rule(i);
             //TODO: критическая для производительности операция! надо что-нибудь придумать. Отказ от словаря для для экономии памяти
-            int index = this.rules.IndexOf(rule);
+            int index = rules.IndexOf(rule);
             if (index > -1)
-                return this.rules[index];
+                return rules[index];
             else
                 return null;
         }
 
-        public Rule this[int i] => this.Get(i);
+        public Rule this[int i] => Get(i);
 
         public int Count()
         {
-            return 1 + this.rules.Sum(r => r.Count());
+            return 1 + rules.Sum(r => r.Count());
         }
 
         public IEnumerator GetEnumerator()
         {
             yield return this;
-            foreach (Rule r in this.rules)
+            foreach (Rule r in rules)
             {
                 yield return r;
             }
@@ -122,18 +122,18 @@ namespace NLDB
 
         public void Dispose()
         {
-            this.rules.Clear();
+            rules.Clear();
         }
 
         public void Clear()
         {
-            this.rules.Clear();
+            rules.Clear();
         }
 
         public bool Equals(Rule other)
         {
             if (other == null) return false;
-            return (other as Rule).id == this.id;
+            return (other as Rule).id == id;
         }
     }
 
@@ -142,21 +142,21 @@ namespace NLDB
     {
         private readonly Rule root = new Rule(0);
 
-        public Rule Root => this.root;
+        public Rule Root => root;
 
         public GrammarTree() { }
 
-        public Rule this[int i] => this.root.Get(i);
+        public Rule this[int i] => root.Get(i);
 
         public void Add(int[] ids)
         {
             if (ids == null || ids.Length == 0) return;
-            this.root.AddSeq(ids);
+            root.AddSeq(ids);
         }
 
         public double Confidence(int[] ids)
         {
-            Rule current = this.root;
+            Rule current = root;
             double confidence = 1;
             int count = 0;
             for (int i = 0; i < ids.Length; i++)
@@ -171,22 +171,22 @@ namespace NLDB
 
         public int Count()
         {
-            return this.root.Count();
+            return root.Count();
         }
 
         public void Clear()
         {
-            this.root.Clear();
+            root.Clear();
         }
 
         public void Dispose()
         {
-            this.root.Dispose();
+            root.Dispose();
         }
 
         public IEnumerator GetEnumerator()
         {
-            return this.root.GetEnumerator();
+            return root.GetEnumerator();
         }
     }
 }

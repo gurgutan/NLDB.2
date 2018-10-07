@@ -31,17 +31,17 @@ namespace NLDB
         private string[] splitters;
         public string[] Splitters
         {
-            get => this.splitters;
-            set => this.splitters = value;
+            get => splitters;
+            set => splitters = value;
         }
 
         private string dbname = "data.db";
 
         public DataContainer(string _dbname, string[] _splitters)
         {
-            this.dbname = _dbname;
-            this.splitters = _splitters;
-            this.current_id = 0;
+            dbname = _dbname;
+            splitters = _splitters;
+            current_id = 0;
             //this.Create();
             //db = SQLiteHelper.OpenConnection(dbname);
         }
@@ -60,19 +60,19 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         public bool IsOpen()
         {
-            if (this.db == null) return false;
-            return this.db.State == System.Data.ConnectionState.Open;
+            if (db == null) return false;
+            return db.State == System.Data.ConnectionState.Open;
         }
 
         public void CreateDB()
         {
-            this.current_id = 0;
-            if (this.IsOpen()) this.CloseConnection();                        // Закрываем
-            if (File.Exists(this.dbname)) File.Delete(this.dbname); // Удаляем БД
-            this.db = new SQLiteConnection($"Data Source={this.dbname}; Version=3;");  // Создаем новую БД
-            this.db.Open();     // Открываем соединение
+            current_id = 0;
+            if (IsOpen()) CloseConnection();                        // Закрываем
+            if (File.Exists(dbname)) File.Delete(dbname); // Удаляем БД
+            db = new SQLiteConnection($"Data Source={dbname}; Version=3;");  // Создаем новую БД
+            db.Open();     // Открываем соединение
             //Создаем таблицы
-            SQLiteCommand cmd = this.db.CreateCommand();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 "CREATE TABLE splitters (rank, expr);"
                 + "CREATE TABLE words (id PRIMARY KEY, rank, symbol, childs);"
@@ -80,7 +80,7 @@ namespace NLDB
             //+"CREATE TABLE grammar (id, next INTEGER NOT NULL, pos INTEGER NOT NULL, count INTEGER NOT NULL );";
             cmd.ExecuteNonQuery();
             //Добавляем разделители слов в таблицу splitters
-            string splitters_values = this.splitters.
+            string splitters_values = splitters.
                 Select((s, i) => $"({i},'{s}')").
                 Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n);
             cmd.CommandText = $"INSERT INTO splitters (rank, expr) VALUES {splitters_values}";
@@ -94,26 +94,26 @@ namespace NLDB
             //+"CREATE INDEX grammar_id_ind ON grammar (id);" 
             //+"CREATE INDEX grammar_id_next_pos_ind ON grammar (id, next ASC, pos ASC);";
             cmd.ExecuteNonQuery();
-            this.db.Close();
+            db.Close();
         }
 
         public SQLiteConnection Connect(string _dbname)
         {
-            this.dbname = _dbname;
+            dbname = _dbname;
             //if (db.State == System.Data.ConnectionState.Open) return db;
             //TODO: переделать для безопасного использования (try catch и т.п.)
-            this.db = new SQLiteConnection($"Data Source={this.dbname}; Version=3;");  // Создаем новую БД
-            this.db.Open();
-            this.current_id = 0;
-            this.current_id = this.CurrentId;
-            this.CreateCash();
-            return this.db;
+            db = new SQLiteConnection($"Data Source={dbname}; Version=3;");  // Создаем новую БД
+            db.Open();
+            current_id = 0;
+            current_id = CurrentId;
+            CreateCash();
+            return db;
         }
 
         public void CloseConnection()
         {
-            if (this.db.State == System.Data.ConnectionState.Open)
-                this.db.Close();
+            if (db.State == System.Data.ConnectionState.Open)
+                db.Close();
         }
 
         public List<string[]> SelectValues(string tablename, string columns = "*", string where = "", string limit = "", string order = "")
@@ -123,7 +123,7 @@ namespace NLDB
                  (limit == "" ? "" : " LIMIT " + limit) +
                  (order == "" ? "" : " ORDER BY " + order);
             List<string[]> values = new List<string[]>();
-            SQLiteDataReader reader = this.ExecuteQuery(cmd_text);
+            SQLiteDataReader reader = ExecuteQuery(cmd_text);
             while (reader.Read())
             {
                 string[] row = new string[columns.Length];
@@ -141,10 +141,10 @@ namespace NLDB
 
         private SQLiteDataReader ExecuteQuery(string text)
         {
-            SQLiteCommand cmd = this.db.CreateCommand();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = text;
             try { return cmd.ExecuteReader(); }
-            catch (SQLiteException e) { throw new SQLiteException($"Ошибка выполнения запроса {text} БД({this.db.FileName}): {e.Message}"); }
+            catch (SQLiteException e) { throw new SQLiteException($"Ошибка выполнения запроса {text} БД({db.FileName}): {e.Message}"); }
         }
 
         private object ExecuteScalar(string text)
@@ -156,12 +156,12 @@ namespace NLDB
 
         public void BeginTransaction()
         {
-            this.transaction = this.db.BeginTransaction();
+            transaction = db.BeginTransaction();
         }
 
         public void EndTransaction()
         {
-            this.transaction.Commit();
+            transaction.Commit();
         }
 
         //--------------------------------------------------------------------------------------------
@@ -176,31 +176,35 @@ namespace NLDB
                 w.id,
                 _confidence: confidence,
                 _text: w.symbol,
-                _childs: w.rank == 0 ? null : w.childs.Select(c => this.ToTerm(c)));
+                _childs: w.rank == 0 ? null : w.childs.Select(c => ToTerm(c)));
             //Сохраняем в кэш
-            this.terms[w.id] = t;
+            terms[w.id] = t;
             return t;
         }
 
         public Term ToTerm(int i, float confidence = 1)
         {
-            if (this.terms.TryGetValue(i, out Term t))
+            if (terms.TryGetValue(i, out Term t))
                 t.confidence = confidence;
             else
-                t = this.ToTerm(this.Get(i));
+                t = ToTerm(Get(i));
             return t;
         }
 
         public IEnumerable<Term> ToTerms(IEnumerable<int> ids)
         {
-            return this.Get(ids).Select(w => ToTerm(w));
+            return Get(ids).Select(w => ToTerm(w));
         }
 
-        //Создание кэша для алфавита
+        /// <summary>
+        /// Инициализирует кэш для Алфавита считывая Слова из хранилища
+        /// </summary>
         internal void CreateCash()
         {
-            this.alphabet.Clear();
-            SQLiteCommand cmd = this.db.CreateCommand();
+            terms.Clear();
+            words_id.Clear();
+            alphabet.Clear();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = "SELECT id, rank, symbol FROM words WHERE rank=0;";   //буквы алфавита, т.е. слова ранга 0
             SQLiteDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -211,88 +215,113 @@ namespace NLDB
                     _symbol: reader.GetString(2),
                     _childs: null,
                     _parents: null);
-                this.alphabet[a.symbol] = a.id;
+                alphabet[a.symbol] = a.id;
             }
         }
 
         internal void ClearCash()
         {
-            this.alphabet.Clear();
-            this.terms.Clear();
-            this.words_id.Clear();
+            alphabet.Clear();
+            terms.Clear();
+            words_id.Clear();
             GC.Collect();
         }
 
+        /// <summary>
+        /// Возвращает слово по идентификатору i
+        /// </summary>
+        /// <param name="i"></param>
+        /// <returns></returns>
         public Word Get(int i)
         {
-            if (this.db == null || this.db.State != System.Data.ConnectionState.Open)
+            if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
-            SQLiteCommand cmd = this.db.CreateCommand();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT id,rank,symbol,childs FROM words WHERE id='{i}' LIMIT 1;";
             SQLiteDataReader reader = cmd.ExecuteReader();
-            if(!reader.Read()) return null;
+            if (!reader.Read()) return null;
             int rank = int.Parse(reader.GetString(1));
             string symbol = reader.GetString(2);
-            int[] childs = this.StringToIntArray(reader.GetString(3));
+            int[] childs = StringToIntArray(reader.GetString(3));
             return new Word(i, rank, symbol, childs, null /*parents*/);
         }
 
+        /// <summary>
+        /// Вовзращает набор список слов по набору идентификаторов
+        /// </summary>
+        /// <param name="ids"></param>
+        /// <returns></returns>
         public List<Word> Get(IEnumerable<int> ids)
         {
-            if (this.db == null || this.db.State != System.Data.ConnectionState.Open)
+            if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
             string ids_str = ids.Distinct().Aggregate("", (c, n) => c + (c == "" ? "" : ",") + "'" + n.ToString() + "'");
-            SQLiteCommand cmd = this.db.CreateCommand();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT id,rank,symbol,childs FROM words WHERE id IN ({ids_str});";
             SQLiteDataReader reader = cmd.ExecuteReader();
-            var result = new List<Word>();
+            List<Word> result = new List<Word>();
             while (reader.Read())
             {
                 int i = int.Parse(reader.GetString(0));
                 int rank = int.Parse(reader.GetString(1));
                 string symbol = reader.GetString(2);
-                int[] childs = this.StringToIntArray(reader.GetString(3));
+                int[] childs = StringToIntArray(reader.GetString(3));
                 result.Add(new Word(i, rank, symbol, childs, null /*parents*/));
             }
             return result;
         }
 
+        /// <summary>
+        /// Возвращает Слово ранга 0 из хранилища по тексту s
+        /// </summary>
+        /// <param name="s"></param>
+        /// <returns></returns>
         public int GetId(string s)
         {
-            if (this.alphabet.TryGetValue(s, out int id)) return id;
-            SQLiteCommand cmd = this.db.CreateCommand();
+            if (alphabet.TryGetValue(s, out int id)) return id;
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT words.id FROM words WHERE symbol='{s}' LIMIT 1;";
             object result = cmd.ExecuteScalar();
             if (result == null) return 0;
             if (int.TryParse(result.ToString(), out id))
             {
-                this.alphabet[s] = id;
+                alphabet[s] = id;
                 return id;
             }
             else return 0;
         }
 
+        /// <summary>
+        /// Возвращает слово по тексту. Текст хранится только для слов ранга 0
+        /// </summary>
+        /// <param name="s"></param>
+        /// <returns></returns>
         public Word Get(string s)
         {
-            if (this.alphabet.TryGetValue(s, out int id)) return new Word(id, 0, s, null, null);
-            SQLiteCommand cmd = this.db.CreateCommand();
+            if (alphabet.TryGetValue(s, out int id)) return new Word(id, 0, s, null, null);
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT words.id FROM words WHERE symbol='{s}' LIMIT 1;";
             object result = cmd.ExecuteScalar();
             if (result == null) return null;
             if (int.TryParse(result.ToString(), out id))
             {
-                this.alphabet[s] = id;
+                alphabet[s] = id;
                 return new Word(id, 0, s, null, null);
             }
             else return null;
         }
 
+        /// <summary>
+        /// Возвращает id слова по дочерним _childs
+        /// </summary>
+        /// <param name="_childs"></param>
+        /// <returns></returns>
         public int GetIdByChilds(int[] _childs)
         {
             Sequence childs = new Sequence(_childs);
-            if (this.words_id.TryGetValue(childs, out int id)) return id;
+            if (words_id.TryGetValue(childs, out int id)) return id;
             string childs_str = _childs.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
-            SQLiteCommand cmd = this.db.CreateCommand();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT words.id FROM words WHERE childs='{childs_str}' LIMIT 1;";
             object result = cmd.ExecuteScalar();
             if (result == null) return 0;
@@ -305,12 +334,17 @@ namespace NLDB
             else return 0;
         }
 
+        /// <summary>
+        /// Возвращает Слово у которого дочерние слова - _childs
+        /// </summary>
+        /// <param name="_childs"></param>
+        /// <returns></returns>
         public Word GetByChilds(int[] _childs)
         {
-            if (this.db == null || this.db.State != System.Data.ConnectionState.Open)
+            if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
             if (_childs == null || _childs.Length == 0) return null;
-            string childs_str = this.IntArrayToString(_childs);
+            string childs_str = IntArrayToString(_childs);
             string[] word = SelectValues(tablename: "words", columns: "id,rank,symbol,childs", where: $"childs='{childs_str}'").FirstOrDefault();
             if (word == null) return null;
             int id = int.Parse(word[0]);
@@ -321,11 +355,16 @@ namespace NLDB
             return new Word(id, rank, symbol, _childs, null/*parents*/);
         }
 
+        /// <summary>
+        /// Возвращает родителей Слова с id=i
+        /// </summary>
+        /// <param name="i"></param>
+        /// <returns></returns>
         public IEnumerable<Word> GetParents(int i)
         {
-            if (this.db == null || this.db.State != System.Data.ConnectionState.Open)
+            if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
-            SQLiteCommand cmd = this.db.CreateCommand();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs FROM words " +
                 $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id='{i}' ;";
@@ -334,16 +373,21 @@ namespace NLDB
             List<Word> words = new List<Word>();
             while (reader.Read())
             {
-                int[] childs = this.StringToIntArray(reader.GetString(3));
+                int[] childs = StringToIntArray(reader.GetString(3));
                 Word w = new Word(int.Parse(reader.GetString(0)), int.Parse(reader.GetString(1)), reader.GetString(2), childs, null);
                 words.Add(w);
             }
             return words;
         }
 
+        /// <summary>
+        /// Возвращает внуков слова с id=i
+        /// </summary>
+        /// <param name="i"></param>
+        /// <returns></returns>
         public IEnumerable<int> GetGrandchildsId(int i)
         {
-            SQLiteCommand cmd = this.db.CreateCommand();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT DISTINCT parents1.id FROM parents parents1 " +
                 $"INNER JOIN parents parents2 ON parents1.parent_id=parents2.id " +
@@ -355,10 +399,15 @@ namespace NLDB
             return result;
         }
 
+        /// <summary>
+        /// Возвращает всех внуков для слов с идентификаторами из набора i
+        /// </summary>
+        /// <param name="i"></param>
+        /// <returns></returns>
         public IEnumerable<int> GetGrandchildsId(IEnumerable<int> i)
         {
             string i_str = i.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + "'" + n.ToString() + "'");
-            SQLiteCommand cmd = this.db.CreateCommand();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT DISTINCT words.childs FROM words " +
                 $"WHERE words.id IN ({i_str}) ;";
@@ -383,12 +432,17 @@ namespace NLDB
             return result;
         }
 
+        /// <summary>
+        /// Возвращает набор пар вида (id родителя, Cлово)
+        /// </summary>
+        /// <param name="i"></param>
+        /// <returns></returns>
         public IEnumerable<Tuple<int, Word>> GetParentsWithChilds(int[] i)
         {
-            if (this.db == null || this.db.State != System.Data.ConnectionState.Open)
+            if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
             string ids = i.Select(e => "'" + e.ToString() + "'").Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
-            SQLiteCommand cmd = this.db.CreateCommand();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs, parents.id FROM words " +
                 $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id IN ({ids})";
@@ -396,19 +450,29 @@ namespace NLDB
             List<Tuple<int, Word>> words = new List<Tuple<int, Word>>();
             while (reader.Read())
             {
-                int[] childs = this.StringToIntArray(reader.GetString(3));
+                int[] childs = StringToIntArray(reader.GetString(3));
                 Word w = new Word(int.Parse(reader.GetString(0)), int.Parse(reader.GetString(1)), reader.GetString(2), childs, null);
                 words.Add(new Tuple<int, Word>(int.Parse(reader.GetString(4)), w));
             }
             return words;
         }
 
-        public IEnumerable<int> GetParentsId(int[] i)
+        /// <summary>
+        /// Возвращает родителей для слов
+        /// </summary>
+        /// <param name="i"></param>
+        /// <returns></returns>
+        public IEnumerable<int> GetParentsId(IEnumerable<int> i)
         {
             StringBuilder builder = new StringBuilder();
-            Array.ForEach(i, e => { if (builder.Length > 0) builder.Append(","); builder.Append("'" + e.ToString() + "'"); });
+            foreach (int e in i)
+            {
+                if (builder.Length > 0) builder.Append(",");
+                builder.Append("'" + e.ToString() + "'");
+            }
+
             string ids = builder.ToString();
-            SQLiteCommand cmd = this.db.CreateCommand();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT DISTINCT parents.parent_id FROM parents " +
                 $"WHERE parents.id IN ({ids})";
@@ -418,13 +482,18 @@ namespace NLDB
             return words;
         }
 
+        /// <summary>
+        /// Добавляет Слово в хранилище и возвращает сгенерированный id Слова
+        /// </summary>
+        /// <param name="w"></param>
+        /// <returns></returns>
         public int Add(Word w)
         {
-            w.id = this.NextId();
-            string childs = this.IntArrayToString(w.childs);
-            string parents = this.BuildParentsString(w);
+            w.id = NextId();
+            string childs = IntArrayToString(w.childs);
+            string parents = BuildParentsString(w);
             string word = $"('{w.id.ToString()}', '{w.rank.ToString()}', '{w.symbol}', '{childs}')";
-            SQLiteCommand cmd = this.db.CreateCommand();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"INSERT INTO words(id,rank,symbol,childs) VALUES {word};" +
                 (parents == "" ? "" : $"INSERT INTO parents(id,parent_id) VALUES {parents};");
@@ -432,6 +501,12 @@ namespace NLDB
             return w.id;
         }
 
+        /// <summary>
+        /// Для Слова w формирует строку из пар сын-родитель вида: 
+        /// ('id Слова 1', 'id родителя'), ('id Слова 2', 'id родителя'),...,('id Слова n', 'id родителя')
+        /// </summary>
+        /// <param name="w"></param>
+        /// <returns></returns>
         private string BuildParentsString(Word w)
         {
             if (w.childs == null || w.childs.Length == 0) return "";
@@ -456,23 +531,32 @@ namespace NLDB
             return s.Split(separator: new char[] { ',' }, options: StringSplitOptions.RemoveEmptyEntries).Select(e => int.Parse(e)).ToArray();
         }
 
+        /// <summary>
+        /// Генерирует очередной неиспользованный Id. Алгоритм линейный с приращением 1.
+        /// TODO: рассмотреть возможности и преимущества генерации id при помощи РСЛОС, лин. конгруэнтных методов, 
+        /// членов мультипликативной группы примитивного корня простого числа.
+        /// </summary>
+        /// <returns></returns>
         private int NextId()
         {
-            Debug.WriteLineIf(this.current_id % (1 << 16) == 0, this.current_id);
-            this.current_id++;
-            return this.current_id;
+            Debug.WriteLineIf(current_id % (1 << 16) == 0, current_id);
+            current_id++;
+            return current_id;
         }
 
+        /// <summary>
+        /// Возвращает текущий (максимальный) занятый Id хранилища
+        /// </summary>
         private int CurrentId
         {
             get
             {
                 //т.к. id слова не может быть равен 0, current_id==0 говорит о том, что он не инициализирован
-                if (this.current_id != 0) return this.current_id;
-                if (this.db == null || this.db.State != System.Data.ConnectionState.Open)
+                if (current_id != 0) return current_id;
+                if (db == null || db.State != System.Data.ConnectionState.Open)
                     throw new Exception($"Подключение к БД не установлено");
-                this.current_id = Max("words", "id");
-                return this.current_id;
+                current_id = Max("words", "id");
+                return current_id;
             }
         }
 
@@ -481,7 +565,7 @@ namespace NLDB
             int id = int.Parse(s_id);
             int rank = int.Parse(s_rank);
             string symbol = s_symbol;
-            int[] childs = this.StringToIntArray(s_childs);
+            int[] childs = StringToIntArray(s_childs);
             int[] parents = s_parents?.Select(p => int.Parse(p)).ToArray();
             return new Word(id, rank, symbol, childs, parents);
         }
@@ -489,7 +573,7 @@ namespace NLDB
         // Методы IEnumerable
         public IEnumerator<Word> GetEnumerator()
         {
-            SQLiteCommand cmd = this.db.CreateCommand();
+            SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT id,rank,symbol,childs FROM words";
             SQLiteDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -501,18 +585,18 @@ namespace NLDB
                 //    columns: "parent_id",
                 //    where: $"parents.id={row[0]}");
                 //IEnumerable<string> parents = parents_qry.Select(p => p[0]);
-                yield return this.StringsToWord(s_id: row[0], s_rank: row[1], s_symbol: row[2], s_childs: row[3], s_parents: null/*parents*/);
+                yield return StringsToWord(s_id: row[0], s_rank: row[1], s_symbol: row[2], s_childs: row[3], s_parents: null/*parents*/);
             }
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return this.GetEnumerator();
+            return GetEnumerator();
         }
 
         public void Dispose()
         {
-            this.db.Close();
+            db.Close();
         }
 
 
