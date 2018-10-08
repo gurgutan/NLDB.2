@@ -181,7 +181,7 @@ namespace NLDB
             List<Tuple<int, string>> db_splitters = new List<Tuple<int, string>>();
             while (reader.Read())
             {
-                int rank = int.Parse(reader.GetString(0));
+                int rank = reader.GetInt32(0);
                 string expr = reader.GetString(1);
                 db_splitters.Add(new Tuple<int, string>(rank, expr));
             }

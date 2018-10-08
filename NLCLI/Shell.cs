@@ -33,7 +33,7 @@ namespace NLDB.NLCLI
         /// </summary>
         public void DialogLoop()
         {
-            //TODO: Сделать сохранение последовательности команд в отдельны файл
+            //TODO: Сделать сохранение последовательности команд в отдельный файл
             //TODO: Сделать сохранение лога работы
             Command c = new Command();
             ShowWelcomeMessage();

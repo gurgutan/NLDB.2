@@ -7,11 +7,11 @@ namespace NLDB
 {
     internal class Program
     {
-        
+
         private static void Main(string[] args)
         {
-            string dbname = "wikiru884.db";
-            string trainfile = @"D:\Data\Wiki\ru\884mb.txt";
+            string dbname = "wikiru5mb.db";
+            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
             string[] splitters = new string[] { "", @"[^а-яё\d\{\}]+", @"[\n\r]+", @"\[\[{число}\]\]" };
             Language l = new Language(dbname, splitters);
             //l.Create();
@@ -65,11 +65,14 @@ namespace NLDB
                 Stopwatch sw = new Stopwatch();
                 Console.WriteLine("\nПостроение цепочки");
                 sw.Restart();
-                List<Term> next = l.Next(text, rank);
+                var core = l.GetCore(text, rank: 2);
+                //List<Term> next = l.Next(text, rank);
                 sw.Stop();
                 Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-                if (next.Count != 0)
-                    Console.WriteLine(next.Aggregate("", (c, n) => c + $" " + n.ToString()));
+                if (core.Count() != 0)
+                    Console.WriteLine(core.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+                //if (next.Count != 0)
+                //    Console.WriteLine(next.Aggregate("", (c, n) => c + $" " + n.ToString()));
                 //l.FreeMemory();
             }
             l.Disconnect();
