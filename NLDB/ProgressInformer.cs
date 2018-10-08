@@ -3,78 +3,120 @@ using System.Text;
 
 namespace NLDB
 {
+    /// <summary>
+    /// Класс для отображения полосы прогрессы операции в консольном режиме
+    /// </summary>
     internal class ProgressInformer
     {
-        public readonly int DefaultBarSize = 32;
+        /// <summary>
+        /// Размер полосы по умолчанию в символах
+        /// </summary>
+        public const int DefaultBarSize = 32;
+        /// <summary>
+        /// Текст перед полосой
+        /// </summary>
         public string Prompt { get; set; }
+        /// <summary>
+        /// Единицы измерения (выводятся вместе с числовым значением после полосы)
+        /// </summary>
+        public string UnitsOfMeasurment { get; set; }
+        /// <summary>
+        /// При значении true выводит полосу прогресса
+        /// </summary>
         public bool ShowProgressBar { get; set; }
+        /// <summary>
+        /// При значении true - выводит значение завершенности в процентах
+        /// </summary>
         public bool ShowPercents { get; set; }
+        /// <summary>
+        /// При значении true - выводит текущее значение завершенности в реальных единицах
+        /// </summary>
         public bool ShowCurrent { get; set; }
+        /// <summary>
+        /// Размер полосы в символах (без учета остальных элементов - скобок, процентов и т.п.)
+        /// </summary>
         public int BarSize { get; set; }
+        /// <summary>
+        /// Максимальное значение величины в реальных единицах
+        /// </summary>
         public long Max { get; set; }
+
         private long current;
+        /// <summary>
+        /// Текущее значение величины в реалбных единицах
+        /// </summary>
         public long Current
         {
-            get => this.current;
-            set => this.current = value;
+            get => current;
+            set => current = value;
         }
 
-        public int LeftBorderPos { get; private set; }
-
-        private readonly char[] animationChars = new char[] { '|', '}', '>', '-' };
-        private readonly char lineChar = '=';
-        private readonly char leftBorder = '[';
-        private readonly char rightBorder = ']';
-        private int animateFrame = 0;
+        private readonly char[] animationChars = new char[] { '|', '/', '-', '\\' };    //символы анимирующие правый край полосы
+        private readonly char lineChar = '#';   //символ заполняющий полосу
+        private readonly char leftBorder = '['; //левый край полосы
+        private readonly char rightBorder = ']';//правый край полосы
+        private int animateFrame = 0;           //текущая позиция анимирующего символа в animationChars
         private readonly int PosY;
         private readonly int PosX;
 
         public ProgressInformer(string prompt, long max)
         {
             Prompt = prompt;
+            UnitsOfMeasurment = "";
             Max = max;
             ShowProgressBar = true;
             ShowPercents = true;
             ShowCurrent = true;
-            BarSize = Math.Min(Console.BufferWidth - Prompt.Length - 7, this.DefaultBarSize);
-            LeftBorderPos = Prompt.Length + 5;
+            BarSize = Math.Min(Console.BufferWidth - Prompt.Length - 7, DefaultBarSize);
             Current = 0;
-            this.PosX = Console.CursorLeft;
-            this.PosY = Console.CursorTop;
+            PosX = Console.CursorLeft;
+            PosY = Console.CursorTop;
         }
 
+        /// <summary>
+        /// Увеличивает величину на count единиц
+        /// </summary>
+        /// <param name="count"></param>
+        /// <returns></returns>
         public long Inc(long count)
         {
             Current += count;
             return Current;
         }
 
+        /// <summary>
+        /// Выводит на экран полосу прогресса
+        /// </summary>
         public void Show()
         {
             double percents = Math.Truncate(100.0 / Max * Current);
             //int parts = (int)((percents - Math.Truncate(percents)) * this.animationChars.Length);
             int barPos = (int)(BarSize / (double)Max * Current);
-            this.animateFrame++;
+            animateFrame++;
             StringBuilder strBuilder = new StringBuilder();
             if (barPos > 0)
-                strBuilder.Append(this.lineChar, barPos);
+                strBuilder.Append(lineChar, barPos);
             if (BarSize - barPos > 0)
-                strBuilder.Append(this.animationChars[this.animateFrame % this.animationChars.Length]);
+                strBuilder.Append(animationChars[animateFrame % animationChars.Length]);
             if (BarSize - barPos > 0 && BarSize - strBuilder.ToString().Length + 1 > 0)
                 strBuilder.Append(' ', BarSize - strBuilder.ToString().Length + 1);
             string progress = strBuilder.ToString();
             string percentsStr = ((int)percents).ToString().PadLeft(2);
-            Console.CursorLeft = this.PosX;
-            Console.CursorTop = this.PosY;
+            Console.CursorLeft = PosX;
+            Console.CursorTop = PosY;
             Console.Write($"{Prompt}");
             if (ShowPercents) Console.Write($"{percentsStr}%");
-            if (ShowProgressBar) Console.Write($"{this.leftBorder}{progress}{this.rightBorder}");
-            if (ShowCurrent) Console.Write($"{Current}\\{Max}");
+            if (ShowProgressBar) Console.Write($"{leftBorder}{progress}{rightBorder}");
+            if (ShowCurrent) Console.Write($"{Current}\\{Max} {UnitsOfMeasurment}");
         }
 
+        /// <summary>
+        /// Устанавливает текущую позицию величины в n и выводит на экран
+        /// </summary>
+        /// <param name="n"></param>
         public void Set(int n)
         {
-            this.current = n;
+            current = n;
             Show();
         }
     }

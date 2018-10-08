@@ -7,20 +7,20 @@ namespace NLDB
 {
     internal class Program
     {
-
+        
         private static void Main(string[] args)
         {
-            string dbname = "wikiru5mb.db";
-            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
+            string dbname = "wikiru884.db";
+            string trainfile = @"D:\Data\Wiki\ru\884mb.txt";
             string[] splitters = new string[] { "", @"[^а-яё\d\{\}]+", @"[\n\r]+", @"\[\[{число}\]\]" };
             Language l = new Language(dbname, splitters);
-            l.Create();
+            //l.Create();
             l.Connect();
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            l.BuildLexicon(trainfile);
-            //l.BuildGrammar();
+            //l.BuildLexicon(trainfile);
+            l.BuildGrammar();
             sw.Stop();
             Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
             //Console.WriteLine("Поиск в БД по id");

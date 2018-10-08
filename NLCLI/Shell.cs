@@ -1,235 +1,261 @@
-﻿//using System;
-//using System.Collections.Generic;
-//using System.Linq;
-//using System.Text;
-//using System.Threading.Tasks;
-//using System.Diagnostics;
-//using NLDB;
-//using System.IO;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 
-//namespace NLDB.NLCLI
-//{
-//    public enum ShellExecuteMode { Debug, Standart };
+namespace NLDB.NLCLI
+{
+    public enum ShellExecuteMode { Debug, Standart };
 
+    /// <summary>
+    /// Класс командной оболочки. Предоставляет методы для исполнения команд пользователя в интерактивном режиме
+    /// </summary>
+    public class Shell
+    {
+        public const string Version = "0.01";
+        public readonly string WelcomeMessage = "Оболочка командной строки NLDB " + Version + "\nДля подсказки используйте команду 'help'";
+        public string PromptDelimiter = ">>";
 
-//    public class Shell
-//    {
-//        public const string Version = "0.01";
-//        public readonly string WelcomeMessage = "Оболочка командной строки NLDB " + Version + "\nДля подсказки используйте команду 'help'";
-//        public string PromptDelimiter = ">>";
+        private Language db = null;
+        private readonly int[] ErrorCodes = { 1001, 1002, 1003, 1004 };
 
-//        Language DB;
+        public ShellExecuteMode ExecuteMode = ShellExecuteMode.Debug;
 
-//        public ShellExecuteMode ExecuteMode = ShellExecuteMode.Debug;
+        public Shell() { }
 
-//        public Shell() { }
+        public Shell(Language _db)
+        {
+            db = _db;
+        }
 
-//        public Shell(Language db)
-//        {
-//            DB = db;
-//        }
+        /// <summary>
+        /// Метод входит в основной цикл диалога командной строки с пользователем.
+        /// </summary>
+        public void DialogLoop()
+        {
+            //TODO: Сделать сохранение последовательности команд в отдельны файл
+            //TODO: Сделать сохранение лога работы
+            Command c = new Command();
+            ShowWelcomeMessage();
+            while (c.CommandType != CommandTypes.Quit)
+            {
+                ShowPrompt();
+                string line = Console.ReadLine();
+                if (c.TryParse(line))
+                {
+                    int resultCode = Execute(c);
+                    if (ErrorCodes.Contains(resultCode))
+                        ErrorMessage($"Ошибка выполнения команды: {resultCode}");
+                    else
+                        InfoMessage($"Команда выполнена с кодом возврата {resultCode}");
+                }
+                else ErrorMessage("Ошибка интерпретации команды. Воспользуйтесь командой help");
+            }
+        }
 
-//        public void DialogLoop()
-//        {
-//            Command c = new Command();
-//            ShowWelcomeMessage();
-//            while (c.CommandType != CommandTypes.Quit)
-//            {
-//                this.ShowPrompt();
-//                string line = Console.ReadLine();
-//                if (c.TryParse(line))
-//                    this.Execute(c);
-//                else ErrorMessage("Ошибка интерпретации команды. Воспользуйтесь командой help");
-//            }
-//        }
+        private void ShowWelcomeMessage()
+        {
+            Console.WriteLine(WelcomeMessage);
+        }
 
-//        private void ShowWelcomeMessage()
-//        {
-//            Console.WriteLine(WelcomeMessage);
-//        }
+        private void ShowPrompt()
+        {
+            string dbname = (db == null) ? "null" : db.Name;
+            Console.Write(dbname + PromptDelimiter);
+        }
 
-//        private void ShowPrompt()
-//        {
-//            string dbname = (DB == null) ? "null" : DB.Name;
-//            Console.Write(dbname + PromptDelimiter);
-//        }
+        public int Execute(Command c)
+        {
+            switch (c.CommandType)
+            {
+                case CommandTypes.Quit: return 0;
+                case CommandTypes.Help: return ShowHelp();
+                case CommandTypes.Create: return Create(c.Parameters);
+                case CommandTypes.Build: return Build(c.Parameters);
+                case CommandTypes.Connect: return Connect(c.Parameters);
+                case CommandTypes.Find: return Find(c.Parameters);
+                case CommandTypes.Empty: return 0;
+                default: { NotImplementedCommandType(); return 1002; }
+            }
+        }
 
-//        public int Execute(Command c)
-//        {
-//            switch (c.CommandType)
-//            {
-//                case CommandTypes.Quit: return 0;
-//                case CommandTypes.Help: return ShowHelp();
-//                case CommandTypes.Clear: return ClearDB();
-//                case CommandTypes.Create: return CreateDB(c.Parameters);
-//                case CommandTypes.Find: return FindInDB(c.Parameters);
-//                case CommandTypes.Empty: return 0;
-//                default: { NotImplementedCommandType(); return 1002; }
-//            }
-//        }
+        private int Connect(Dictionary<string, string> parameters)
+        {
+            if (db != null && db.IsConnected()) db.Disconnect();
+            string dbname = parameters["db"];
+            db = new Language(dbname);
+            db.Connect();
+            return 0;
+        }
 
-//        private int ShowHelp()
-//        {
-//            foreach (var s in Command.helpstrings)
-//                Console.WriteLine(s);
-//            return 0;
-//        }
+        private int Build(Dictionary<string, string> parameters)
+        {
+            string filename = parameters["fromfile"];
+            Console.WriteLine($"Начало обучения на файле {filename}");
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            db.BuildLexicon(filename);
+            sw.Stop();
+            Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
+            return 0;
+        }
 
-//        private int FindInDB(Dictionary<string, string> parameters)
-//        {
-//            if (DB == null)
-//            {
-//                ErrorMessage("База данных не инициализирована. Сначала загрузите или создайте БД.");
-//                return 0;
-//            }
-//            string text = "";
-//            int rank = 1;
-//            int maxcount = 1;
-//            foreach (var key in parameters.Keys)
-//                switch (key)
-//                {
-//                    case "text": text = parameters[key]; break;
-//                    case "rank":
-//                        {
-//                            if (!int.TryParse(parameters[key], out rank))
-//                                IncorrectParameter(key, parameters[key]);
-//                            return 1001;
-//                        }
-//                    case "top":
-//                        {
-//                            if (!int.TryParse(parameters[key], out maxcount))
-//                                IncorrectParameter(key, parameters[key]);
-//                            return 1001;
-//                        }
-//                    default: UnknownParameter(key); break;
-//                }
-//            //Вывод информации о команде
-//            Stopwatch stopwatch = Stopwatch.StartNew();
-//            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] поиск ближайших {maxcount} к '{text}' в лексиконе ранга {rank}");
-//            var terms = DB.FindMany(text, maxcount, rank);
-//            stopwatch.Stop();
-//            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
-//            ShowTerms(terms);
-//            return 0;
-//        }
+        private int ShowHelp()
+        {
+            foreach (string s in Command.helpstrings)
+                Console.WriteLine(s);
+            return 0;
+        }
 
-//        //Пара [ключ,значение] словаря соответствуют типу источника и пути к источнику. Допустимы варианты:
-//        //[file, полное_имя_файла]
-//        //[folder, полный_путь_к_папке]
-//        //[string, строка_с_данными]
-//        //TODO: сделать возможной обработку данных из Stream
-//        private int CreateDB(Dictionary<string, string> parameters)
-//        {
-//            string name = "";
-//            List<string> splitters = new List<string>();
-//            foreach (var key in parameters.Keys)
-//                switch (key)
-//                {
-//                    case "name": name = parameters[key]; break;
-//                    case "splitters": splitters.Add(parameters[key]); break;
-//                    default: { UnknownParameter(key); return 1001; };
-//                }
-//            DB = new Language(name, splitters.ToArray());
-//            return 0;
-//        }
+        private int Find(Dictionary<string, string> parameters)
+        {
+            if (db == null)
+            {
+                ErrorMessage("База данных не инициализирована. Сначала загрузите или создайте БД.");
+                return 0;
+            }
+            string text = "";
+            int rank = 1;
+            int maxcount = 1;
+            foreach (string key in parameters.Keys)
+                switch (key)
+                {
+                    case "text": text = parameters[key]; break;
+                    case "rank":
+                        {
+                            if (!int.TryParse(parameters[key], out rank))
+                                IncorrectParameter(key, parameters[key]);
+                            return 1001;
+                        }
+                    case "top":
+                        {
+                            if (!int.TryParse(parameters[key], out maxcount))
+                                IncorrectParameter(key, parameters[key]);
+                            return 1001;
+                        }
+                    default: UnknownParameter(key); break;
+                }
+            //Вывод информации о команде
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            DebugMessage($"[{stopwatch.Elapsed.ToString()}] поиск ближайших {maxcount} к '{text}' в лексиконе ранга {rank}");
+            List<Term> terms = db.Similars(text, rank);
+            stopwatch.Stop();
+            DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
+            ShowTerms(terms);
+            return 0;
+        }
 
-//        private int AddData(Dictionary<string, string> parameters)
-//        {
-//            if (DB == null)
-//            {
-//                ErrorMessage("База данных не инициализирована. Сначала загрузите или создайте БД.");
-//                return 0;
-//            }
-//            foreach (var key in parameters.Keys)
-//                switch (key)
-//                {
-//                    case "file": return AddDataFromFile(parameters[key]);
-//                    case "folder": return AddDataFromFolder(parameters[key]);
-//                    case "string": return AddDataFromString(parameters[key]);
-//                    default: { UnknownParameter(key); return 1001; };
-//                }
-//            return 0;
-//        }
+        /// <summary>
+        /// Метод исполнения команды создания Языка
+        /// </summary>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
+        private int Create(Dictionary<string, string> parameters)
+        {
+            string name = "";
+            List<string> splitters = new List<string>();
+            foreach (string key in parameters.Keys)
+                switch (key)
+                {
+                    case "name": name = parameters[key]; break;
+                    case "splitters": splitters.Add(parameters[key]); break;
+                    default: { UnknownParameter(key); return 1001; };
+                }
+            db = new Language(name, splitters.ToArray());
+            return 0;
+        }
 
-//        private int AddDataFromString(string s)
-//        {
-//            Stopwatch stopwatch = Stopwatch.StartNew();
-//            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] Добавление данных из строки");
-//            int wordscount = DB.CreateFromString(s);
-//            stopwatch.Stop();
-//            Console.WriteLine($"В БД {DB.Name} добавлено {wordscount} слов.");
-//            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
-//            return 0;
-//        }
+        //private int AddData(Dictionary<string, string> parameters)
+        //{
+        //    if (db == null)
+        //    {
+        //        ErrorMessage("База данных не инициализирована. Сначала загрузите или создайте БД.");
+        //        return 0;
+        //    }
+        //    foreach (string key in parameters.Keys)
+        //        switch (key)
+        //        {
+        //            case "file": return AddDataFromFile(parameters[key]);
+        //            case "folder": return AddDataFromFolder(parameters[key]);
+        //            case "string": return AddDataFromString(parameters[key]);
+        //            default: { UnknownParameter(key); return 1001; };
+        //        }
+        //    return 0;
+        //}
 
-//        private int AddDataFromFolder(string path)
-//        {
-//            int wordscount = 0;
-//            Stopwatch stopwatch = Stopwatch.StartNew();
-//            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] Добавление данных из папки '{path}'");
-//            var files = Directory.GetFiles(path);
-//            foreach(var file in files)
-//                wordscount += DB.CreateFromTextFile(file);
-//            Console.WriteLine($"В БД {DB.Name} добавлено {wordscount} слов.");
-//            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
-//            return 0;
-//        }
+        //private int AddDataFromString(string s)
+        //{
+        //    Stopwatch stopwatch = Stopwatch.StartNew();
+        //    DebugMessage($"[{stopwatch.Elapsed.ToString()}] Добавление данных из строки");
+        //    int wordscount = db.CreateFromString(s);
+        //    stopwatch.Stop();
+        //    Console.WriteLine($"В БД {db.Name} добавлено {wordscount} слов.");
+        //    DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
+        //    return 0;
+        //}
 
-//        private int AddDataFromFile(string filename)
-//        {
-//            Stopwatch stopwatch = Stopwatch.StartNew();
-//            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] Добавление данных из файла '{filename}'");
-//            int wordscount = DB.CreateFromTextFile(filename);
-//            stopwatch.Stop();
-//            Console.WriteLine($"В БД {DB.Name} добавлено {wordscount} слов.");
-//            this.DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
-//            return 0;
-//        }
+        //private int AddDataFromFolder(string path)
+        //{
+        //    int wordscount = 0;
+        //    Stopwatch stopwatch = Stopwatch.StartNew();
+        //    DebugMessage($"[{stopwatch.Elapsed.ToString()}] Добавление данных из папки '{path}'");
+        //    string[] files = Directory.GetFiles(path);
+        //    foreach (string file in files)
+        //        wordscount += db.CreateFromTextFile(file);
+        //    Console.WriteLine($"В БД {db.Name} добавлено {wordscount} слов.");
+        //    DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
+        //    return 0;
+        //}
 
-//        private int ClearDB()
-//        {
-//            if (DB == null)
-//            {
-//                Console.WriteLine("База данныйх не инициализирована");
-//                return 0;
-//            }
-//            DB.Clear();
-//            return 0;
-//        }
+        //private int AddDataFromFile(string filename)
+        //{
+        //    Stopwatch stopwatch = Stopwatch.StartNew();
+        //    DebugMessage($"[{stopwatch.Elapsed.ToString()}] Добавление данных из файла '{filename}'");
+        //    int wordscount = db.CreateFromTextFile(filename);
+        //    stopwatch.Stop();
+        //    Console.WriteLine($"В БД {db.Name} добавлено {wordscount} слов.");
+        //    DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
+        //    return 0;
+        //}
 
-//        private void IncorrectParameter(string key, string value)
-//        {
-//            Console.WriteLine($"Некорректный параметр {key}:{value}");
-//        }
+        private void IncorrectParameter(string key, string value)
+        {
+            Console.WriteLine($"Некорректный параметр {key}:{value}");
+        }
 
-//        private void UnknownParameter(string key)
-//        {
-//            Console.WriteLine($"Неизвестный параметр {key}");
-//        }
+        private void UnknownParameter(string key)
+        {
+            Console.WriteLine($"Неизвестный параметр {key}");
+        }
 
-//        private void DebugMessage(string s)
-//        {
-//            if (this.ExecuteMode == ShellExecuteMode.Debug)
-//                Console.WriteLine(s);
-//        }
+        private void DebugMessage(string s)
+        {
+            if (ExecuteMode == ShellExecuteMode.Debug)
+                Console.WriteLine(s);
+        }
 
-//        private void ErrorMessage(string s)
-//        {
-//            Console.WriteLine(s);
-//        }
+        private void ErrorMessage(string s)
+        {
+            Console.WriteLine(s);
+        }
 
-//        private void ShowTerms(IEnumerable<Term> terms)
-//        {
-//            terms.ToList().ForEach(term =>
-//            {
-//                if (term.Id >= 0)
-//                    Console.WriteLine($"[{term.Confidence}, {DB.Lexicons[term.Rank].WordIdToText(term.Id)}]");
-//            });
-//        }
+        private void InfoMessage(string s)
+        {
+            Console.WriteLine(s);
+        }
 
-//        private void NotImplementedCommandType()
-//        {
-//            Console.WriteLine("Данный тип команды не реализован");
-//        }
-//    }
-//}
+        private void ShowTerms(IEnumerable<Term> terms)
+        {
+            terms.ToList().ForEach(term =>
+            {
+                if (term.id >= 0)
+                    Console.WriteLine($"[{term.confidence}] {term.ToString()}");
+            });
+        }
+
+        private void NotImplementedCommandType()
+        {
+            Console.WriteLine("Данный тип команды не реализован");
+        }
+    }
+}
