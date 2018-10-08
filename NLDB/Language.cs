@@ -24,18 +24,18 @@ namespace NLDB
 
         //Основные свойства
         public string Name { get; private set; }
-        public int Rank => this.data.Splitters.Length - 1;
-        public string[] Splitters => this.data.Splitters;
-        public int Count => this.data.CountWords();
+        public int Rank => data.Splitters.Length - 1;
+        public string[] Splitters => data.Splitters;
+        public int Count => data.CountWords();
         //Размер буфера для чтения текста
         public static readonly int TEXT_BUFFER_SIZE = 1 << 16;
 
         public Language(string _name, string[] _splitters)
         {
             Name = _name;
-            this.splitters = _splitters;
-            this.parsers = this.splitters.Select(s => new Parser(s)).ToArray();
-            this.data = new DataContainer(_name, this.splitters);
+            splitters = _splitters;
+            parsers = splitters.Select(s => new Parser(s)).ToArray();
+            data = new DataContainer(_name, splitters);
         }
 
         public Language(string _name)
@@ -51,24 +51,24 @@ namespace NLDB
         /// </summary>
         public void Connect()
         {
-            if (this.data != null && this.data.IsConnected()) this.data.Disconnect();
-            this.data = new DataContainer(Name);
+            if (data != null && data.IsConnected()) data.Disconnect();
+            data = new DataContainer(Name);
             //Считаем разделители из БД
-            this.data.Connect(Name);
+            data.Connect(Name);
             //Разделители Словаря 
-            this.splitters = this.data.Splitters;
+            splitters = data.Splitters;
             //Создадим парсеры из разделителей
-            this.parsers = this.splitters.Select(s => new Parser(s)).ToArray();
+            parsers = splitters.Select(s => new Parser(s)).ToArray();
         }
 
         public void Disconnect()
         {
-            this.data.Disconnect();
+            data.Disconnect();
         }
 
         public bool IsConnected()
         {
-            return this.data.IsConnected();
+            return data.IsConnected();
         }
 
         /// <summary>
@@ -76,10 +76,10 @@ namespace NLDB
         /// </summary>
         public void Create()
         {
-            if (this.data.IsConnected()) this.data.Disconnect();
+            if (data.IsConnected()) data.Disconnect();
             if (File.Exists(Name)) File.Delete(Name);
-            this.data = new DataContainer(Name, this.splitters);
-            this.data.CreateDB();
+            data = new DataContainer(Name, splitters);
+            data.CreateDB();
         }
 
         /// <summary>
@@ -97,7 +97,7 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         protected void FreeMemory()
         {
-            this.data.ClearCash();
+            data.ClearCash();
         }
 
         //--------------------------------------------------------------------------------------------
@@ -105,7 +105,7 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         public Word Find(int i)
         {
-            return this.data.Get(i);
+            return data.Get(i);
         }
 
         /// <summary>
@@ -115,7 +115,7 @@ namespace NLDB
         /// <returns></returns>
         public Word FindByChilds(int[] i)
         {
-            return this.data.GetByChilds(i);
+            return data.GetByChilds(i);
         }
 
         /// <summary>
@@ -126,10 +126,10 @@ namespace NLDB
         /// <returns></returns>
         public Term ToTerm(string text, int rank)
         {
-            text = this.parsers[rank].Normilize(text);
+            text = parsers[rank].Normilize(text);
             return new Term(rank, 0, 0, text,
                 rank == 0 ? null :
-                this.parsers[rank - 1].
+                parsers[rank - 1].
                 Split(text).
                 Where(s => !string.IsNullOrWhiteSpace(s)).
                 Select(s => ToTerm(s, rank - 1)));
@@ -142,7 +142,7 @@ namespace NLDB
 
         public Term ToTerm(int i, float _confidence = 1)
         {
-            return this.data.ToTerm(i, _confidence);
+            return data.ToTerm(i, _confidence);
         }
 
         //--------------------------------------------------------------------------------------------
@@ -153,8 +153,8 @@ namespace NLDB
         ///добавляет слово в Словарь, иначе возвращает 0.
         private IEnumerable<int> Parse(string text, int rank, bool addIfNotExists = true)
         {
-            text = this.parsers[rank].Normilize(text);
-            IEnumerable<string> strings = this.parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
+            text = parsers[rank].Normilize(text);
+            IEnumerable<string> strings = parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
             //Для слов ранга > 0 добавляем слова, которых еще нет
             List<int> result = strings.Select(s =>
             {
@@ -168,18 +168,18 @@ namespace NLDB
                     //значит слово не найдено и не может быть создано - возвращаем 0
                     if (childs.Length == 0) return 0;
                     //Пытаемся найти в Словаре Слово по дочерним
-                    id = this.data.GetIdByChilds(childs);
+                    id = data.GetIdByChilds(childs);
                     if (id == 0)
                         if (addIfNotExists)
-                            id = this.data.Add(new Word(0, rank, "", childs, new int[0]));
+                            id = data.Add(new Word(0, rank, "", childs, new int[0]));
                 }
                 else
                 {
                     //Ищем в Словаре Слово ранга 0 в символьном представлении =s
-                    id = this.data.GetId(s);
+                    id = data.GetId(s);
                     if (id == 0)
                         if (addIfNotExists)
-                            id = this.data.Add(new Word(0, rank, s, null, new int[0]));
+                            id = data.Add(new Word(0, rank, s, null, new int[0]));
                 }
                 return id;
             }).Where(i => i != 0).ToList();
@@ -199,7 +199,7 @@ namespace NLDB
             if (term.rank == 0)
             {
                 //При нулевом ранге терма (т.е. терм - это буква), confidence считаем исходя из наличия соответствующей буквы в алфавите
-                term.id = this.data.GetId(term.text);
+                term.id = data.GetId(term.text);
                 term.confidence = (term.id == 0 ? 0 : 1);
                 term.Identified = true;
                 return term;
@@ -218,7 +218,7 @@ namespace NLDB
                 sw.Stop();  //!!!
                 Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
-                List<int> parents = this.data.GetParentsId(childs).ToList();
+                List<int> parents = data.GetParentsId(childs).ToList();
                 sw.Stop();  //!!!
                 Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
@@ -251,7 +251,7 @@ namespace NLDB
         /// <returns></returns>
         public Term Similar(string text, int rank)
         {
-            text = this.parsers[rank].Normilize(text);
+            text = parsers[rank].Normilize(text);
             Term term = ToTerm(text, rank);
             return Identify(term);
         }
@@ -265,7 +265,7 @@ namespace NLDB
         /// <returns></returns>
         public List<Term> Similars(string text, int rank = 2, int count = 0)
         {
-            text = this.parsers[rank].Normilize(text);
+            text = parsers[rank].Normilize(text);
             Stopwatch sw = new Stopwatch(); //!!!
             sw.Start(); //!!!
             Term term = ToTerm(text, rank);
@@ -287,7 +287,7 @@ namespace NLDB
             sw.Stop();  //!!!
             Debug.WriteLine($"Similars->childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
             sw.Restart(); //!!!
-            List<Term> context = this.data.
+            List<Term> context = data.
                 GetParentsId(childs).
                 Distinct().
                 Select(p => ToTerm(p)).
@@ -331,9 +331,9 @@ namespace NLDB
             Dictionary<int, float> weights = similars.ToDictionary(s => s.id, s => s.confidence);
             sw.Restart(); //!!!
             //Получаем контекст similars: все дочерние Слова для Слов, являющихся родителями similars
-            Dictionary<int, Link> context = this.data.
+            Dictionary<int, Link> context = data.
                 GetParentsWithChilds(weights.Keys.ToArray()).
-                SelectMany(p => this.data.GetGrandchildsId(p.Item2.id).
+                SelectMany(p => data.GetGrandchildsId(p.Item2.id).
                 Select(gc => new Link(gc, 0, weights[p.Item1]))).
                 Distinct(new LinkComparer()).
                 ToDictionary(link => link.id, link => link);
@@ -341,8 +341,8 @@ namespace NLDB
             Debug.WriteLine($"Определение context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
             //Запоминаем словарь допустимых слов, для использования в поиске
             sw.Restart(); //!!!
-            context.Add(this.grammar.Root.id, new Link(0, 0, 0));
-            Tuple<float, Stack<Link>> path = FindSequence(this.grammar.Root, context);
+            context.Add(grammar.Root.id, new Link(0, 0, 0));
+            Tuple<float, Stack<Link>> path = FindSequence(grammar.Root, context);
             sw.Stop();  //!!!
             Debug.WriteLine($"Определение path [{path.Item1.ToString("F4")};{path.Item2.Count}]: {sw.Elapsed.TotalSeconds}");
             return path.Item2.Skip(1).Select(link => ToTerm(link.id)).ToList();
@@ -392,13 +392,13 @@ namespace NLDB
         public IEnumerable<Term> GetCore(string text, int rank = 2)
         {
             //1. Найти Parent
-            var similars = Similars(text, rank, similars_max_count);
-            var parents = new Dictionary<Term, double>();
+            List<Term> similars = Similars(text, rank, similars_max_count);
+            Dictionary<Term, double> parents = new Dictionary<Term, double>();
             //Для каждого parent вычисляем оценку как сумму confidence его потомков из similars
             similars
-                .SelectMany(t => this.data
+                .SelectMany(t => data
                     .GetParents(t.id))          //получаем Слова-родители t
-                    .Select(p => this.data.ToTerm(p))  //преобразуем в термы
+                    .Select(p => data.ToTerm(p))  //преобразуем в термы
                 .ToList()                       //ForEach есть IList, но нет в IEnumerable
                 .ForEach(t =>
                 {
@@ -406,25 +406,25 @@ namespace NLDB
                     parents[t] += t.confidence;
                 });
             //Сортируем список пар по убыванию оценки и берем первый элемент
-            var best_parents = parents.OrderByDescending(kvp => kvp.Value);
-            var best_parent = best_parents.First().Key;
-            var terms = best_parent.Childs.Distinct(new TermComparer()).ToList();
+            IOrderedEnumerable<KeyValuePair<Term, double>> best_parents = parents.OrderByDescending(kvp => kvp.Value);
+            Term best_parent = best_parents.First().Key;
+            List<Term> terms = best_parent.Childs.Distinct(new TermComparer()).ToList();
 
             //2. Вычислить матрицу расстояний для дочерних Слов Parent
-            var dmatrix = DMatrix(terms);
+            Dictionary<string, double> dmatrix = DMatrix(terms);
 
             //3. Найти минимальный набор дочерних Слов, покрывающих Parent на половину радиуса
-            var core = new HashSet<Term>();
-            var B = terms.ToDictionary(t => t.id, t => t);
+            HashSet<Term> core = new HashSet<Term>();
+            Dictionary<int, Term> B = terms.ToDictionary(t => t.id, t => t);
             double max_distance = MaxDistance(core, B.Values, dmatrix);
             double d = max_distance;
             //Вычисления проводятся либо пока не опустеет список B, либо пока макс. расстояние
             //между множествами A и B не будет меньше maxdist_divisor части от макс. расстояния 
             //между любыми двумя термами terms
-            while (B.Count > 0 && core.Count< description_max_words)
+            while (B.Count > 0 && core.Count < description_max_words)
             {
                 //Найдем терм с минимальной суммой расстояний до остальных в B
-                var id = MinSumDistance(B, dmatrix);
+                int id = MinSumDistance(B, dmatrix);
                 //Перекладываем терм id из A в B
                 core.Add(B[id]);
                 B.Remove(id);
@@ -443,8 +443,8 @@ namespace NLDB
             if (B.Count() == 0) return 0;
             if (A.Count() == 0) return double.MaxValue;
             double max = 0;
-            foreach (var a in A)
-                foreach (var b in B)
+            foreach (Term a in A)
+                foreach (Term b in B)
                 {
                     double dist = dmatrix[$"{a.id}-{b.id}"];
                     if (dist > max)
@@ -467,10 +467,10 @@ namespace NLDB
             double min = double.MaxValue;
             int id = 0;
             //Ищем строку с минимальной суммой значений dmatrix по всем столбцам
-            foreach (var r in terms)
+            foreach (KeyValuePair<int, Term> r in terms)
             {
                 double s = 0;
-                foreach (var c in terms)
+                foreach (KeyValuePair<int, Term> c in terms)
                 {
                     s += dmatrix[$"{r.Key}-{c.Key}"];
                 }
@@ -512,7 +512,7 @@ namespace NLDB
         /// <returns>количество созданных слов</returns>
         public void BuildLexicon(string filename)
         {
-            if (!this.data.IsConnected())
+            if (!data.IsConnected())
                 throw new Exception($"Нет подключения к базе данных!");
             BuildWords(filename);
             BuildGrammar(); //BuildSequences();
@@ -537,15 +537,15 @@ namespace NLDB
                 {
                     count_chars = reader.ReadBlock(buffer, 0, Language.TEXT_BUFFER_SIZE);
                     string text = new string(buffer, 0, count_chars);
-                    this.data.BeginTransaction();
+                    data.BeginTransaction();
                     IEnumerable<int> result = Parse(text, Rank, true);
-                    this.data.EndTransaction();
+                    data.EndTransaction();
                     informer.Current = reader.BaseStream.Position;
                     informer.Show();
                 }
                 //Очистка кэша
-                this.data.ClearCash();
-                Console.WriteLine($"\nСчитано {informer.Current} символов. Добавлено {this.data.CountWords()} слов.");
+                data.ClearCash();
+                Console.WriteLine($"\nСчитано {informer.Current} символов. Добавлено {data.CountWords()} слов.");
             }
         }
 
@@ -555,17 +555,17 @@ namespace NLDB
         public void BuildGrammar()
         {
             //grammar.Clear();
-            IEnumerable<Word> words = this.data.Where(w => w.rank > 0);
+            IEnumerable<Word> words = data.Where(w => w.rank > 0);
             ProgressInformer informer = new ProgressInformer("Построение грамматики:", words.Count());
             int count = 0;
             foreach (Word w in words)
             {
-                this.grammar.Add(w.childs);
+                grammar.Add(w.childs);
                 count++;
                 informer.Current = count;
                 if (count % (1 << 10) == 0) informer.Show();
                 //очистка кэша на каждые 1<<20 слов
-                if (count % (1 << 20) == 0) this.data.ClearCash();
+                if (count % (1 << 20) == 0) data.ClearCash();
             }
             informer.Set(count);
         }

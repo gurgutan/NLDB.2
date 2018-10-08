@@ -1,14 +1,20 @@
-﻿using System;
+﻿/// =========================================================================================================================
+/// Слеповичев И.И. 10.2018
+/// Модуль с классом Command
+/// =========================================================================================================================
+
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace NLDB.NLCLI
 {
     public enum CommandTypes { Empty, Help, Create, Build, Connect, Quit, Find };
 
+    /// <summary>
+    /// Класс для создания команды. На данный момент (08.10.2018) команда является пассивным набором данных, необходимым для выполнения действий.
+    /// Планируется добавить средства исполнения команды и управления последовательностью команд.
+    /// </summary>
     public class Command
     {
         public static readonly List<string> ptrns = new List<string>
@@ -39,12 +45,11 @@ namespace NLDB.NLCLI
         public Dictionary<string, string> Parameters = new Dictionary<string, string>();
         public string Result;
 
-
         public bool TryParse(string line)
         {
             Parameters.Clear();
             line = line.ToLower();
-            foreach (var ptrn in ptrns)
+            foreach (string ptrn in ptrns)
             {
                 Match match = Regex.Match(line, ptrn, RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture);
                 if (!match.Success) continue;

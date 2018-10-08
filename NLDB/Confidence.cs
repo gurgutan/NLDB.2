@@ -1,24 +1,36 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace NLDB
 {
     //TODO: Создать модульные тесты для Confidence для каждой из метрик (осталось: Inclusive, SoftInclusive, CosineLeft, SoftCosine)
+    /// <summary>
+    /// Класс, реализующий несколько различных метрик для вычисления схожести Термов
+    /// </summary>
     public class Confidence
     {
         public Confidence()
         {
         }
 
+        /// <summary>
+        /// Основной метод, вызывающий вычисления метрики, соответствющей рангу Термов a и b
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <returns></returns>
         public static float Compare(Term a, Term b)
         {
             if (a.rank != b.rank) throw new ArgumentException("Попытка сравнить термы разных рангов");
             return Confidence.Operations[a.rank](a, b);
         }
 
+        /// <summary>
+        /// Логическое (двоичное) сравнение двух чисел
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <returns></returns>
         public static float Compare(int a, int b)
         {
             return a == b ? 1 : 0;
@@ -36,12 +48,25 @@ namespace NLDB
             return count / a.Count;
         }
 
+        /// <summary>
+        /// Аналог Inclusive, но для Слов, представленных своими id
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <returns></returns>
         private static float Inclusive(int[] a, int[] b)
         {
             int count = a.Sum(c => b.Contains(c) ? 1 : 0);
             return count / a.Length;
         }
 
+        /// <summary>
+        /// Метрика схожестви, аналогичная Inclusive (считается отношение количества совпадающих подслов к количеству подслов в Терме a),
+        /// но также учитывается вес подслов в Слове b
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <returns></returns>
         private static float SoftInclusive(Term a, Term b)
         {
             float count = a.Childs.Sum(c => b.Childs.Max(bc => Confidence.Compare(bc, c)));
@@ -54,6 +79,12 @@ namespace NLDB
             return count / a.Length;
         }
 
+        /// <summary>
+        /// Косинусная метрика между Термами: сумма совпадающих подслов, делёная на произведение модулей Термов
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <returns></returns>
         private static float Cosine(Term a, Term b)
         {
             int n = a.Count < b.Count ? a.Count : b.Count;
@@ -74,6 +105,13 @@ namespace NLDB
             return s / denominator;
         }
 
+        /// <summary>
+        /// Левое косинусная метрика - в отличие от косинусного, в знаменателе не произведение модулей Термов, а модуль терма a
+        /// Данная метрика учитывает только модуль (длину) Терма a. Аналогично можно сделать правую косинусную метрику, вызовом CosineLeft(b,a).
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <returns></returns>
         private static float CosineLeft(Term a, Term b)
         {
             int n = a.Count < b.Count ? a.Count : b.Count;
@@ -92,6 +130,12 @@ namespace NLDB
             return s / a.Length;
         }
 
+        /// <summary>
+        /// Мягкая косинусная метрика использует матрицу произведений значений confidence Терма a с собой, Терма b с собой, Терма a с Термом b
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <returns></returns>
         private static float SoftCosine(Term a, Term b)
         {
             float s = 0;
@@ -124,11 +168,23 @@ namespace NLDB
             return (float)(s / (Math.Sqrt(da) * Math.Sqrt(db)));
         }
 
+        /// <summary>
+        /// Метрика бинарного совпадения Термов по идентификаторам
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <returns></returns>
         private static float Equality(Term a, Term b)
         {
             return a.id == b.id ? 1 : 0;
         }
 
+        /// <summary>
+        /// Метрика биннарного совпадения Термов по последовательности подслов
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <returns></returns>
         private static float Equality(int[] a, int[] b)
         {
             return a.SequenceEqual(b) ? 1 : 0;
@@ -146,11 +202,11 @@ namespace NLDB
         //Функция применяется к двум скалярным элементам веторов, в соответствующих позициях
         private static readonly Func<Term, Term, float>[] Operations = new Func<Term, Term, float>[5]
         {
-            Confidence.Equality,
-            Confidence.Cosine,
-            Confidence.SoftInclusive,
-            Confidence.SoftInclusive,
-            Confidence.SoftInclusive
+            Confidence.Equality,        //для букв
+            Confidence.Cosine,          //для слов
+            Confidence.SoftInclusive,   //для предложений
+            Confidence.SoftInclusive,   //для параграфов
+            Confidence.SoftInclusive    //зарезервивровано
         };
 
     }
