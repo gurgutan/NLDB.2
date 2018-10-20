@@ -10,39 +10,43 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
+            //Имя Словаря(а также базы данных). При отсутствии класс Language его создаст автоматически.
             string dbname = "wikiru5mb.db";
+            //Укажем файл с текстом, который будем использовать для обучения. Должен присутствовать по указанному пути
             string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
-            string[] splitters = new string[] { "", @"[^а-яё\d\{\}]+", @"[\n\r]+", @"\[\[{число}\]\]" };
+            //Массив разделителей текста на Слова. Разделители задаются регулярными выражениями, 
+            //применяемыми к нормализованному тексту.
+            string[] splitters = new string[]
+            {
+               "",                 //0-й ранг - символы, поэтому используется пустая строка
+               @"[^а-яё\d\{\}]+",  //1-ранг - любой символ не являющийся буквой русского алфавита или цифрой разделяет слова
+               @"[\n\r]+",         //2-й ранг - символы перевода строки разделяет предложения
+               @"\[\[{число}\]\]"  //3-й ранг - текст вида [[343467]] разделяет статьи
+			};
+            //Создаем Словарь
             Language l = new Language(dbname, splitters);
-            //l.Create();
+            //После создания объекта создаем хранилище. Это нужно так как к созданному ранее хранилищу можно сразу подключиться
+            l.Create();
+            //Подключимся к хранилищу
             l.Connect();
             Console.WriteLine($"Начало обучения на файле {trainfile}");
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            //l.BuildLexicon(trainfile);
-            l.BuildGrammar();
-            sw.Stop();
-            Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-            //Console.WriteLine("Поиск в БД по id");
-            //List<int[]> childsList = new List<int[]>();
-            //for (int i = 64; i < 128; i++)
-            //{
-            //    Word w = l.Find(i);
-            //    var childs = w.childs;
-            //    if (childs != null)
-            //        childsList.Add(childs);
-            //    Console.WriteLine(i.ToString() + $"={w.id}<{w.rank}>:" + l.ToTerm(w).ToString());
-            //}
-            //Console.WriteLine("Поиск в БД по childs");
-            //childsList.ForEach(e =>
-            //{
-            //    Word w = l.Find(e);
-            //    if (w != null)
-            //        Console.WriteLine($"{w.id}<{w.rank}>:" + l.ToTerm(w).ToString());
-            //    else Console.WriteLine("Не найден " + e.Aggregate("", (c, n) => c + "," + n.ToString()));
-            //});
-            //l.Disconnect();
-            TestLangConsole(l);
+            //Запускаем процесс построения структуры текста
+            l.BuildLexicon(trainfile);
+            //Теперь будем использовать полученные данные
+            Console.Write($"\n\nВвведите фразу:");
+            string line = Console.ReadLine();
+            //Найдем 8 лучших совпадений с текстом line. rank=2 означает, что нас интересуют совпадения предложений
+            List<Term> similars = l.Similars(text: line, rank: 2, count: 8);
+            Console.WriteLine("\n\nПохожие предложения:\n" + similars.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+            //Получим предположение о предложении, следующем за line
+            List<Term> next = l.Next(text: line, rank: 2);
+            Console.WriteLine("\n\nОтветные предложения (продолжение):\n" + next.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+            //Получим предоположение о сути статьи, в котором есть предложение, наиболее похожее на line
+            IEnumerable<Term> core = l.GetCore(text: line, rank: 2);
+            Console.WriteLine("\n\nЯдро текста статьи:\n" + core.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+            Console.ReadKey();
+            //Отключаемся от хранилища
+            l.Disconnect();
         }
 
         private static void TestLangConsole(Language l)
@@ -65,7 +69,7 @@ namespace NLDB
                 Stopwatch sw = new Stopwatch();
                 Console.WriteLine("\nПостроение цепочки");
                 sw.Restart();
-                var core = l.GetCore(text, rank: 2);
+                IEnumerable<Term> core = l.GetCore(text, rank: 2);
                 //List<Term> next = l.Next(text, rank);
                 sw.Stop();
                 Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
