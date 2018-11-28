@@ -16,6 +16,7 @@ namespace NLDB
     [Serializable]
     public partial class Language
     {
+        public enum ProcessingType { Build, Grammar, Distance };
         //Данные
         private DataContainer data = null;
         private Parser[] parsers = null;
@@ -225,13 +226,13 @@ namespace NLDB
                 List<Term> context = parents.Select(p => ToTerm(p)).ToList();
                 sw.Stop();  //!!!
                 Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
-                //Поиск ближайшего родителя, т.е.родителя с максимумом сonfidence
-                Link max = context.AsParallel().Aggregate(
-                    new Link(),
+                //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
+                Pointer max = context.AsParallel().Aggregate(
+                    new Pointer(),
                     (subtotal, thread_term) =>
                     {
                         float confidence = Confidence.Compare(term, thread_term);
-                        if (subtotal.confidence < confidence) return new Link(thread_term.id, 0, confidence);
+                        if (subtotal.confidence < confidence) return new Pointer(thread_term.id, 0, confidence);
                         return subtotal;
                     },
                     (total, subtotal) => total.confidence < subtotal.confidence ? subtotal : total,
@@ -331,18 +332,18 @@ namespace NLDB
             Dictionary<int, float> weights = similars.ToDictionary(s => s.id, s => s.confidence);
             sw.Restart(); //!!!
             //Получаем контекст similars: все дочерние Слова для Слов, являющихся родителями similars
-            Dictionary<int, Link> context = data.
+            Dictionary<int, Pointer> context = data.
                 GetParentsWithChilds(weights.Keys.ToArray()).
                 SelectMany(p => data.GetGrandchildsId(p.Item2.id).
-                Select(gc => new Link(gc, 0, weights[p.Item1]))).
-                Distinct(new LinkComparer()).
+                Select(gc => new Pointer(gc, 0, weights[p.Item1]))).
+                Distinct(new PointerComparer()).
                 ToDictionary(link => link.id, link => link);
             sw.Stop();  //!!!
             Debug.WriteLine($"Определение context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
             //Запоминаем словарь допустимых слов, для использования в поиске
             sw.Restart(); //!!!
-            context.Add(grammar.Root.id, new Link(0, 0, 0));
-            Tuple<float, Stack<Link>> path = FindSequence(grammar.Root, context);
+            context.Add(grammar.Root.id, new Pointer(0, 0, 0));
+            Tuple<float, Stack<Pointer>> path = FindSequence(grammar.Root, context);
             sw.Stop();  //!!!
             Debug.WriteLine($"Определение path [{path.Item1.ToString("F4")};{path.Item2.Count}]: {sw.Elapsed.TotalSeconds}");
             return path.Item2.Skip(1).Select(link => ToTerm(link.id)).ToList();
@@ -354,28 +355,28 @@ namespace NLDB
         /// <param name="rule"></param>
         /// <param name="context"></param>
         /// <returns></returns>
-        private Tuple<float, Stack<Link>> FindSequence(Rule rule, Dictionary<int, Link> context)
+        private Tuple<float, Stack<Pointer>> FindSequence(Rule rule, Dictionary<int, Pointer> context)
         {
             if (!context.ContainsKey(rule.id)) return null;
             float head_weight = context[rule.id].confidence;
             float tail_weight = 0;
-            Stack<Link> path = new Stack<Link>();
-            Link found = new Link();
+            Stack<Pointer> path = new Stack<Pointer>();
+            Pointer found = new Pointer();
             foreach (Rule t in rule.Rules)
             {
                 //if (!bag.ContainsKey(t.Key)) continue;
-                Tuple<float, Stack<Link>> cur_path = FindSequence(t, context);
+                Tuple<float, Stack<Pointer>> cur_path = FindSequence(t, context);
                 if (cur_path == null) continue;
                 if (tail_weight < cur_path.Item1)
                 {
                     //критерий определяется как максимум сумм произведений вероятности слова в цепочке на confidence слова
-                    found = new Link(t.id, 0, context[t.id].confidence /* rule.Confidence(t.id)*/);
+                    found = new Pointer(t.id, 0, context[t.id].confidence /* rule.Confidence(t.id)*/);
                     tail_weight = cur_path.Item1;
                     path = cur_path.Item2;
                 }
             }
-            path.Push(new Link(rule.id, 0, head_weight));
-            return new Tuple<float, Stack<Link>>((head_weight + tail_weight) / (path.Count / attenuation), path);
+            path.Push(new Pointer(rule.id, 0, head_weight));
+            return new Tuple<float, Stack<Pointer>>((head_weight + tail_weight) / (path.Count / attenuation), path);
         }
 
         /// <summary>
@@ -411,7 +412,7 @@ namespace NLDB
             List<Term> terms = best_parent.Childs.Distinct(new TermComparer()).ToList();
 
             //2. Вычислить матрицу расстояний для дочерних Слов Parent
-            Dictionary<string, double> dmatrix = DMatrix(terms);
+            Dictionary<string, double> dmatrix = SDMatrix(terms);
 
             //3. Найти минимальный набор дочерних Слов, покрывающих Parent на половину радиуса
             HashSet<Term> core = new HashSet<Term>();
@@ -484,38 +485,102 @@ namespace NLDB
         }
 
         /// <summary>
-        /// Возвращает матрицу расстояний для списка термов terms.
+        /// Возвращает матрицу синтаксических расстояний для списка термов terms (Sintactic Distances Matrix).
+        /// Синтаксическое расстояние считается как результат численного сравнения двух термов А и Б при помощи 
+        /// функции Confidence.Compare(А,Б) 
         /// </summary>
         /// <param name="terms">список термов, для которых считаются взаимные расстояния</param>
         /// <returns>Матрица в виде словаря, ключ состоит из id терма-строки и id терма-столбца</returns>
-        private Dictionary<string, double> DMatrix(IList<Term> terms)
+        private Dictionary<string, double> SDMatrix(IList<Term> terms)
         {
             int n = terms.Count;
             Dictionary<string, double> d = new Dictionary<string, double>(n * n);
             for (int r = 0; r < terms.Count; r++)
-            {
                 for (int c = 0; c < terms.Count; c++)
-                {
                     d[$"{terms[r].id}-{terms[c].id}"] = Confidence.Compare(terms[r], terms[c]);
-                }
-            }
             return d;
+        }
+
+        public List<Term> GetNearest(string text, int rank = 2)
+        {
+            List<Term> result = new List<Term>();
+            Stopwatch sw = new Stopwatch(); //!!!
+            sw.Start(); //!!!
+            IEnumerable<Term> similars = Similars(text, rank)
+                .Where(t => t.confidence >= similars_min_confidence)
+                .Take(similars_max_count);
+            sw.Stop();
+            Debug.WriteLine($"Определение similars [{similars.Count()}]: {sw.Elapsed.TotalSeconds}");
+            similars.ToList().ForEach(s => Debug.WriteLine($" [{s.confidence.ToString("F4")}] {s}"));    //!!!
+            //Если похожих слов не нашли, возвращаем пустой список
+            if (similars.Count() == 0) return result;
+            //Запоминаем веса в привязке к словам
+            Dictionary<int, float> weights = similars.ToDictionary(s => s.id, s => s.confidence);
+            sw.Restart(); //!!!
+            //Получаем контекст similars: все дочерние Слова для Слов, являющихся родителями similars
+            var context = data.
+                GetParentsWithChilds(weights.Keys.ToArray()).
+                Select(p => new Pointer(p.Item2.id, 0, weights[p.Item1])).
+                Distinct(new PointerComparer());
+            context.Select(c=>c.confidence/data.dmatrix[])
+            data.dmatrix.ElementwiseProduct(context,)
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Определение context [{context.Count()}]: {sw.Elapsed.TotalSeconds}");
+            //Запоминаем словарь допустимых слов, для использования в поиске
+            sw.Restart(); //!!!
+
         }
 
         //--------------------------------------------------------------------------------------------
         //Методы построения лексикона, грамматики
         //--------------------------------------------------------------------------------------------
+        public void Preprocessing(string filename, ProcessingType processingType)
+        {
+            switch (processingType)
+            {
+                case ProcessingType.Build: CreateLexicon(filename); break;
+                case ProcessingType.Grammar: CreateGrammar(); break;
+                case ProcessingType.Distance: CreatePDMatrix(); break;
+                default: throw new NotImplementedException("Не реализованный тип обработки текста");
+            }
+        }
+
+        /// <summary>
+        /// Создание матрицы позиционных расстояний слов (Position Distances Matrix). 
+        /// Позиционное расстояние от слова А до слова Б считается как среднее количество промежуточных слов в предложении
+        /// между А и Б плюс один. Т.е. в предложении "Вася ушёл и не вернулся" расстояния равны:
+        /// |Вася-ушёл|=1, |Вася-и|=2, |Вася-вернулся|=4.
+        /// </summary>
+        private void CreatePDMatrix()
+        {
+            //Матрица расстояний считается для слов одного ранга
+            //Цикл по всем рангам
+            for (int r = 0; r < Rank; r++)
+            {
+                var words = data.Where(w => w.rank == r);
+                foreach (var w in words)
+                    CalcPositionDistances(w);
+            };
+        }
+
+        private void CalcPositionDistances(Word w)
+        {
+            for (int i = 0; i < w.childs.Length - 1; i++)
+                for (int j = i + 1; j < w.childs.Length; i++)
+                    data.dmatrix.Add(w.childs[i], w.childs[j], j - i);
+        }
+
         /// <summary>
         /// Создает Словарь из текстового файла filename
         /// </summary>
         /// <param name="streamreader">считыватель потока</param>
         /// <returns>количество созданных слов</returns>
-        public void BuildLexicon(string filename)
+        private void CreateLexicon(string filename)
         {
             if (!data.IsConnected())
                 throw new Exception($"Нет подключения к базе данных!");
             BuildWords(filename);
-            BuildGrammar(); //BuildSequences();
+            CreateGrammar(); //BuildSequences();
         }
 
         /// <summary>
@@ -552,10 +617,15 @@ namespace NLDB
         /// <summary>
         /// Построение Грамматики (префиксного взвешенного дерева) по существующему Словарю
         /// </summary>
-        public void BuildGrammar()
+        private void CreateGrammar()
         {
             //grammar.Clear();
             IEnumerable<Word> words = data.Where(w => w.rank > 0);
+            if (words.Count() == 0)
+            {
+                Console.WriteLine("Словарь не содержит слов. Сначала запустите обработку текста для составления Словаря.");
+                return;
+            }
             ProgressInformer informer = new ProgressInformer("Построение грамматики:", words.Count());
             int count = 0;
             foreach (Word w in words)

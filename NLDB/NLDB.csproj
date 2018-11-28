@@ -103,11 +103,11 @@
   <ItemGroup>
     <Compile Include="Confidence.cs" />
     <Compile Include="DataContainer.cs" />
+    <Compile Include="DMatrix.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="Grammar.cs" />
-    <Compile Include="GrammarDAG.cs" />
     <Compile Include="Lexicon.cs" />
-    <Compile Include="Link.cs" />
+    <Compile Include="Pointer.cs" />
     <Compile Include="ProgressInformer.cs" />
     <Compile Include="Sequence.cs" />
     <Compile Include="Primes.cs" />

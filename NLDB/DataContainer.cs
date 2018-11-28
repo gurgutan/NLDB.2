@@ -17,6 +17,7 @@ namespace NLDB
         private SQLiteTransaction transaction;
         private SQLiteConnection db;
 
+        public DMatrix dmatrix = new DMatrix();
         //Кэш термов для быстрого выполнения метода ToTerm
         private readonly Dictionary<int, Term> terms = new Dictionary<int, Term>(1 << 18);
 

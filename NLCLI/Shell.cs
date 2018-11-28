@@ -94,7 +94,7 @@ namespace NLDB.NLCLI
             Console.WriteLine($"Начало обучения на файле {filename}");
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            db.BuildLexicon(filename);
+            db.Build(filename);
             sw.Stop();
             Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
             return 0;
