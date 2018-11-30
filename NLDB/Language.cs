@@ -232,13 +232,13 @@ namespace NLDB
                     (subtotal, thread_term) =>
                     {
                         float confidence = Confidence.Compare(term, thread_term);
-                        if (subtotal.confidence < confidence) return new Pointer(thread_term.id, 0, confidence);
+                        if (subtotal.value < confidence) return new Pointer(thread_term.id, 0, confidence);
                         return subtotal;
                     },
-                    (total, subtotal) => total.confidence < subtotal.confidence ? subtotal : total,
+                    (total, subtotal) => total.value < subtotal.value ? subtotal : total,
                     (final) => final);
                 term.id = max.id;
-                term.confidence = max.confidence;
+                term.confidence = max.value;
                 term.Identified = true;
                 return term;
             }
@@ -358,7 +358,7 @@ namespace NLDB
         private Tuple<float, Stack<Pointer>> FindSequence(Rule rule, Dictionary<int, Pointer> context)
         {
             if (!context.ContainsKey(rule.id)) return null;
-            float head_weight = context[rule.id].confidence;
+            float head_weight = context[rule.id].value;
             float tail_weight = 0;
             Stack<Pointer> path = new Stack<Pointer>();
             Pointer found = new Pointer();
@@ -370,7 +370,7 @@ namespace NLDB
                 if (tail_weight < cur_path.Item1)
                 {
                     //критерий определяется как максимум сумм произведений вероятности слова в цепочке на confidence слова
-                    found = new Pointer(t.id, 0, context[t.id].confidence /* rule.Confidence(t.id)*/);
+                    found = new Pointer(t.id, 0, context[t.id].value /* rule.Confidence(t.id)*/);
                     tail_weight = cur_path.Item1;
                     path = cur_path.Item2;
                 }
@@ -501,34 +501,44 @@ namespace NLDB
             return d;
         }
 
-        public List<Term> GetNearest(string text, int rank = 2)
+        public Term NextNearest(string text, int rank = 2)
         {
-            List<Term> result = new List<Term>();
             Stopwatch sw = new Stopwatch(); //!!!
             sw.Start(); //!!!
+            //Ищем Слова похожие на text
             IEnumerable<Term> similars = Similars(text, rank)
                 .Where(t => t.confidence >= similars_min_confidence)
                 .Take(similars_max_count);
             sw.Stop();
             Debug.WriteLine($"Определение similars [{similars.Count()}]: {sw.Elapsed.TotalSeconds}");
             similars.ToList().ForEach(s => Debug.WriteLine($" [{s.confidence.ToString("F4")}] {s}"));    //!!!
-            //Если похожих слов не нашли, возвращаем пустой список
-            if (similars.Count() == 0) return result;
-            //Запоминаем веса в привязке к словам
+            //Если похожих слов не нашли, возвращаем пустой список термов
+            if (similars.Count() == 0) return null;
+            //Запоминаем веса в привязке к похожим словам
             Dictionary<int, float> weights = similars.ToDictionary(s => s.id, s => s.confidence);
             sw.Restart(); //!!!
-            //Получаем контекст similars: все дочерние Слова для Слов, являющихся родителями similars
+            //Получаем контекст Слова через similars: все дочерние Слова для Слов, являющихся родителями similars
             var context = data.
                 GetParentsWithChilds(weights.Keys.ToArray()).
                 Select(p => new Pointer(p.Item2.id, 0, weights[p.Item1])).
                 Distinct(new PointerComparer());
-            context.Select(c=>c.confidence/data.dmatrix[])
-            data.dmatrix.ElementwiseProduct(context,)
             sw.Stop();  //!!!
             Debug.WriteLine($"Определение context [{context.Count()}]: {sw.Elapsed.TotalSeconds}");
-            //Запоминаем словарь допустимых слов, для использования в поиске
             sw.Restart(); //!!!
-
+            //Для каждого слова контекста id уверенностью c, вычисляем функцию f(c)=c/(1+min_dist(id)).
+            //Чем меньше расстояние до слова, тем меньше делитель уверенности слова id
+            var similar = similars.First();
+            var min = data.dmatrix.Min(similar.id);
+            var arrows = context
+                .Select(c =>
+                {
+                    return new Tuple<int, int, float>(c.id, min.id, c.value / (1 + min.value));
+                })                
+                .ToList();
+            arrows.Sort(new Comparison<Tuple<int, int, float>>((t1, t2) => Math.Sign(t2.Item3 - t1.Item3)));
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Определение arrows [{arrows.Count()}]: {sw.Elapsed.TotalSeconds}");
+            return ToTerm(arrows.First().Item2, arrows.First().Item3);
         }
 
         //--------------------------------------------------------------------------------------------
@@ -555,40 +565,40 @@ namespace NLDB
         {
             //Матрица расстояний считается для слов одного ранга
             //Цикл по всем рангам
-            for (int r = 0; r < Rank; r++)
+            for (int r = 1; r < Rank; r++)
             {
                 var words = data.Where(w => w.rank == r);
+                Console.WriteLine();
+                ProgressInformer informer = new ProgressInformer($"Матрица расстояний слов ранга {r}:", words.Count())
+                {
+                    BarSize = 64,
+                    UnitsOfMeasurment = "слов"
+                };
+                int i = 0;
                 foreach (var w in words)
+                {
                     CalcPositionDistances(w);
+                    informer.Current = ++i;
+                    if (i % 97 == 0) informer.Show();
+                }
             };
         }
 
         private void CalcPositionDistances(Word w)
         {
             for (int i = 0; i < w.childs.Length - 1; i++)
-                for (int j = i + 1; j < w.childs.Length; i++)
+                for (int j = i + 1; j < w.childs.Length; j++)
                     data.dmatrix.Add(w.childs[i], w.childs[j], j - i);
-        }
-
-        /// <summary>
-        /// Создает Словарь из текстового файла filename
-        /// </summary>
-        /// <param name="streamreader">считыватель потока</param>
-        /// <returns>количество созданных слов</returns>
-        private void CreateLexicon(string filename)
-        {
-            if (!data.IsConnected())
-                throw new Exception($"Нет подключения к базе данных!");
-            BuildWords(filename);
-            CreateGrammar(); //BuildSequences();
         }
 
         /// <summary>
         /// Составление Словаря по тексту из файла filename
         /// </summary>
         /// <param name="filename"></param>
-        private void BuildWords(string filename)
+        private void CreateLexicon(string filename)
         {
+            if (!data.IsConnected())
+                throw new Exception($"Нет подключения к базе данных!");
             char[] buffer = new char[Language.TEXT_BUFFER_SIZE];
             int count_chars = Language.TEXT_BUFFER_SIZE;
             using (StreamReader reader = File.OpenText(filename))

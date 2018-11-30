@@ -1,23 +1,19 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace NLDB
 {
-    public struct Pointer:IComparable<Pointer>
+    public struct Pointer : IComparable<Pointer>
     {
         public int id;
         public int count;
-        public float confidence;
+        public float value;
 
         public Pointer(int _id, int _number, float _conf)
         {
             id = _id;
             count = _number;
-            confidence = _conf;
+            value = _conf;
         }
 
         public override int GetHashCode()
@@ -27,7 +23,7 @@ namespace NLDB
 
         public override bool Equals(object obj)
         {
-            return ((Pointer)obj).id == this.id;
+            return ((Pointer)obj).id == id;
         }
 
         public int GetHashCode(object obj)
@@ -35,11 +31,11 @@ namespace NLDB
             return id;
         }
 
-        public float Average() => confidence / count;
+        public float Average() => value / count;
 
         int IComparable<Pointer>.CompareTo(Pointer other)
         {
-            float this_average = this.Average();
+            float this_average = Average();
             float other_average = other.Average();
             if (other_average > this_average)
                 return -1;
@@ -55,7 +51,7 @@ namespace NLDB
     {
         public bool Equals(Pointer x, Pointer y)
         {
-            return ((Pointer)x).id == ((Pointer)y).id;
+            return x.id == y.id;
         }
 
         public new bool Equals(object x, object y)
@@ -65,7 +61,7 @@ namespace NLDB
 
         public int GetHashCode(Pointer obj)
         {
-            return ((Pointer)obj).id;
+            return obj.id;
         }
 
     }

@@ -32,18 +32,23 @@ namespace NLDB
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             //Запускаем процесс построения структуры текста
             l.Preprocessing(trainfile, Language.ProcessingType.Build);
+            l.Preprocessing(trainfile, Language.ProcessingType.Distance);
             //Теперь будем использовать полученные данные
-            Console.Write($"\n\nВвведите фразу:");
-            string line = Console.ReadLine();
+            string line = "причины гражданской войны";
+            Console.Write($"\n\nФраза: {line}");
+            //string line = Console.ReadLine();
             //Найдем 8 лучших совпадений с текстом line. rank=2 означает, что нас интересуют совпадения предложений
             List<Term> similars = l.Similars(text: line, rank: 2, count: 8);
             Console.WriteLine("\n\nПохожие предложения:\n" + similars.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
             //Получим предположение о предложении, следующем за line
             List<Term> next = l.Next(text: line, rank: 2);
-            Console.WriteLine("\n\nОтветные предложения (продолжение):\n" + next.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+            Console.WriteLine("\n\nОтветные предложения:\n" + next.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+            //Получим предположение о предложении, следующем за line другим способом
+            Term next2 = l.NextNearest(text: line, rank: 2);
+            Console.WriteLine("\n\nСледующее предложение:\n" + next2.ToString());
             //Получим предоположение о сути статьи, в котором есть предложение, наиболее похожее на line
-            IEnumerable<Term> core = l.GetCore(text: line, rank: 2);
-            Console.WriteLine("\n\nЯдро текста статьи:\n" + core.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+            //IEnumerable<Term> core = l.GetCore(text: line, rank: 2);
+            //Console.WriteLine("\n\nЯдро текста статьи:\n" + core.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
             Console.ReadKey();
             //Отключаемся от хранилища
             l.Disconnect();

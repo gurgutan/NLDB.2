@@ -16,29 +16,18 @@ namespace NLDB
 
     public class DMatrix
     {
+        //Данные матрицы представлены словарем, содержащим строки матрицы. Строка матрицы также представлена словарем.
+        //ключ строки и ключ столбца - id Слов.
         private Dictionary<int, Dictionary<int, DInfo>> m;
 
-        private bool ContainsColumn(int col)
+        public DMatrix()
         {
-            return m.ContainsKey(col);
+            m = new Dictionary<int, Dictionary<int, DInfo>>();
         }
 
-        public DInfo this[int r, int c]
+        private bool ContainsRow(int row)
         {
-            get
-            {
-                if (!m.TryGetValue(r, out Dictionary<int, DInfo> row))
-                    return new DInfo();
-                if (!row.TryGetValue(c, out DInfo info))
-                    return new DInfo();
-                return info;
-            }
-            set
-            {
-                if (!m.TryGetValue(r, out Dictionary<int, DInfo> row))
-                    m[r] = new Dictionary<int, DInfo>();
-                m[r][c] = value;
-            }
+            return m.ContainsKey(row);
         }
 
         /// <summary>
@@ -49,9 +38,41 @@ namespace NLDB
         /// <returns></returns>
         public bool Contains(int r, int c)
         {
-            if (!m.TryGetValue(r, out Dictionary<int, DInfo> row)) return false;
+            var row = GetRow(r);
+            if (row == null) return false;
             if (!row.ContainsKey(c)) return false;
             return true;
+        }
+
+        /// <summary>
+        /// Возвращает строку матрицы, если она существует и null в противном случае
+        /// </summary>
+        /// <param name="r"></param>
+        /// <returns></returns>
+        private Dictionary<int, DInfo> GetRow(int r)
+        {
+            if (m.TryGetValue(r, out Dictionary<int, DInfo> row))
+                return row;
+            return null;
+        }
+
+        public DInfo this[int r, int c]
+        {
+            get
+            {
+                var row = GetRow(r);
+                if (row == null) return new DInfo();
+                if (!row.TryGetValue(c, out DInfo info))
+                    return new DInfo();
+                return info;
+            }
+            set
+            {
+                var row = GetRow(r);
+                if (row == null)
+                    m[r] = new Dictionary<int, DInfo>();
+                m[r][c] = value;
+            }
         }
 
         /// <summary>
@@ -75,7 +96,8 @@ namespace NLDB
         /// <param name="c"></param>
         public void Remove(int r, int c)
         {
-            if (!m.TryGetValue(r, out Dictionary<int, DInfo> row)) return;
+            var row = GetRow(r);
+            if (row == null) return;
             if (row.ContainsKey(c)) row.Remove(c);
         }
 
@@ -90,12 +112,52 @@ namespace NLDB
             return this[r, c].sum / this[r, c].count;
         }
 
+        /// <summary>
+        /// Возвращает Pointer(id, count, dist),  наименьший по критерию dist/count из всех элементов матрицы строки r
+        /// </summary>
+        /// <param name="r">id строки матрицы</param>
+        /// <returns></returns>
         public Pointer Min(int r)
         {
-            if (!m.TryGetValue(r, out Dictionary<int, DInfo> row))
-                return new Pointer();
-            var first = new Pointer(row.First().Key,row.First().Value.count, row.First().Value.sum)
-            Pointer min = row.Aggregate(new Pointer(row.First().Key,row.));
+            var row = GetRow(r);
+            //Если нет строки в матрице или нет значения - значит у слова нет соседних. В этом случае возвращаем
+            //специальный элемент - id=0, count=0, dist="бесконечность"
+            if (row == null || row.Count == 0)
+                return new Pointer(0, 0, float.MaxValue);
+            var first = new Pointer(row.First().Key, row.First().Value.count, row.First().Value.sum);
+            //TODO: переделать на параллельный Aggregate
+            Pointer min = row.Aggregate(first,
+                (c, n) =>
+                {
+                    var dist = n.Value.sum / n.Value.count;
+                    if (dist < c.value)
+                        return new Pointer(n.Key, n.Value.count, dist);
+                    return c;
+                });
+            return min;
+        }
+
+        /// <summary>
+        /// Возвращает Pointer(id, count, dist), наибольший по критерию dist/count из всех элементов матрицы строки r
+        /// </summary>
+        /// <param name="r"></param>
+        /// <returns></returns>
+        public Pointer Max(int r)
+        {
+            var row = GetRow(r);
+            if (row == null || row.Count == 0)
+                return new Pointer(0, 0, float.MaxValue);
+            var first = new Pointer(row.First().Key, row.First().Value.count, row.First().Value.sum);
+            //TODO: переделать на параллельный Aggregate
+            Pointer max = row.Aggregate(first,
+                (c, n) =>
+                {
+                    var dist = n.Value.sum / n.Value.count;
+                    if (dist > c.value)
+                        return new Pointer(n.Key, n.Value.count, dist);
+                    return c;
+                });
+            return max;
         }
 
         /// <summary>
@@ -110,7 +172,7 @@ namespace NLDB
             return v.Select(e =>
             {
                 DInfo info = row[e.id];
-                return new Pointer(e.id, e.count * info.count, e.confidence * info.sum);
+                return new Pointer(e.id, e.count * info.count, e.value * info.sum);
             }).ToList();
         }
 
@@ -121,7 +183,7 @@ namespace NLDB
             return v.Select(e =>
             {
                 DInfo info = row[e.id];
-                return new Pointer(e.id, e.count + info.count, e.confidence + info.sum);
+                return new Pointer(e.id, e.count + info.count, e.value + info.sum);
             }).ToList();
         }
     }
