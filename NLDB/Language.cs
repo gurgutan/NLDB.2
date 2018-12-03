@@ -508,7 +508,7 @@ namespace NLDB
             Stopwatch sw = new Stopwatch(); //!!!
             sw.Start(); //!!!
             //Ищем Слова похожие на text
-            IEnumerable<Term> similars = 
+            IEnumerable<Term> similars =
                 Similars(text: text, rank: rank, count: count)
                 .Where(t => t.confidence >= similars_min_confidence);
             sw.Stop();
@@ -545,7 +545,7 @@ namespace NLDB
         }
 
         //--------------------------------------------------------------------------------------------
-        //Методы построения лексикона, грамматики
+        //Методы построения лексикона, грамматики, матрицы расстояний
         //--------------------------------------------------------------------------------------------
         public void Preprocessing(string filename, ProcessingType processingType)
         {
@@ -559,7 +559,7 @@ namespace NLDB
         }
 
         /// <summary>
-        /// Создание матрицы позиционных расстояний слов (Position Distances Matrix). 
+        /// Создание матрицы позиционных расстояний слов (Positions Distances Matrix). 
         /// Позиционное расстояние от слова А до слова Б считается как среднее количество промежуточных слов в предложении
         /// между А и Б плюс один. Т.е. в предложении "Вася ушёл и не вернулся" расстояния равны:
         /// |Вася-ушёл|=1, |Вася-и|=2, |Вася-вернулся|=4.
@@ -581,9 +581,10 @@ namespace NLDB
                 foreach (var w in words)
                 {
                     CalcPositionDistances(w);
-                    informer.Current = ++i;
-                    if (i % 97 == 0) informer.Show();
+                    i++;
+                    if(i % 97 == 0) informer.Set(i);    // показать прогресс
                 }
+                informer.Show(); // показать завершенный результат
             };
         }
 

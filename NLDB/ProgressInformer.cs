@@ -114,7 +114,7 @@ namespace NLDB
         /// Устанавливает текущую позицию величины в n и выводит на экран
         /// </summary>
         /// <param name="n"></param>
-        public void Set(int n)
+        public void Set(long n)
         {
             current = n;
             Show();
