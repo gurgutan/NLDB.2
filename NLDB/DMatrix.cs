@@ -129,7 +129,7 @@ namespace NLDB
             Pointer min = row.Aggregate(first,
                 (c, n) =>
                 {
-                    var dist = n.Value.sum / n.Value.count;
+                    float dist = n.Value.sum / n.Value.count;
                     if (dist < c.value)
                         return new Pointer(n.Key, n.Value.count, dist);
                     return c;

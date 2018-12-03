@@ -501,14 +501,16 @@ namespace NLDB
             return d;
         }
 
-        public Term NextNearest(string text, int rank = 2)
+        public List<Term> NextNearest(string text, int rank = 2, int count = 1)
         {
+            if (count <= 0)
+                throw new ArgumentOutOfRangeException("Параметр count не может быть меньше 1");
             Stopwatch sw = new Stopwatch(); //!!!
             sw.Start(); //!!!
             //Ищем Слова похожие на text
-            IEnumerable<Term> similars = Similars(text, rank)
-                .Where(t => t.confidence >= similars_min_confidence)
-                .Take(similars_max_count);
+            IEnumerable<Term> similars = 
+                Similars(text: text, rank: rank, count: count)
+                .Where(t => t.confidence >= similars_min_confidence);
             sw.Stop();
             Debug.WriteLine($"Определение similars [{similars.Count()}]: {sw.Elapsed.TotalSeconds}");
             similars.ToList().ForEach(s => Debug.WriteLine($" [{s.confidence.ToString("F4")}] {s}"));    //!!!
@@ -516,29 +518,30 @@ namespace NLDB
             if (similars.Count() == 0) return null;
             //Запоминаем веса в привязке к похожим словам
             Dictionary<int, float> weights = similars.ToDictionary(s => s.id, s => s.confidence);
-            sw.Restart(); //!!!
-            //Получаем контекст Слова через similars: все дочерние Слова для Слов, являющихся родителями similars
-            var context = data.
-                GetParentsWithChilds(weights.Keys.ToArray()).
-                Select(p => new Pointer(p.Item2.id, 0, weights[p.Item1])).
-                Distinct(new PointerComparer());
-            sw.Stop();  //!!!
-            Debug.WriteLine($"Определение context [{context.Count()}]: {sw.Elapsed.TotalSeconds}");
+            //sw.Restart(); //!!!
+            ////Получаем контекст Слова через similars: все дочерние Слова для Слов, являющихся родителями similars
+            //var context = similars
+            //    .SelectMany(s => data
+            //        .GetParents(s.id).Select(p => new Tuple<Word, float>(p, s.confidence)))
+            //    .SelectMany(p => p.Item1.childs.Select(c => new Tuple<int, float>(c, p.Item2)));
+            //sw.Stop();  //!!!
+            //Debug.WriteLine($"Определение context [{context.Count()}]: {sw.Elapsed.TotalSeconds}");
             sw.Restart(); //!!!
             //Для каждого слова контекста id уверенностью c, вычисляем функцию f(c)=c/(1+min_dist(id)).
             //Чем меньше расстояние до слова, тем меньше делитель уверенности слова id
-            var similar = similars.First();
-            var min = data.dmatrix.Min(similar.id);
-            var arrows = context
-                .Select(c =>
+            var arrows = similars
+                .Select(s =>
                 {
-                    return new Tuple<int, int, float>(c.id, min.id, c.value / (1 + min.value));
-                })                
+                    var min = data.dmatrix.Min(s.id);
+                    return new Tuple<int, int, float>(s.id, min.id, 2 * s.confidence / (1 + min.value));
+                })
+                .Where(t => t.Item2 != 0)
                 .ToList();
             arrows.Sort(new Comparison<Tuple<int, int, float>>((t1, t2) => Math.Sign(t2.Item3 - t1.Item3)));
             sw.Stop();  //!!!
             Debug.WriteLine($"Определение arrows [{arrows.Count()}]: {sw.Elapsed.TotalSeconds}");
-            return ToTerm(arrows.First().Item2, arrows.First().Item3);
+            Debug.WriteLine(arrows.Aggregate("", (c, n) => c + $"\n" + $"[{n.Item3}]: {ToTerm(n.Item2).ToString()}"));
+            return arrows.Select(a => ToTerm(a.Item2, a.Item3)).Distinct(new TermComparer()).Take(count).ToList();
         }
 
         //--------------------------------------------------------------------------------------------
@@ -565,7 +568,7 @@ namespace NLDB
         {
             //Матрица расстояний считается для слов одного ранга
             //Цикл по всем рангам
-            for (int r = 1; r < Rank; r++)
+            for (int r = 1; r <= Rank; r++)
             {
                 var words = data.Where(w => w.rank == r);
                 Console.WriteLine();

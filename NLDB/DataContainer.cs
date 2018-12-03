@@ -447,6 +447,18 @@ namespace NLDB
             return words;
         }
 
+        public IEnumerable<int> GetParentsId(int i)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"SELECT DISTINCT parents.parent_id FROM parents " +
+                $"WHERE parents.id = {i})";
+            SQLiteDataReader reader = cmd.ExecuteReader();
+            List<int> words = new List<int>();
+            while (reader.Read()) words.Add(int.Parse(reader.GetString(0)));
+            return words;
+        }
+
         /// <summary>
         /// Добавляет Слово в хранилище и возвращает сгенерированный id Слова
         /// </summary>
