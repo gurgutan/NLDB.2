@@ -29,7 +29,7 @@ namespace NLDB
         public string[] Splitters => data.Splitters;
         public int Count => data.CountWords();
         //Размер буфера для чтения текста
-        public static readonly int TEXT_BUFFER_SIZE = 1 << 16;
+        public static readonly int TEXT_BUFFER_SIZE = 1 << 18;
 
         public Language(string _name, string[] _splitters)
         {
@@ -622,6 +622,7 @@ namespace NLDB
                     informer.Current = reader.BaseStream.Position;
                     informer.Show();
                 }
+                informer.Show();
                 //Очистка кэша
                 data.ClearCash();
                 Console.WriteLine($"\nСчитано {informer.Current} символов. Добавлено {data.CountWords()} слов.");
