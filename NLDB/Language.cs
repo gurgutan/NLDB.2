@@ -106,7 +106,7 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         public Word Find(int i)
         {
-            return data.Get(i);
+            return data.GetWord(i);
         }
 
         /// <summary>
@@ -116,7 +116,7 @@ namespace NLDB
         /// <returns></returns>
         public Word FindByChilds(int[] i)
         {
-            return data.GetByChilds(i);
+            return data.GetWordByChilds(i);
         }
 
         /// <summary>
@@ -169,18 +169,18 @@ namespace NLDB
                     //значит слово не найдено и не может быть создано - возвращаем 0
                     if (childs.Length == 0) return 0;
                     //Пытаемся найти в Словаре Слово по дочерним
-                    id = data.GetIdByChilds(childs);
+                    id = data.GetWordIdByChilds(childs);
                     if (id == 0)
                         if (addIfNotExists)
-                            id = data.Add(new Word(0, rank, "", childs, new int[0]));
+                            id = data.AddWord(new Word(0, rank, "", childs, new int[0]));
                 }
                 else
                 {
                     //Ищем в Словаре Слово ранга 0 в символьном представлении =s
-                    id = data.GetId(s);
+                    id = data.GetWordId(s);
                     if (id == 0)
                         if (addIfNotExists)
-                            id = data.Add(new Word(0, rank, s, null, new int[0]));
+                            id = data.AddWord(new Word(0, rank, s, null, new int[0]));
                 }
                 return id;
             }).Where(i => i != 0).ToList();
@@ -200,7 +200,7 @@ namespace NLDB
             if (term.rank == 0)
             {
                 //При нулевом ранге терма (т.е. терм - это буква), confidence считаем исходя из наличия соответствующей буквы в алфавите
-                term.id = data.GetId(term.text);
+                term.id = data.GetWordId(term.text);
                 term.confidence = (term.id == 0 ? 0 : 1);
                 term.Identified = true;
                 return term;
@@ -219,7 +219,7 @@ namespace NLDB
                 sw.Stop();  //!!!
                 Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
-                List<int> parents = data.GetParentsId(childs).ToList();
+                List<int> parents = data.GetWordsParentsId(childs).ToList();
                 sw.Stop();  //!!!
                 Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
@@ -289,7 +289,7 @@ namespace NLDB
             Debug.WriteLine($"Similars->childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
             sw.Restart(); //!!!
             List<Term> context = data.
-                GetParentsId(childs).
+                GetWordsParentsId(childs).
                 Distinct().
                 Select(p => ToTerm(p)).
                 ToList();
@@ -333,8 +333,8 @@ namespace NLDB
             sw.Restart(); //!!!
             //Получаем контекст similars: все дочерние Слова для Слов, являющихся родителями similars
             Dictionary<int, Pointer> context = data.
-                GetParentsWithChilds(weights.Keys.ToArray()).
-                SelectMany(p => data.GetGrandchildsId(p.Item2.id).
+                GetWordsParentsWithChilds(weights.Keys.ToArray()).
+                SelectMany(p => data.GetWordGrandchildsId(p.Item2.id).
                 Select(gc => new Pointer(gc, 0, weights[p.Item1]))).
                 Distinct(new PointerComparer()).
                 ToDictionary(link => link.id, link => link);
@@ -398,7 +398,7 @@ namespace NLDB
             //Для каждого parent вычисляем оценку как сумму confidence его потомков из similars
             similars
                 .SelectMany(t => data
-                    .GetParents(t.id))          //получаем Слова-родители t
+                    .GetWordParents(t.id))          //получаем Слова-родители t
                     .Select(p => data.ToTerm(p))  //преобразуем в термы
                 .ToList()                       //ForEach есть IList, но нет в IEnumerable
                 .ForEach(t =>
@@ -532,7 +532,7 @@ namespace NLDB
             var arrows = similars
                 .Select(s =>
                 {
-                    var min = data.dmatrix.Min(s.id);
+                    var min = data.DMatrixRowMin(s.id);
                     return new Tuple<int, int, float>(s.id, min.id, 2 * s.confidence / (1 + min.value));
                 })
                 .Where(t => t.Item2 != 0)
@@ -566,6 +566,8 @@ namespace NLDB
         /// </summary>
         private void CreatePDMatrix()
         {
+            if (!data.IsConnected())
+                throw new Exception($"Нет подключения к базе данных!");
             //Матрица расстояний считается для слов одного ранга
             //Цикл по всем рангам
             for (int r = 1; r <= Rank; r++)
@@ -578,12 +580,19 @@ namespace NLDB
                     UnitsOfMeasurment = "слов"
                 };
                 int i = 0;
+                int divider = 397;
                 foreach (var w in words)
                 {
+                    if (i % divider == 0)
+                    {
+                        if (data.IsTransaction()) data.EndTransaction();
+                        data.BeginTransaction();
+                    }
                     CalcPositionDistances(w);
                     i++;
-                    if(i % 97 == 0) informer.Set(i);    // показать прогресс
+                    if (i % divider == 0) informer.Set(i);    // показать прогресс
                 }
+                data.EndTransaction();
                 informer.Show(); // показать завершенный результат
             };
         }
@@ -592,7 +601,7 @@ namespace NLDB
         {
             for (int i = 0; i < w.childs.Length - 1; i++)
                 for (int j = i + 1; j < w.childs.Length; j++)
-                    data.dmatrix.Add(w.childs[i], w.childs[j], j - i);
+                    data.DMatrixAddValue(w.childs[i], w.childs[j], j - i);
         }
 
         /// <summary>

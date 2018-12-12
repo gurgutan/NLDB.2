@@ -11,9 +11,9 @@ namespace NLDB
         private static void Main(string[] args)
         {
             //Имя Словаря(а также базы данных). При отсутствии создаст.
-            string dbname = @"D:\Data\Result\full.db";
+            string dbname = @"D:\Data\Result\5mb.db";
             //Укажем файл с текстом, который будем использовать для обучения. Должен присутствовать по указанному пути
-            string trainfile = @"D:\Data\Wiki\ru\full.txt";
+            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
             //Массив разделителей текста на Слова. Разделители задаются регулярными выражениями, 
             //применяемыми к нормализованному тексту.
             string[] splitters = new string[]
@@ -26,13 +26,13 @@ namespace NLDB
             //Создаем Словарь
             Language l = new Language(dbname, splitters);
             //После создания объекта создаем хранилище. Это нужно так как к созданному ранее хранилищу можно сразу подключиться
-            l.Create();
+            //l.Create();
             //Подключимся к хранилищу
             l.Connect();
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             //Запускаем процесс построения структуры текста
-            l.Preprocessing(trainfile, Language.ProcessingType.Build);
-            l.Preprocessing(trainfile, Language.ProcessingType.Distance);
+            //l.Preprocessing(trainfile, Language.ProcessingType.Build);
+            //l.Preprocessing(trainfile, Language.ProcessingType.Distance);
             //Теперь будем использовать полученные данные
             Console.WriteLine("Для окончания диалога нажмите Enter");
             string line = "-";
