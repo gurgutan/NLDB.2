@@ -26,13 +26,13 @@ namespace NLDB
             //Создаем Словарь
             Language l = new Language(dbname, splitters);
             //После создания объекта создаем хранилище. Это нужно так как к созданному ранее хранилищу можно сразу подключиться
-            //l.Create();
+            l.Create();
             //Подключимся к хранилищу
             l.Connect();
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             //Запускаем процесс построения структуры текста
-            //l.Preprocessing(trainfile, Language.ProcessingType.Build);
-            //l.Preprocessing(trainfile, Language.ProcessingType.Distance);
+            l.Preprocessing(trainfile, Language.ProcessingType.Build);
+            l.Preprocessing(trainfile, Language.ProcessingType.Distance);
             //Теперь будем использовать полученные данные
             Console.WriteLine("Для окончания диалога нажмите Enter");
             string line = "-";

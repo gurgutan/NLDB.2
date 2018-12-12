@@ -529,10 +529,10 @@ namespace NLDB
             sw.Restart(); //!!!
             //Для каждого слова контекста id уверенностью c, вычисляем функцию f(c)=c/(1+min_dist(id)).
             //Чем меньше расстояние до слова, тем меньше делитель уверенности слова id
-            var arrows = similars
+            List<Tuple<int, int, float>> arrows = similars
                 .Select(s =>
                 {
-                    var min = data.DMatrixRowMin(s.id);
+                    Pointer min = data.DMatrixRowMin(s.id);
                     return new Tuple<int, int, float>(s.id, min.id, 2 * s.confidence / (1 + min.value));
                 })
                 .Where(t => t.Item2 != 0)
@@ -572,7 +572,7 @@ namespace NLDB
             //Цикл по всем рангам
             for (int r = 1; r <= Rank; r++)
             {
-                var words = data.Where(w => w.rank == r);
+                IEnumerable<Word> words = data.Where(w => w.rank == r);
                 Console.WriteLine();
                 ProgressInformer informer = new ProgressInformer($"Матрица расстояний слов ранга {r}:", words.Count())
                 {
@@ -580,8 +580,8 @@ namespace NLDB
                     UnitsOfMeasurment = "слов"
                 };
                 int i = 0;
-                int divider = 397;
-                foreach (var w in words)
+                int divider = 1031;
+                foreach (Word w in words)
                 {
                     if (i % divider == 0)
                     {
@@ -593,7 +593,7 @@ namespace NLDB
                     if (i % divider == 0) informer.Set(i);    // показать прогресс
                 }
                 data.EndTransaction();
-                informer.Show(); // показать завершенный результат
+                informer.Set(i); // показать завершенный результат
             };
         }
 
@@ -628,10 +628,9 @@ namespace NLDB
                     data.BeginTransaction();
                     IEnumerable<int> result = Parse(text, Rank, true);
                     data.EndTransaction();
-                    informer.Current = reader.BaseStream.Position;
-                    informer.Show();
+                    informer.Set(reader.BaseStream.Position);
                 }
-                informer.Show();
+                informer.Set(reader.BaseStream.Position);
                 //Очистка кэша
                 data.ClearCash();
                 Console.WriteLine($"\nСчитано {informer.Current} символов. Добавлено {data.CountWords()} слов.");
