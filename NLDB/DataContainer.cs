@@ -18,6 +18,7 @@ namespace NLDB
         private SQLiteConnection db;
 
         public DMatrix dmatrix = new DMatrix();
+
         //Кэш термов для быстрого выполнения метода ToTerm
         private readonly Dictionary<int, Term> terms = new Dictionary<int, Term>(1 << 18);
 
@@ -96,7 +97,8 @@ namespace NLDB
             cmd.CommandText =
                 "CREATE TABLE splitters (rank, expr);"
                 + "CREATE TABLE words (id PRIMARY KEY, rank, symbol, childs);"
-                + "CREATE TABLE parents (id, parent_id);";
+                + "CREATE TABLE parents (id, parent_id);"
+                + "CREATE TABLE dmatrix (row INTEGER NOT NULL, column integer NOT NULL, count INTEGER NOT NULL, sum REAL NOT NULL);";
             //+"CREATE TABLE grammar (id, next INTEGER NOT NULL, pos INTEGER NOT NULL, count INTEGER NOT NULL );";
             cmd.ExecuteNonQuery();
             //Добавляем разделители слов в таблицу splitters
@@ -110,7 +112,10 @@ namespace NLDB
                 "CREATE INDEX childs_ind ON words (childs);"
                 + "CREATE INDEX parents_id_ind ON parents (id);"
                 + "CREATE INDEX parents_p_id_ind ON parents (parent_id);"
-                + "CREATE INDEX words_id_ind ON words (id);";
+                + "CREATE INDEX words_id_ind ON words (id);"
+                + "CREATE INDEX dmatrix_row_ind ON dmatrix (row);"
+                + "CREATE INDEX dmatrix_col_ind ON dmatrix (column);"
+                + "CREATE INDEX dmatrix_row_col_ind ON dmatrix (row, column);";
             //+"CREATE INDEX grammar_id_ind ON grammar (id);" 
             //+"CREATE INDEX grammar_id_next_pos_ind ON grammar (id, next ASC, pos ASC);";
             cmd.ExecuteNonQuery();
@@ -125,6 +130,12 @@ namespace NLDB
         public void EndTransaction()
         {
             transaction.Commit();
+            transaction = null;
+        }
+
+        public bool IsTransaction()
+        {
+            return (transaction != null);
         }
 
         /// <summary>
@@ -165,13 +176,13 @@ namespace NLDB
             if (terms.TryGetValue(i, out Term t))
                 t.confidence = confidence;
             else
-                t = ToTerm(Get(i));
+                t = ToTerm(GetWord(i));
             return t;
         }
 
         public IEnumerable<Term> ToTerms(IEnumerable<int> ids)
         {
-            return Get(ids).Select(w => ToTerm(w));
+            return GetWords(ids).Select(w => ToTerm(w));
         }
 
         internal void ReadSplitters()
@@ -188,6 +199,91 @@ namespace NLDB
             }
             Splitters = db_splitters.OrderBy(t => t.Item1).Select(t => t.Item2).ToArray();
         }
+        //--------------------------------------------------------------------------------------------
+        //Работа с матрицей расстояний
+        //--------------------------------------------------------------------------------------------
+        public bool DMatrixContainsRow(int r)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT row,column FROM dmatrix WHERE row='{r}' LIMIT 1;";
+            var result = cmd.ExecuteScalar();
+            return result != null;
+        }
+
+        public bool DMatrixContains(int r, int c)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT row,column FROM dmatrix WHERE row={r} and column={c} LIMIT 1;";
+            var result = cmd.ExecuteScalar();
+            return result != null;
+        }
+
+        public Dictionary<int, DInfo> DMatrixGetRow(int r)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT row, column, count, sum FROM dmatrix WHERE row={r};";
+            SQLiteDataReader reader = cmd.ExecuteReader();
+            Dictionary<int, DInfo> row = new Dictionary<int, DInfo>();
+            while (reader.Read())
+            {
+                int c = reader.GetInt32(1);
+                int count = reader.GetInt32(2);
+                float sum = reader.GetFloat(3);
+                DInfo info = new DInfo(count, sum);
+                row.Add(c, info);
+            }
+            return row;
+        }
+
+        public DInfo DMatrixGetValue(int r, int c)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT row, column, count, sum FROM dmatrix WHERE row={r} and column={c} LIMIT 1;";
+            SQLiteDataReader reader = cmd.ExecuteReader();
+            if (!reader.Read()) return new DInfo();
+            int count = reader.GetInt32(2);
+            float sum = reader.GetFloat(3);
+            return new DInfo(count, sum);
+        }
+
+        public void DMatrixAddValue(int r, int c, float s)
+        {
+            var value = DMatrixGetValue(r, c);
+            value.count++;
+            value.sum += s;
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"INSERT INTO dmatrix(row, column, count, sum) VALUES ({r},{c},{value.count},{value.sum});";
+            cmd.ExecuteNonQuery();
+        }
+
+        public Pointer DMatrixRowMin(int r)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = 
+                $"SELECT row, column, count, sum, sum/count as avgval FROM dmatrix "+
+                $"WHERE row={r} and avgval = (SELECT MIN(sum/count) FROM dmatrix WHERE row={r});";
+            SQLiteDataReader reader = cmd.ExecuteReader();
+            if (!reader.Read()) return new Pointer();
+            int column = reader.GetInt32(1);
+            int count = reader.GetInt32(2);
+            float sum = reader.GetFloat(3);
+            return new Pointer(column, count, sum);
+        }
+
+        public Pointer DMatrixRowMax(int r)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"SELECT row, column, count, sum, sum/count as avgval FROM dmatrix " +
+                $"WHERE row={r} and avgval = (SELECT MAX(sum/count) WHERE row={r} FROM dmatrix)";
+            SQLiteDataReader reader = cmd.ExecuteReader();
+            if (!reader.Read()) return new Pointer();
+            int column = reader.GetInt32(1);
+            int count = reader.GetInt32(2);
+            float sum = reader.GetFloat(3);
+            return new Pointer(column, count, sum);
+        }
 
         //--------------------------------------------------------------------------------------------
         //Работа со Словами в БД
@@ -197,7 +293,7 @@ namespace NLDB
         /// </summary>
         /// <param name="i"></param>
         /// <returns></returns>
-        public Word Get(int i)
+        public Word GetWord(int i)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
@@ -216,7 +312,7 @@ namespace NLDB
         /// </summary>
         /// <param name="ids"></param>
         /// <returns></returns>
-        public List<Word> Get(IEnumerable<int> ids)
+        public List<Word> GetWords(IEnumerable<int> ids)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
@@ -241,7 +337,7 @@ namespace NLDB
         /// </summary>
         /// <param name="s"></param>
         /// <returns></returns>
-        public int GetId(string s)
+        public int GetWordId(string s)
         {
             if (alphabet.TryGetValue(s, out int id)) return id;
             SQLiteCommand cmd = db.CreateCommand();
@@ -261,7 +357,7 @@ namespace NLDB
         /// </summary>
         /// <param name="s"></param>
         /// <returns></returns>
-        public Word Get(string s)
+        public Word GetWord(string s)
         {
             if (alphabet.TryGetValue(s, out int id)) return new Word(id, 0, s, null, null);
             SQLiteCommand cmd = db.CreateCommand();
@@ -281,7 +377,7 @@ namespace NLDB
         /// </summary>
         /// <param name="_childs"></param>
         /// <returns></returns>
-        public int GetIdByChilds(int[] _childs)
+        public int GetWordIdByChilds(int[] _childs)
         {
             Sequence childs = new Sequence(_childs);
             if (words_id.TryGetValue(childs, out int id)) return id;
@@ -304,7 +400,7 @@ namespace NLDB
         /// </summary>
         /// <param name="_childs"></param>
         /// <returns></returns>
-        public Word GetByChilds(int[] _childs)
+        public Word GetWordByChilds(int[] _childs)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
@@ -325,7 +421,7 @@ namespace NLDB
         /// </summary>
         /// <param name="i"></param>
         /// <returns></returns>
-        public IEnumerable<Word> GetParents(int i)
+        public IEnumerable<Word> GetWordParents(int i)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
@@ -350,7 +446,7 @@ namespace NLDB
         /// </summary>
         /// <param name="i"></param>
         /// <returns></returns>
-        public IEnumerable<int> GetGrandchildsId(int i)
+        public IEnumerable<int> GetWordGrandchildsId(int i)
         {
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
@@ -369,7 +465,7 @@ namespace NLDB
         /// </summary>
         /// <param name="i"></param>
         /// <returns></returns>
-        public IEnumerable<int> GetGrandchildsId(IEnumerable<int> i)
+        public IEnumerable<int> GetWordsGrandchildsId(IEnumerable<int> i)
         {
             string i_str = i.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + "'" + n.ToString() + "'");
             SQLiteCommand cmd = db.CreateCommand();
@@ -402,7 +498,7 @@ namespace NLDB
         /// </summary>
         /// <param name="i"></param>
         /// <returns></returns>
-        public IEnumerable<Tuple<int, Word>> GetParentsWithChilds(int[] i)
+        public IEnumerable<Tuple<int, Word>> GetWordsParentsWithChilds(int[] i)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
@@ -427,7 +523,7 @@ namespace NLDB
         /// </summary>
         /// <param name="i"></param>
         /// <returns></returns>
-        public IEnumerable<int> GetParentsId(IEnumerable<int> i)
+        public IEnumerable<int> GetWordsParentsId(IEnumerable<int> i)
         {
             StringBuilder builder = new StringBuilder();
             foreach (int e in i)
@@ -447,7 +543,7 @@ namespace NLDB
             return words;
         }
 
-        public IEnumerable<int> GetParentsId(int i)
+        public IEnumerable<int> GetWordParentsId(int i)
         {
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
@@ -464,11 +560,11 @@ namespace NLDB
         /// </summary>
         /// <param name="w"></param>
         /// <returns></returns>
-        public int Add(Word w)
+        public int AddWord(Word w)
         {
             w.id = NextId();
             string childs = IntArrayToString(w.childs);
-            string parents = BuildParentsString(w);
+            string parents = BuildWordParentsString(w);
             string word = $"('{w.id.ToString()}', '{w.rank.ToString()}', '{w.symbol}', '{childs}')";
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
@@ -484,7 +580,7 @@ namespace NLDB
         /// </summary>
         /// <param name="w"></param>
         /// <returns></returns>
-        private string BuildParentsString(Word w)
+        private string BuildWordParentsString(Word w)
         {
             if (w.childs == null || w.childs.Length == 0) return "";
             StringBuilder builder = new StringBuilder();
@@ -560,7 +656,6 @@ namespace NLDB
             }
             return values;
         }
-
 
         private string IntArrayToString(int[] a)
         {

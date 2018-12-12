@@ -94,7 +94,7 @@ namespace NLDB.NLCLI
             Console.WriteLine($"Начало обучения на файле {filename}");
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            db.Build(filename);
+            db.Create(filename);
             sw.Stop();
             Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
             return 0;
@@ -107,6 +107,11 @@ namespace NLDB.NLCLI
             return 0;
         }
 
+        /// <summary>
+        /// Поиск слова в БД по параметрам
+        /// </summary>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
         private int Find(Dictionary<string, string> parameters)
         {
             if (db == null)
@@ -124,21 +129,25 @@ namespace NLDB.NLCLI
                     case "rank":
                         {
                             if (!int.TryParse(parameters[key], out rank))
+                            {
                                 IncorrectParameter(key, parameters[key]);
-                            return 1001;
+                                return 1001;
+                            }; break;
                         }
                     case "top":
                         {
                             if (!int.TryParse(parameters[key], out maxcount))
+                            {
                                 IncorrectParameter(key, parameters[key]);
-                            return 1001;
+                                return 1001;
+                            }; break;
                         }
                     default: UnknownParameter(key); break;
                 }
             //Вывод информации о команде
             Stopwatch stopwatch = Stopwatch.StartNew();
             DebugMessage($"[{stopwatch.Elapsed.ToString()}] поиск ближайших {maxcount} к '{text}' в лексиконе ранга {rank}");
-            List<Term> terms = db.Similars(text, rank);
+            List<Term> terms = db.Similars(text, rank, maxcount);
             stopwatch.Stop();
             DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
             ShowTerms(terms);
@@ -246,6 +255,7 @@ namespace NLDB.NLCLI
 
         private void ShowTerms(IEnumerable<Term> terms)
         {
+            Console.WriteLine();
             terms.ToList().ForEach(term =>
             {
                 if (term.id >= 0)
