@@ -49,7 +49,10 @@ namespace NLDB
                 //Console.WriteLine("\n\nОтветные предложения:\n" + next.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
                 //Получим предположение о предложении, следующем за line другим способом
                 var next2 = l.NextNearest(text: line, rank: 2, count: 16);
-                Console.WriteLine("\n\nСледующее предложение:\n" + next2.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+                if (next2.Count > 0)
+                    Console.WriteLine("\n\nСледующее предложение:\n" + next2.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+                else
+                    Console.Write("\n\nНе найдено подходящих продолжений");
                 //Получим предоположение о сути статьи, в котором есть предложение, наиболее похожее на line
                 //IEnumerable<Term> core = l.GetCore(text: line, rank: 2);
                 //Console.WriteLine("\n\nЯдро текста статьи:\n" + core.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
