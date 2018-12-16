@@ -17,7 +17,7 @@ namespace NLDB
         private SQLiteTransaction transaction;
         private SQLiteConnection db;
 
-        public DMatrix dmatrix = new DMatrix();
+        //public DMatrix dmatrix = new DMatrix();
 
         //Кэш термов для быстрого выполнения метода ToTerm
         private readonly Dictionary<int, Term> terms = new Dictionary<int, Term>(1 << 18);
@@ -98,7 +98,8 @@ namespace NLDB
                 "CREATE TABLE splitters (rank, expr);"
                 + "CREATE TABLE words (id PRIMARY KEY, rank, symbol, childs);"
                 + "CREATE TABLE parents (id, parent_id);"
-                + "CREATE TABLE dmatrix (row INTEGER NOT NULL, column integer NOT NULL, count INTEGER NOT NULL, sum REAL NOT NULL);";
+                + "CREATE TABLE dmatrix (row INTEGER NOT NULL, column integer NOT NULL, count INTEGER NOT NULL, sum REAL NOT NULL);"
+                + "CREATE TABLE smatrix (row INTEGER NOT NULL, column integer NOT NULL, similarity INTEGER NOT NULL);";
             //+"CREATE TABLE grammar (id, next INTEGER NOT NULL, pos INTEGER NOT NULL, count INTEGER NOT NULL );";
             cmd.ExecuteNonQuery();
             //Добавляем разделители слов в таблицу splitters
@@ -115,7 +116,8 @@ namespace NLDB
                 + "CREATE INDEX words_id_ind ON words (id);"
                 + "CREATE INDEX dmatrix_row_ind ON dmatrix (row);"
                 + "CREATE INDEX dmatrix_col_ind ON dmatrix (column);"
-                + "CREATE INDEX dmatrix_row_col_ind ON dmatrix (row, column);";
+                + "CREATE INDEX dmatrix_row_col_ind ON dmatrix (row, column);"
+                + "CREATE INDEX smatrix_row_col_ind ON smatrix (row, column);";
             //+"CREATE INDEX grammar_id_ind ON grammar (id);" 
             //+"CREATE INDEX grammar_id_next_pos_ind ON grammar (id, next ASC, pos ASC);";
             cmd.ExecuteNonQuery();
@@ -136,6 +138,11 @@ namespace NLDB
         public bool IsTransaction()
         {
             return (transaction != null);
+        }
+
+        public void Commit()
+        {
+            if (IsTransaction()) EndTransaction();
         }
 
         /// <summary>
@@ -206,7 +213,7 @@ namespace NLDB
         {
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT row,column FROM dmatrix WHERE row='{r}' LIMIT 1;";
-            var result = cmd.ExecuteScalar();
+            object result = cmd.ExecuteScalar();
             return result != null;
         }
 
@@ -214,7 +221,7 @@ namespace NLDB
         {
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT row,column FROM dmatrix WHERE row={r} and column={c} LIMIT 1;";
-            var result = cmd.ExecuteScalar();
+            object result = cmd.ExecuteScalar();
             return result != null;
         }
 
@@ -246,9 +253,25 @@ namespace NLDB
             return new DInfo(count, sum);
         }
 
+        public float SMatrixGetValue(int r, int c)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT similarity FROM smatrix WHERE row={r} and column={c} LIMIT 1;";
+            object result = cmd.ExecuteScalar();
+            return (float)result;
+        }
+
+        public float SMatrixSetValue(int r, int c, float s)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = $"INSERT INTO table(row,column,similarity) VALUES({r},{c},{s.ToString()});";
+            cmd.ExecuteNonQuery();
+            return s;
+        }
+
         public void DMatrixAddValue(int r, int c, float s)
         {
-            var value = DMatrixGetValue(r, c);
+            DInfo value = DMatrixGetValue(r, c);
             value.count++;
             value.sum += s;
             SQLiteCommand cmd = db.CreateCommand();
@@ -260,8 +283,8 @@ namespace NLDB
         public Pointer DMatrixRowMin(int r)
         {
             SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText = 
-                $"SELECT row, column, count, sum, sum/count as avgval FROM dmatrix "+
+            cmd.CommandText =
+                $"SELECT row, column, count, sum, sum/count as avgval FROM dmatrix " +
                 $"WHERE row={r} and avgval = (SELECT MIN(sum/count) FROM dmatrix WHERE row={r});";
             SQLiteDataReader reader = cmd.ExecuteReader();
             if (!reader.Read()) return new Pointer();

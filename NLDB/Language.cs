@@ -16,7 +16,9 @@ namespace NLDB
     [Serializable]
     public partial class Language
     {
-        public enum ProcessingType { Build, Grammar, Distance };
+        //Типы обработки данных
+        public enum ProcessingType { Build, Grammar, Distance, Similarity };
+
         //Данные
         private DataContainer data = null;
         private Parser[] parsers = null;
@@ -554,7 +556,88 @@ namespace NLDB
                 case ProcessingType.Build: CreateLexicon(filename); break;
                 case ProcessingType.Grammar: CreateGrammar(); break;
                 case ProcessingType.Distance: CreatePDMatrix(); break;
+                case ProcessingType.Similarity: CreateSMatrix(); break;
                 default: throw new NotImplementedException("Не реализованный тип обработки текста");
+            }
+        }
+
+        //
+        /// <summary>
+        /// Создание матрицы близости слов на основе матрицы расстояний
+        /// </summary>
+        private void CreateSMatrix()
+        {
+            //Функция вычисляет попарные расстояния между векторами-строками матрицы расстояний dmatrix и сохраняет результат в БД
+            if (!data.IsConnected())
+                throw new Exception($"Нет подключения к базе данных!");
+            for (int r = 1; r <= Rank; r++)
+            {
+                Console.WriteLine();
+                //Получаем список слов ранга r
+                IEnumerable<Word> words = data.Where(w => w.rank == r);
+                int maxCount = words.Count();
+                ProgressInformer informer = new ProgressInformer(
+                    prompt: $"Матрица расстояний слов ранга {r}:",
+                    max: maxCount * maxCount,
+                    measurment: "слов",
+                    barSize: 64);
+                int i = 0;  //счетчик слов
+                int divider = 1031; //делитель, для определения момента фиксации транзакции
+                foreach (Word a in words)
+                {
+                    foreach (Word b in words)
+                    {
+                        if (i % divider == 0)
+                        {
+                            data.Commit();
+                            data.BeginTransaction();
+                            informer.Set(i);
+                        }
+                        CalcSimilarity(a, b);
+                        i++;
+                    }
+                }
+                data.Commit();
+                informer.Set(i); // показать завершенный результат
+            }
+        }
+
+        /// <summary>
+        /// Рассчитывает похожесть слов на основании вектора контекста
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        private void CalcSimilarity(Word a, Word b)
+        {
+            Dictionary<int, DInfo> a_row = data.DMatrixGetRow(a.id);
+            Dictionary<int, DInfo> b_row = data.DMatrixGetRow(b.id);
+            float dist = 0;
+            foreach (int key in a_row.Keys)
+            {
+                float result = 0;
+                DInfo a_val = a_row[key];
+                a_row.Remove(key);
+                if (b_row.TryGetValue(key, out DInfo b_val))
+                {
+                    float diff = a_val.Average() - b_val.Average();
+                    result = diff * diff;
+                    b_row.Remove(key);
+                }
+                dist += result;
+            }
+            foreach(var key in b_row.Keys)
+            {
+                float result = 0;
+                DInfo b_val = b_row[key];
+                b_row.Remove(key);
+                if (a_row.TryGetValue(key, out DInfo a_val))
+                {
+                    float diff = a_val.Average() - b_val.Average();
+                    result = diff * diff;
+                    a_row.Remove(key);
+                }
+                dist += result;
+                sdfjhksfdgkjsd
             }
         }
 
@@ -585,14 +668,14 @@ namespace NLDB
                 {
                     if (i % divider == 0)
                     {
-                        if (data.IsTransaction()) data.EndTransaction();
+                        data.Commit();
                         data.BeginTransaction();
+                        informer.Set(i);
                     }
                     CalcPositionDistances(w);
                     i++;
-                    if (i % divider == 0) informer.Set(i);    // показать прогресс
                 }
-                data.EndTransaction();
+                data.Commit();
                 informer.Set(i); // показать завершенный результат
             };
         }
@@ -720,6 +803,7 @@ namespace NLDB
         private const float followers_min_confidence = 0.02F;
         private const int followers_max_count = 16;
         private const double description_max_words = 16;
+        private const float max_dist = 1 << 20;
         //private int[] EmptyArray = new int[0];
     }
 }

@@ -59,15 +59,15 @@ namespace NLDB
         private readonly int PosY;
         private readonly int PosX;
 
-        public ProgressInformer(string prompt, long max)
+        public ProgressInformer(string prompt = "", long max = 100, string measurment = "", int barSize = 64)
         {
             Prompt = prompt;
-            UnitsOfMeasurment = "";
+            UnitsOfMeasurment = measurment;
             Max = max;
             ShowProgressBar = true;
             ShowPercents = true;
             ShowCurrent = true;
-            BarSize = Math.Min(Console.BufferWidth - Prompt.Length - 7, DefaultBarSize);
+            BarSize = Math.Min(Console.BufferWidth - Prompt.Length - 7, barSize);
             Current = 0;
             PosX = Console.CursorLeft;
             PosY = Console.CursorTop;

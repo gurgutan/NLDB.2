@@ -13,6 +13,11 @@ namespace NLDB
             count = c;
             sum = s;
         }
+
+        public float Average()
+        {
+            return sum / count;
+        }
     }
 
     /// <summary>
