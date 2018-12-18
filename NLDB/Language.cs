@@ -568,8 +568,8 @@ namespace NLDB
         private void CreateSMatrix()
         {
             //Функция вычисляет попарные расстояния между векторами-строками матрицы расстояний dmatrix и сохраняет результат в БД
-            if (!data.IsConnected())
-                throw new Exception($"Нет подключения к базе данных!");
+            data.StartSession();
+            data.SMatrixClear();
             for (int r = 1; r <= Rank; r++)
             {
                 Console.WriteLine();
@@ -577,12 +577,12 @@ namespace NLDB
                 IEnumerable<Word> words = data.Where(w => w.rank == r);
                 int maxCount = words.Count();
                 ProgressInformer informer = new ProgressInformer(
-                    prompt: $"Матрица расстояний слов ранга {r}:",
-                    max: maxCount * maxCount,
+                    prompt: $"Матрица подобия слов ранга {r}:",
+                    max: (long)maxCount * maxCount,
                     measurment: "слов",
                     barSize: 64);
-                int i = 0;  //счетчик слов
-                int divider = 1031; //делитель, для определения момента фиксации транзакции
+                long i = 0;  //счетчик слов
+                long divider = 1031; //делитель, для определения момента фиксации транзакции
                 foreach (Word a in words)
                 {
                     foreach (Word b in words)
@@ -590,16 +590,16 @@ namespace NLDB
                         if (i % divider == 0)
                         {
                             data.Commit();
-                            data.BeginTransaction();
                             informer.Set(i);
                         }
-                        CalcSimilarity(a, b);
+                        var s = CalcSimilarity(a, b);
+                        data.SMatrixSetValue(a.id, b.id, s);
                         i++;
                     }
                 }
-                data.Commit();
                 informer.Set(i); // показать завершенный результат
             }
+            data.EndSession();
         }
 
         /// <summary>
@@ -607,39 +607,29 @@ namespace NLDB
         /// </summary>
         /// <param name="a"></param>
         /// <param name="b"></param>
-        private void CalcSimilarity(Word a, Word b)
+        private float CalcSimilarity(Word a, Word b)
         {
             Dictionary<int, DInfo> a_row = data.DMatrixGetRow(a.id);
             Dictionary<int, DInfo> b_row = data.DMatrixGetRow(b.id);
-            float dist = 0;
-            foreach (int key in a_row.Keys)
+            float result = 0;
+            //Вычисляем квадрат расстояния между векторами 
+            var keys = a_row.Keys.ToList();
+            foreach (int key in keys)
             {
-                float result = 0;
                 DInfo a_val = a_row[key];
-                a_row.Remove(key);
                 if (b_row.TryGetValue(key, out DInfo b_val))
                 {
-                    float diff = a_val.Average() - b_val.Average();
-                    result = diff * diff;
+                    result += Sqr(a_val.Average() - b_val.Average());
                     b_row.Remove(key);
-                }
-                dist += result;
-            }
-            foreach(var key in b_row.Keys)
-            {
-                float result = 0;
-                DInfo b_val = b_row[key];
-                b_row.Remove(key);
-                if (a_row.TryGetValue(key, out DInfo a_val))
-                {
-                    float diff = a_val.Average() - b_val.Average();
-                    result = diff * diff;
                     a_row.Remove(key);
                 }
-                dist += result;
-                sdfjhksfdgkjsd
             }
+            //TODO: решить что делать с несовпадающими компонентами веткоров соседства
+            return result;
         }
+
+        private float Sqr(float x) => x * x;
+
 
         /// <summary>
         /// Создание матрицы позиционных расстояний слов (Positions Distances Matrix). 
@@ -649,8 +639,8 @@ namespace NLDB
         /// </summary>
         private void CreatePDMatrix()
         {
-            if (!data.IsConnected())
-                throw new Exception($"Нет подключения к базе данных!");
+            data.StartSession();
+            data.DMatrixClear();
             //Матрица расстояний считается для слов одного ранга
             //Цикл по всем рангам
             for (int r = 1; r <= Rank; r++)
@@ -663,21 +653,20 @@ namespace NLDB
                     UnitsOfMeasurment = "слов"
                 };
                 int i = 0;
-                int divider = 1031;
+                int divider = 911;
                 foreach (Word w in words)
                 {
+                    i++;
                     if (i % divider == 0)
                     {
                         data.Commit();
-                        data.BeginTransaction();
                         informer.Set(i);
                     }
                     CalcPositionDistances(w);
-                    i++;
                 }
-                data.Commit();
                 informer.Set(i); // показать завершенный результат
             };
+            data.EndSession();
         }
 
         private void CalcPositionDistances(Word w)
@@ -704,6 +693,7 @@ namespace NLDB
                     BarSize = 64,
                     UnitsOfMeasurment = "байт"
                 };
+                data.WordsClear();
                 while (count_chars == TEXT_BUFFER_SIZE)
                 {
                     count_chars = reader.ReadBlock(buffer, 0, Language.TEXT_BUFFER_SIZE);
@@ -803,7 +793,7 @@ namespace NLDB
         private const float followers_min_confidence = 0.02F;
         private const int followers_max_count = 16;
         private const double description_max_words = 16;
-        private const float max_dist = 1 << 20;
+        private const float max_dist = 1 << 10;
         //private int[] EmptyArray = new int[0];
     }
 }

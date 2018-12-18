@@ -98,8 +98,8 @@ namespace NLDB
                 "CREATE TABLE splitters (rank, expr);"
                 + "CREATE TABLE words (id PRIMARY KEY, rank, symbol, childs);"
                 + "CREATE TABLE parents (id, parent_id);"
-                + "CREATE TABLE dmatrix (row INTEGER NOT NULL, column integer NOT NULL, count INTEGER NOT NULL, sum REAL NOT NULL);"
-                + "CREATE TABLE smatrix (row INTEGER NOT NULL, column integer NOT NULL, similarity INTEGER NOT NULL);";
+                + "CREATE TABLE dmatrix (row INTEGER NOT NULL, column integer NOT NULL, count INTEGER NOT NULL, sum REAL NOT NULL, PRIMARY KEY(row, column));"
+                + "CREATE TABLE smatrix (row INTEGER NOT NULL, column integer NOT NULL, similarity REAL NOT NULL, PRIMARY KEY(row, column));";
             //+"CREATE TABLE grammar (id, next INTEGER NOT NULL, pos INTEGER NOT NULL, count INTEGER NOT NULL );";
             cmd.ExecuteNonQuery();
             //Добавляем разделители слов в таблицу splitters
@@ -141,6 +141,19 @@ namespace NLDB
         }
 
         public void Commit()
+        {
+            if (IsTransaction()) EndTransaction();
+            BeginTransaction();
+        }
+
+        public void StartSession()
+        {
+            if (!IsConnected())
+                throw new Exception($"Подключение к БД не установлено");
+            transaction = db.BeginTransaction();
+        }
+
+        public void EndSession()
         {
             if (IsTransaction()) EndTransaction();
         }
@@ -209,6 +222,13 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         //Работа с матрицей расстояний
         //--------------------------------------------------------------------------------------------
+        public void DMatrixClear()
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = $"DELETE FROM dmatrix";
+            cmd.ExecuteNonQuery();
+        }
+
         public bool DMatrixContainsRow(int r)
         {
             SQLiteCommand cmd = db.CreateCommand();
@@ -247,36 +267,19 @@ namespace NLDB
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT row, column, count, sum FROM dmatrix WHERE row={r} and column={c} LIMIT 1;";
             SQLiteDataReader reader = cmd.ExecuteReader();
-            if (!reader.Read()) return new DInfo();
+            if (!reader.Read()) return new DInfo(-1, 0);
             int count = reader.GetInt32(2);
             float sum = reader.GetFloat(3);
             return new DInfo(count, sum);
         }
 
-        public float SMatrixGetValue(int r, int c)
-        {
-            SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText = $"SELECT similarity FROM smatrix WHERE row={r} and column={c} LIMIT 1;";
-            object result = cmd.ExecuteScalar();
-            return (float)result;
-        }
-
-        public float SMatrixSetValue(int r, int c, float s)
-        {
-            SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText = $"INSERT INTO table(row,column,similarity) VALUES({r},{c},{s.ToString()});";
-            cmd.ExecuteNonQuery();
-            return s;
-        }
-
         public void DMatrixAddValue(int r, int c, float s)
         {
             DInfo value = DMatrixGetValue(r, c);
-            value.count++;
-            value.sum += s;
             SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText =
-                $"INSERT INTO dmatrix(row, column, count, sum) VALUES ({r},{c},{value.count},{value.sum});";
+            cmd.CommandText = value.count == -1
+                ? $"INSERT INTO dmatrix(row, column, count, sum) VALUES({r}, {c}, 1, {s.ToString()});"
+                : $"UPDATE dmatrix SET count={value.count + 1}, sum={s.ToString()} WHERE row={r} AND column={c};";
             cmd.ExecuteNonQuery();
         }
 
@@ -308,9 +311,61 @@ namespace NLDB
             return new Pointer(column, count, sum);
         }
 
+
+        //--------------------------------------------------------------------------------------------
+        //Матрица подобия слов
+        //--------------------------------------------------------------------------------------------
+        public void SMatrixClear()
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = $"DELETE FROM smatrix";
+            cmd.ExecuteNonQuery();
+        }
+
+        public float SMatrixGetValue(int r, int c)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT similarity FROM smatrix WHERE row={r} and column={c} LIMIT 1;";
+            object result = cmd.ExecuteScalar();
+            return (float)result;
+        }
+
+        public float SMatrixSetValue(int r, int c, float s)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = 
+                $"DELETE FROM smatrix WHERE row={r} and column={c};" +
+                $"INSERT INTO smatrix(row, column, similarity) VALUES({r}, {c}, {s.ToString().Replace(',','.')});";
+            cmd.ExecuteNonQuery();
+            return s;
+        }
+
+        public Dictionary<int, float> SMatrixGetRow(int r)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT row, column, similarity FROM smatrix WHERE row={r} ORDER BY similarity DESC;";
+            SQLiteDataReader reader = cmd.ExecuteReader();
+            Dictionary<int, float> result = new Dictionary<int, float>();
+            while (reader.Read())
+            {
+                int id = reader.GetInt32(1);
+                float s = reader.GetFloat(2);
+                result[id] = s;
+            }
+            return result;
+        }
+
+
         //--------------------------------------------------------------------------------------------
         //Работа со Словами в БД
         //--------------------------------------------------------------------------------------------
+        public void WordsClear()
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = $"DELETE FROM words; DELETE FROM parents;";
+            cmd.ExecuteNonQuery();
+        }
+
         /// <summary>
         /// Возвращает слово по идентификатору i
         /// </summary>

@@ -33,6 +33,7 @@ namespace NLDB
             //Запускаем процесс построения структуры текста
             l.Preprocessing(trainfile, Language.ProcessingType.Build);
             l.Preprocessing(trainfile, Language.ProcessingType.Distance);
+            l.Preprocessing(trainfile, Language.ProcessingType.Similarity);
             //Теперь будем использовать полученные данные
             Console.WriteLine("Для окончания диалога нажмите Enter");
             string line = "-";
