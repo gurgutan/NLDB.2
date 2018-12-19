@@ -574,30 +574,27 @@ namespace NLDB
             {
                 Console.WriteLine();
                 //Получаем список слов ранга r
-                IEnumerable<Word> words = data.Where(w => w.rank == r);
+                List<Word> words = data.Where(w => w.rank == r).ToList();
                 int maxCount = words.Count();
                 ProgressInformer informer = new ProgressInformer(
                     prompt: $"Матрица подобия слов ранга {r}:",
-                    max: (long)maxCount * maxCount,
+                    max: maxCount - 1,
                     measurment: "слов",
                     barSize: 64);
-                long i = 0;  //счетчик слов
-                long divider = 1031; //делитель, для определения момента фиксации транзакции
-                foreach (Word a in words)
+                //Матрица симметричная, с нулевой главной диагональю
+                for (int i = 0; i < words.Count - 1; i++)
                 {
-                    foreach (Word b in words)
+                    data.Commit();
+                    informer.Set(i);
+                    Dictionary<int, DInfo> a_row = data.DMatrixGetRow(words[i].id);
+                    for (int j = i + 1; j < words.Count; j++)
                     {
-                        if (i % divider == 0)
-                        {
-                            data.Commit();
-                            informer.Set(i);
-                        }
-                        var s = CalcSimilarity(a, b);
-                        data.SMatrixSetValue(a.id, b.id, s);
-                        i++;
+                        Dictionary<int, DInfo> b_row = data.DMatrixGetRow(words[j].id);
+                        var s = CalcSimilarity(a_row, b_row);
+                        data.SMatrixSetValue(words[i].id, words[j].id, s);
                     }
                 }
-                informer.Set(i); // показать завершенный результат
+                informer.Set(maxCount - 1); // показать завершенный прогресс
             }
             data.EndSession();
         }
@@ -607,23 +604,31 @@ namespace NLDB
         /// </summary>
         /// <param name="a"></param>
         /// <param name="b"></param>
-        private float CalcSimilarity(Word a, Word b)
+        private float CalcSimilarity(Dictionary<int, DInfo> a_row, Dictionary<int, DInfo> b_row)
         {
-            Dictionary<int, DInfo> a_row = data.DMatrixGetRow(a.id);
-            Dictionary<int, DInfo> b_row = data.DMatrixGetRow(b.id);
             float result = 0;
             //Вычисляем квадрат расстояния между векторами 
             var keys = a_row.Keys.ToList();
-            foreach (int key in keys)
+            keys.AsParallel().ForAll(key => 
             {
                 DInfo a_val = a_row[key];
                 if (b_row.TryGetValue(key, out DInfo b_val))
                 {
                     result += Sqr(a_val.Average() - b_val.Average());
-                    b_row.Remove(key);
-                    a_row.Remove(key);
+                    //b_row.Remove(key);
+                    //a_row.Remove(key);
                 }
-            }
+            });
+            //foreach (int key in keys)
+            //{
+            //    DInfo a_val = a_row[key];
+            //    if (b_row.TryGetValue(key, out DInfo b_val))
+            //    {
+            //        result += Sqr(a_val.Average() - b_val.Average());
+            //        //b_row.Remove(key);
+            //        //a_row.Remove(key);
+            //    }
+            //}
             //TODO: решить что делать с несовпадающими компонентами веткоров соседства
             return result;
         }
@@ -703,7 +708,7 @@ namespace NLDB
                     data.EndTransaction();
                     informer.Set(reader.BaseStream.Position);
                 }
-                informer.Set(reader.BaseStream.Position);
+                informer.Set(reader.BaseStream.Length);
                 //Очистка кэша
                 data.ClearCash();
                 Console.WriteLine($"\nСчитано {informer.Current} символов. Добавлено {data.CountWords()} слов.");

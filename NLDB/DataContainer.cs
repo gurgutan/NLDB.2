@@ -336,7 +336,7 @@ namespace NLDB
             cmd.CommandText = 
                 $"DELETE FROM smatrix WHERE row={r} and column={c};" +
                 $"INSERT INTO smatrix(row, column, similarity) VALUES({r}, {c}, {s.ToString().Replace(',','.')});";
-            cmd.ExecuteNonQuery();
+            cmd.ExecuteNonQueryAsync();
             return s;
         }
 
