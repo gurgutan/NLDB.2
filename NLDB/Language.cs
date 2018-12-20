@@ -546,6 +546,33 @@ namespace NLDB
             return arrows.Select(a => ToTerm(a.Item2, a.Item3)).Distinct(new TermComparer()).Take(count).ToList();
         }
 
+        public List<Term> SimilarsByContext(string text, int rank = 2, int count = 1)
+        {
+            if (count <= 0)
+                throw new ArgumentOutOfRangeException("Параметр count не может быть меньше 1");
+            Stopwatch sw = new Stopwatch(); //!!!
+            sw.Start(); //!!!
+            //Ищем Слова похожие на text
+            IEnumerable<Term> similars =
+                Similars(text: text, rank: rank, count: count)
+                .Where(t => t.confidence >= similars_min_confidence);
+            sw.Stop();
+            Debug.WriteLine($"Определение similars [{similars.Count()}]: {sw.Elapsed.TotalSeconds}");
+            similars.ToList().ForEach(s => Debug.WriteLine($" [{s.confidence.ToString("F4")}] {s}"));
+            //Если похожих слов не нашли, возвращаем пустой список термов
+            if (similars.Count() == 0) return null;
+            sw.Restart(); //!!!
+            //Ищем подобные слова
+            var terms = similars
+                .SelectMany(s => data.SMatrixGetMin(s.id, 1))
+                .Select(t => data.ToTerm(t.Item1, t.Item2))
+                .ToList();
+            sw.Stop();
+            Debug.WriteLine($"Определение подобия [{terms.Count}]: {sw.Elapsed.TotalSeconds}");
+            terms.ToList().ForEach(s => Debug.WriteLine($" [{s.confidence.ToString("F4")}] {s}"));
+            return terms;
+        }
+
         //--------------------------------------------------------------------------------------------
         //Методы построения лексикона, грамматики, матрицы расстояний
         //--------------------------------------------------------------------------------------------
@@ -561,19 +588,15 @@ namespace NLDB
             }
         }
 
-        //
-        /// <summary>
-        /// Создание матрицы близости слов на основе матрицы расстояний
-        /// </summary>
         private void CreateSMatrix()
         {
-            //Функция вычисляет попарные расстояния между векторами-строками матрицы расстояний dmatrix и сохраняет результат в БД
             data.StartSession();
             data.SMatrixClear();
+            Console.WriteLine("Создание матрицы подобия...");
+            int step = 111;
             for (int r = 1; r <= Rank; r++)
             {
                 Console.WriteLine();
-                //Получаем список слов ранга r
                 List<Word> words = data.Where(w => w.rank == r).ToList();
                 int maxCount = words.Count();
                 ProgressInformer informer = new ProgressInformer(
@@ -581,22 +604,20 @@ namespace NLDB
                     max: maxCount - 1,
                     measurment: "слов",
                     barSize: 64);
-                //Матрица симметричная, с нулевой главной диагональю
-                for (int i = 0; i < words.Count - 1; i++)
+                int divider = 11;
+                for (int row = 0; row < maxCount; row += step)
                 {
-                    data.Commit();
-                    informer.Set(i);
-                    Dictionary<int, DInfo> a_row = data.DMatrixGetRow(words[i].id);
-                    for (int j = i + 1; j < words.Count; j++)
+                    data.SMatrixCalculateTable(r, row, row + step - 1);
+                    if (row % divider == 0)
                     {
-                        Dictionary<int, DInfo> b_row = data.DMatrixGetRow(words[j].id);
-                        var s = CalcSimilarity(a_row, b_row);
-                        data.SMatrixSetValue(words[i].id, words[j].id, s);
+                        informer.Set(row);
+                        data.Commit();
                     }
                 }
-                informer.Set(maxCount - 1); // показать завершенный прогресс
+                data.Commit();
+                data.EndSession();
+                informer.Set(maxCount);
             }
-            data.EndSession();
         }
 
         /// <summary>
@@ -609,7 +630,7 @@ namespace NLDB
             float result = 0;
             //Вычисляем квадрат расстояния между векторами 
             var keys = a_row.Keys.ToList();
-            keys.AsParallel().ForAll(key => 
+            keys.AsParallel().ForAll(key =>
             {
                 DInfo a_val = a_row[key];
                 if (b_row.TryGetValue(key, out DInfo b_val))
@@ -798,7 +819,7 @@ namespace NLDB
         private const float followers_min_confidence = 0.02F;
         private const int followers_max_count = 16;
         private const double description_max_words = 16;
-        private const float max_dist = 1 << 10;
+        private const float max_dist = DataContainer.max_dist;
         //private int[] EmptyArray = new int[0];
     }
 }

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -14,6 +15,8 @@ namespace NLDB
     /// </summary>
     public class DataContainer : IEnumerable<Word>, IDisposable
     {
+        public const float max_dist = 1 << 10;
+
         private SQLiteTransaction transaction;
         private SQLiteConnection db;
 
@@ -277,9 +280,11 @@ namespace NLDB
         {
             DInfo value = DMatrixGetValue(r, c);
             SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText = value.count == -1
+            value.sum += s;
+            value.count++;
+            cmd.CommandText = value.count == 0
                 ? $"INSERT INTO dmatrix(row, column, count, sum) VALUES({r}, {c}, 1, {s.ToString()});"
-                : $"UPDATE dmatrix SET count={value.count + 1}, sum={s.ToString()} WHERE row={r} AND column={c};";
+                : $"UPDATE dmatrix SET count={value.count}, sum={value.sum.ToString()} WHERE row={r} AND column={c};";
             cmd.ExecuteNonQuery();
         }
 
@@ -311,10 +316,56 @@ namespace NLDB
             return new Pointer(column, count, sum);
         }
 
+        public float DMatrixRowsDistL1(int a, int b)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"SELECT SUM(ABS(dmatrix1.sum/dmatrix1.count - dmatrix2.sum/dmatrix2.count)) AS dist " +
+                $"FROM dmatrix dmatrix1 INNER JOIN dmatrix dmatrix2 on dmatrix1.column=dmatrix2.column " +
+                $"WHERE dmatrix1.row={a} AND dmatrix2.row={b};";
+            object result = cmd.ExecuteScalar();
+            var englishCulture = CultureInfo.GetCultureInfo("en-US");
+            return (result == null || result.ToString() == "") ? max_dist : float.Parse(result.ToString(), englishCulture);
+        }
+
+        public int SMatrixCalculateTable(int rank, int from, int to)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"INSERT INTO smatrix(row, column, similarity) " +
+                $"SELECT dmatrix1.row, dmatrix2.row, SUM(ABS(dmatrix1.sum/dmatrix1.count - dmatrix2.sum/dmatrix2.count)) AS dist " +
+                $"FROM dmatrix dmatrix1 INNER JOIN dmatrix dmatrix2 on dmatrix1.column=dmatrix2.column " +
+                //$"FROM dmatrix dmatrix1 INNER JOIN dmatrix dmatrix2 on dmatrix1.column=dmatrix2.column AND dmatrix1.row<dmatrix2.row " +
+                $"INNER JOIN words words1 ON dmatrix1.row=words1.id AND words1.rank={rank} " +
+                $"INNER JOIN words words2 ON dmatrix2.row=words2.id AND words2.rank={rank} " +
+                $"WHERE {from}<=dmatrix1.row AND dmatrix1.row<={to} " +
+                $"GROUP BY dmatrix1.row, dmatrix2.row;";
+            return cmd.ExecuteNonQuery();
+        }
+
+        public List<Tuple<int, float>> SMatrixGetMin(int id, int count)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"SELECT column, similarity FROM smatrix WHERE row={id} ORDER BY similarity ASC LIMIT {count}";
+            var result = new List<Tuple<int, float>>();
+            var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                int col = reader.GetInt32(0);
+                float similarity = reader.GetFloat(1);
+                result.Add(new Tuple<int, float>(col, similarity));
+            }
+            return result;
+        }
+
 
         //--------------------------------------------------------------------------------------------
         //Матрица подобия слов
         //--------------------------------------------------------------------------------------------
+        /// <summary>
+        /// Стирает все строки таблицы
+        /// </summary>
         public void SMatrixClear()
         {
             SQLiteCommand cmd = db.CreateCommand();
@@ -333,9 +384,9 @@ namespace NLDB
         public float SMatrixSetValue(int r, int c, float s)
         {
             SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText = 
+            cmd.CommandText =
                 $"DELETE FROM smatrix WHERE row={r} and column={c};" +
-                $"INSERT INTO smatrix(row, column, similarity) VALUES({r}, {c}, {s.ToString().Replace(',','.')});";
+                $"INSERT INTO smatrix(row, column, similarity) VALUES({r}, {c}, {s.ToString().Replace(',', '.')});";
             cmd.ExecuteNonQueryAsync();
             return s;
         }
@@ -354,7 +405,6 @@ namespace NLDB
             }
             return result;
         }
-
 
         //--------------------------------------------------------------------------------------------
         //Работа со Словами в БД
