@@ -546,6 +546,27 @@ namespace NLDB
             return arrows.Select(a => ToTerm(a.Item2, a.Item3)).Distinct(new TermComparer()).Take(count).ToList();
         }
 
+        public List<Term> Alike(string text, int rank = 2, int count = 1)
+        {
+            if (count < 1)
+                throw new ArgumentException("Значение параметра count не может быть меньше 1");
+            List<Term> result = new List<Term>();
+            Stopwatch sw = new Stopwatch(); //!!!
+            sw.Start(); //!!!
+            IEnumerable<Term> similars = Similars(text, rank)
+                .Where(t => t.confidence >= similars_min_confidence)
+                .Take(1);
+            sw.Stop();
+            Debug.WriteLine($"Определение similars [{similars.Count()}]: {sw.Elapsed.TotalSeconds}");
+            similars.ToList().ForEach(s => Debug.WriteLine($" [{s.confidence.ToString("F4")}] {s}"));    //!!!
+            //Если похожих слов не нашли, возвращаем пустой список
+            if (similars.Count() == 0) return result;
+            sw.Restart(); //!!!
+            result = similars.SelectMany(s => data.SMatrixGetRow(s.id, 4)).Select(a => ToTerm(a.Key, a.Value)).ToList();
+            sw.Stop();
+            return result;
+        }
+
         //--------------------------------------------------------------------------------------------
         //Методы построения лексикона, грамматики, матрицы расстояний
         //--------------------------------------------------------------------------------------------
@@ -570,31 +591,27 @@ namespace NLDB
             //Функция вычисляет попарные расстояния между векторами-строками матрицы расстояний dmatrix и сохраняет результат в БД
             data.StartSession();
             data.SMatrixClear();
-            for (int r = 1; r <= Rank; r++)
+            for (int r = 0; r <= Rank; r++)
             {
                 Console.WriteLine();
                 //Получаем список слов ранга r
-                List<Word> words = data.Where(w => w.rank == r).ToList();
-                int maxCount = words.Count();
+                List<Word> words = data.Where(w => w.rank == r).OrderBy(w => w.id).ToList();
+                int maxCount = words.Count;
                 ProgressInformer informer = new ProgressInformer(
                     prompt: $"Матрица подобия слов ранга {r}:",
                     max: maxCount - 1,
                     measurment: "слов",
                     barSize: 64);
                 //Матрица симметричная, с нулевой главной диагональю
-                for (int i = 0; i < words.Count - 1; i++)
+                int step = 12;
+                for (int i = 0; i < maxCount - 1; i += step)
                 {
                     data.Commit();
                     informer.Set(i);
-                    Dictionary<int, DInfo> a_row = data.DMatrixGetRow(words[i].id);
-                    for (int j = i + 1; j < words.Count; j++)
-                    {
-                        Dictionary<int, DInfo> b_row = data.DMatrixGetRow(words[j].id);
-                        var s = CalcSimilarity(a_row, b_row);
-                        data.SMatrixSetValue(words[i].id, words[j].id, s);
-                    }
+                    data.SMatrixCalcTable(r, words[i].id, words[Math.Min(i + step, maxCount - 1)].id);
                 }
-                informer.Set(maxCount - 1); // показать завершенный прогресс
+                informer.Set(maxCount - 1);
+                data.Commit();
             }
             data.EndSession();
         }
@@ -608,8 +625,8 @@ namespace NLDB
         {
             float result = 0;
             //Вычисляем квадрат расстояния между векторами 
-            var keys = a_row.Keys.ToList();
-            keys.AsParallel().ForAll(key => 
+            List<int> keys = a_row.Keys.ToList();
+            keys.AsParallel().ForAll(key =>
             {
                 DInfo a_val = a_row[key];
                 if (b_row.TryGetValue(key, out DInfo b_val))
@@ -633,7 +650,10 @@ namespace NLDB
             return result;
         }
 
-        private float Sqr(float x) => x * x;
+        private float Sqr(float x)
+        {
+            return x * x;
+        }
 
 
         /// <summary>
@@ -678,7 +698,7 @@ namespace NLDB
         {
             for (int i = 0; i < w.childs.Length - 1; i++)
                 for (int j = i + 1; j < w.childs.Length; j++)
-                    data.DMatrixAddValue(w.childs[i], w.childs[j], j - i);
+                    data.DMatrixAddValue(w.childs[i], w.childs[j], j - i, w.rank - 1);
         }
 
         /// <summary>

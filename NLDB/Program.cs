@@ -26,13 +26,13 @@ namespace NLDB
             //Создаем Словарь
             Language l = new Language(dbname, splitters);
             //После создания объекта создаем хранилище. Это нужно так как к созданному ранее хранилищу можно сразу подключиться
-            l.Create();
+            //l.Create();
             //Подключимся к хранилищу
             l.Connect();
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             //Запускаем процесс построения структуры текста
-            l.Preprocessing(trainfile, Language.ProcessingType.Build);
-            l.Preprocessing(trainfile, Language.ProcessingType.Distance);
+            //l.Preprocessing(trainfile, Language.ProcessingType.Build);
+            //l.Preprocessing(trainfile, Language.ProcessingType.Distance);
             l.Preprocessing(trainfile, Language.ProcessingType.Similarity);
             //Теперь будем использовать полученные данные
             Console.WriteLine("Для окончания диалога нажмите Enter");
@@ -49,11 +49,16 @@ namespace NLDB
                 //List<Term> next = l.Next(text: line, rank: 2);
                 //Console.WriteLine("\n\nОтветные предложения:\n" + next.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
                 //Получим предположение о предложении, следующем за line другим способом
-                var next2 = l.NextNearest(text: line, rank: 2, count: 16);
-                if (next2.Count > 0)
-                    Console.WriteLine("\n\nСледующее предложение:\n" + next2.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+                //var next2 = l.NextNearest(text: line, rank: 2, count: 16);
+                //if (next2.Count > 0)
+                //    Console.WriteLine("\n\nСледующее предложение:\n" + next2.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+                //else
+                //    Console.Write("\n\nНе найдено подходящих продолжений");
+                List<Term> alike = l.Alike(text: line, rank: 1, count: 8);
+                if (alike.Count > 0)
+                    Console.WriteLine("\n\nПохожие по смыслу:\n" + alike.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
                 else
-                    Console.Write("\n\nНе найдено подходящих продолжений");
+                    Console.Write("\n\nНе найдено подходящих слов");
                 //Получим предоположение о сути статьи, в котором есть предложение, наиболее похожее на line
                 //IEnumerable<Term> core = l.GetCore(text: line, rank: 2);
                 //Console.WriteLine("\n\nЯдро текста статьи:\n" + core.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
