@@ -96,8 +96,8 @@ namespace NLDB
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 "CREATE TABLE splitters (rank, expr);" +
-                "CREATE TABLE words (id PRIMARY KEY, rank, symbol, childs);" +
-                "CREATE TABLE parents (id, parent_id);" +
+                "CREATE TABLE words (id INTEGER PRIMARY KEY, rank INTEGER NOT NULL, symbol, childs);" +
+                "CREATE TABLE parents (id INTEGER NOT NULL, parent_id INTEGER NOT NULL);" +
                 "CREATE TABLE dmatrix (" +
                     "row INTEGER NOT NULL, " +
                     "column integer NOT NULL, " +
@@ -245,7 +245,7 @@ namespace NLDB
         public bool DMatrixContainsRow(int r)
         {
             SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText = $"SELECT row,column FROM dmatrix WHERE row='{r}' LIMIT 1;";
+            cmd.CommandText = $"SELECT row,column FROM dmatrix WHERE row={r} LIMIT 1;";
             object result = cmd.ExecuteScalar();
             return result != null;
         }
@@ -286,14 +286,14 @@ namespace NLDB
             return new DInfo(count, sum);
         }
 
-        public void DMatrixAddValue(int r, int c, float s, int rank)
+        public async void DMatrixAddValue(int r, int c, float s, int rank)
         {
             DInfo value = DMatrixGetValue(r, c);
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = value.count == -1
                 ? $"INSERT INTO dmatrix(row, column, count, sum, rank) SELECT {r}, {c}, 1, {s.ToString()}, {rank};"
                 : $"UPDATE dmatrix SET count={value.count + 1}, sum={value.sum + s} WHERE row={r} AND column={c};";
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
         }
 
         public Pointer DMatrixRowMin(int r)
@@ -431,10 +431,10 @@ namespace NLDB
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
             SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText = $"SELECT id,rank,symbol,childs FROM words WHERE id='{i}' LIMIT 1;";
+            cmd.CommandText = $"SELECT id,rank,symbol,childs FROM words WHERE id={i} LIMIT 1;";
             SQLiteDataReader reader = cmd.ExecuteReader();
             if (!reader.Read()) return null;
-            int rank = int.Parse(reader.GetString(1));
+            int rank = reader.GetInt32(1);
             string symbol = reader.GetString(2);
             int[] childs = StringToIntArray(reader.GetString(3));
             return new Word(i, rank, symbol, childs, null /*parents*/);
@@ -449,7 +449,7 @@ namespace NLDB
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
-            string ids_str = ids.Distinct().Aggregate("", (c, n) => c + (c == "" ? "" : ",") + "'" + n.ToString() + "'");
+            string ids_str = ids.Distinct().Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT id,rank,symbol,childs FROM words WHERE id IN ({ids_str});";
             SQLiteDataReader reader = cmd.ExecuteReader();
@@ -544,7 +544,7 @@ namespace NLDB
             int id = int.Parse(word[0]);
             int rank = int.Parse(word[1]);
             string symbol = word[2];
-            //var parents_qry = SQLiteHelper.SelectValues(db, tablename: "parents", columns: "id,parent_id", where: $"id='{id}'");
+            //var parents_qry = SQLiteHelper.SelectValues(db, tablename: "parents", columns: "id,parent_id", where: $"id={id}");
             //int[] parents = parents_qry.Select(s => int.Parse(s[1])).ToArray();
             return new Word(id, rank, symbol, _childs, null/*parents*/);
         }
@@ -561,7 +561,7 @@ namespace NLDB
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs FROM words " +
-                $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id='{i}' ;";
+                $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id={i} ;";
             //$"WHERE words.id IN (SELECT parents.parent_id FROM parents WHERE parents.id = {i});";
             SQLiteDataReader reader = cmd.ExecuteReader();
             List<Word> words = new List<Word>();
@@ -585,7 +585,7 @@ namespace NLDB
             cmd.CommandText =
                 $"SELECT DISTINCT parents1.id FROM parents parents1 " +
                 $"INNER JOIN parents parents2 ON parents1.parent_id=parents2.id " +
-                $"WHERE parents2.parent_id='{i.ToString()}'";
+                $"WHERE parents2.parent_id={i.ToString()}";
             SQLiteDataReader reader = cmd.ExecuteReader();
             List<int> result = new List<int>();
             while (reader.Read())
@@ -600,7 +600,7 @@ namespace NLDB
         /// <returns></returns>
         public IEnumerable<int> GetWordsGrandchildsId(IEnumerable<int> i)
         {
-            string i_str = i.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + "'" + n.ToString() + "'");
+            string i_str = i.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString() );
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT DISTINCT words.childs FROM words " +
@@ -635,7 +635,7 @@ namespace NLDB
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
-            string ids = i.Select(e => "'" + e.ToString() + "'").Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
+            string ids = i.Select(e =>  e.ToString() ).Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs, parents.id FROM words " +
@@ -662,7 +662,7 @@ namespace NLDB
             foreach (int e in i)
             {
                 if (builder.Length > 0) builder.Append(",");
-                builder.Append("'" + e.ToString() + "'");
+                builder.Append(e.ToString());
             }
 
             string ids = builder.ToString();
@@ -698,7 +698,7 @@ namespace NLDB
             w.id = NextId();
             string childs = IntArrayToString(w.childs);
             string parents = BuildWordParentsString(w);
-            string word = $"('{w.id.ToString()}', '{w.rank.ToString()}', '{w.symbol}', '{childs}')";
+            string word = $"({w.id.ToString()}, {w.rank.ToString()}, '{w.symbol}', '{childs}')";
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"INSERT INTO words(id,rank,symbol,childs) VALUES {word};" +
@@ -717,7 +717,7 @@ namespace NLDB
         {
             if (w.childs == null || w.childs.Length == 0) return "";
             StringBuilder builder = new StringBuilder();
-            Array.ForEach(w.childs, c => builder.Append((builder.Length == 0 ? "" : ",") + $"('{c}','{w.id}')"));
+            Array.ForEach(w.childs, c => builder.Append((builder.Length == 0 ? "" : ",") + $"({c},{w.id})"));
             return builder.ToString();
         }
 
@@ -738,8 +738,8 @@ namespace NLDB
             while (reader.Read())
             {
                 Word a = new Word(
-                    _id: int.Parse(reader.GetString(0)),
-                    _rank: int.Parse(reader.GetString(1)),
+                    _id: reader.GetInt32(0),
+                    _rank: reader.GetInt32(1),
                     _symbol: reader.GetString(2),
                     _childs: null,
                     _parents: null);
@@ -842,6 +842,19 @@ namespace NLDB
             return new Word(id, rank, symbol, childs, parents);
         }
 
+        public IList<int> GetWordsId(int rank)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT id FROM words WHERE rank={rank}";
+            var result = new List<int>();
+            SQLiteDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(reader.GetInt32(0));
+            }
+            return result;
+        }
+
         // Методы IEnumerable
         public IEnumerator<Word> GetEnumerator()
         {
@@ -850,14 +863,9 @@ namespace NLDB
             SQLiteDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                string[] row = new string[4];
-                reader.GetValues(row);
-                //var parents_qry = SQLiteHelper.SelectValues(db,
-                //    tablename: "parents",
-                //    columns: "parent_id",
-                //    where: $"parents.id={row[0]}");
-                //IEnumerable<string> parents = parents_qry.Select(p => p[0]);
-                yield return StringsToWord(s_id: row[0], s_rank: row[1], s_symbol: row[2], s_childs: row[3], s_parents: null/*parents*/);
+                Word w = new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), StringToIntArray(reader.GetString(3)), null);
+                yield return w;
+                //return StringsToWord(s_id: row[0], s_rank: row[1], s_symbol: row[2], s_childs: row[3], s_parents: null/*parents*/);
             }
         }
 

@@ -596,7 +596,7 @@ namespace NLDB
             {
                 Console.WriteLine();
                 //Получаем список слов ранга r
-                List<Word> words = data.Where(w => w.rank == r).OrderBy(w => w.id).ToList();
+                List<int> words = data.GetWordsId(r).OrderBy(i => i).ToList();//data.Where(w => w.rank == r).OrderBy(w => w.id).ToList();
                 int maxCount = words.Count;
                 ProgressInformer informer = new ProgressInformer(
                     prompt: $"Матрица подобия слов ранга {r}:",
@@ -612,7 +612,7 @@ namespace NLDB
 
                     int i = j * step;
                     informer.Set(i);
-                    var rows = words.Where((w, ind) => ind >= i && ind < i + step).Select(w => w.id).ToList();
+                    var rows = words.Where((id, ind) => ind >= i && ind < i + step).ToList();
                     data.SMatrixCalcTable(rows);
                     //data.Commit();
                 }
@@ -679,7 +679,7 @@ namespace NLDB
             {
                 IEnumerable<Word> words = data.Where(w => w.rank == r);
                 Console.WriteLine();
-                ProgressInformer informer = new ProgressInformer($"Матрица расстояний слов ранга {r}:", words.Count())
+                ProgressInformer informer = new ProgressInformer($"Матрица расстояний слов ранга {r-1}:", words.Count())
                 {
                     BarSize = 64,
                     UnitsOfMeasurment = "слов"
@@ -704,9 +704,17 @@ namespace NLDB
 
         private void CalcPositionDistances(Word w)
         {
-            for (int i = 0; i < w.childs.Length - 1; i++)
+            for(int i=0; i<w.childs.Length - 1;i++)
+            {
                 for (int j = i + 1; j < w.childs.Length; j++)
-                    data.DMatrixAddValue(w.childs[i], w.childs[j], j - i, w.rank - 1);
+                {
+                    if (w.childs[i] != w.childs[j])
+                    {
+                        data.DMatrixAddValue(w.childs[i], w.childs[j], j - i, w.rank - 1);
+                        data.DMatrixAddValue(w.childs[j], w.childs[i], j - i, w.rank - 1);
+                    }
+                }
+            };
         }
 
         /// <summary>
