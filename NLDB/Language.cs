@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Threading.Tasks;
 
 namespace NLDB
 {
@@ -576,7 +577,7 @@ namespace NLDB
             {
                 case ProcessingType.Build: CreateLexicon(filename); break;
                 case ProcessingType.Grammar: CreateGrammar(); break;
-                case ProcessingType.Distance: CreatePDMatrix(); break;
+                case ProcessingType.Distance: CreateDMatrix(); break;
                 case ProcessingType.Similarity: CreateSMatrix(); break;
                 default: throw new NotImplementedException("Не реализованный тип обработки текста");
             }
@@ -603,15 +604,21 @@ namespace NLDB
                     measurment: "слов",
                     barSize: 64);
                 //Матрица симметричная, с нулевой главной диагональю
-                int step = 12;
-                for (int i = 0; i < maxCount - 1; i += step)
+                int step = 32;
+                //Parallel.For(0, maxCount / step, (j) =>
+                //{
+                for (int j = 0; j < maxCount / step; j++)
                 {
-                    data.Commit();
+
+                    int i = j * step;
                     informer.Set(i);
-                    data.SMatrixCalcTable(r, words[i].id, words[Math.Min(i + step, maxCount - 1)].id);
+                    var rows = words.Where((w, ind) => ind >= i && ind < i + step).Select(w => w.id).ToList();
+                    data.SMatrixCalcTable(rows);
+                    //data.Commit();
                 }
-                informer.Set(maxCount - 1);
+                //});
                 data.Commit();
+                informer.Set(maxCount - 1);
             }
             data.EndSession();
         }
@@ -662,7 +669,7 @@ namespace NLDB
         /// между А и Б плюс один. Т.е. в предложении "Вася ушёл и не вернулся" расстояния равны:
         /// |Вася-ушёл|=1, |Вася-и|=2, |Вася-вернулся|=4.
         /// </summary>
-        private void CreatePDMatrix()
+        private void CreateDMatrix()
         {
             data.StartSession();
             data.DMatrixClear();
@@ -689,6 +696,7 @@ namespace NLDB
                     }
                     CalcPositionDistances(w);
                 }
+                data.Commit();
                 informer.Set(i); // показать завершенный результат
             };
             data.EndSession();

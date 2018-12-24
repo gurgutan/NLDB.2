@@ -11,9 +11,9 @@ namespace NLDB
         private static void Main(string[] args)
         {
             //Имя Словаря(а также базы данных). При отсутствии создаст.
-            string dbname = @"D:\Data\Result\5mb.db";
+            string dbname = @"D:\Data\Result\1200kb.db";
             //Укажем файл с текстом, который будем использовать для обучения. Должен присутствовать по указанному пути
-            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
+            string trainfile = @"D:\Data\Wiki\ru\1200kb.txt";
             //Массив разделителей текста на Слова. Разделители задаются регулярными выражениями, 
             //применяемыми к нормализованному тексту.
             string[] splitters = new string[]
@@ -35,7 +35,7 @@ namespace NLDB
             //l.Preprocessing(trainfile, Language.ProcessingType.Distance);
             l.Preprocessing(trainfile, Language.ProcessingType.Similarity);
             //Теперь будем использовать полученные данные
-            Console.WriteLine("Для окончания диалога нажмите Enter");
+            Console.WriteLine("\n\nДля окончания диалога нажмите Enter");
             string line = "-";
             while (line != "")
             {

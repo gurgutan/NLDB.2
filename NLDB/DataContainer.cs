@@ -104,7 +104,7 @@ namespace NLDB
                     "count INTEGER NOT NULL, " +
                     "sum REAL NOT NULL, " +
                     "rank INTEGER NOT NULL, " +
-                    "PRIMARY KEY(row, column));"+
+                    "PRIMARY KEY(row, column));" +
                 "CREATE TABLE smatrix (" +
                     "row INTEGER NOT NULL, " +
                     "column integer NOT NULL, " +
@@ -128,10 +128,9 @@ namespace NLDB
                 + "CREATE INDEX dmatrix_row_ind ON dmatrix (row);"
                 + "CREATE INDEX dmatrix_col_ind ON dmatrix (column);"
                 + "CREATE INDEX dmatrix_row_col_ind ON dmatrix (row, column);"
-                + "CREATE INDEX smatrix_row_col_ind ON smatrix (row, column);"
-                + "CREATE INDEX dmatrix_rank_ind ON dmatrix (rank);"
-                + "CREATE INDEX smatrix_rank_ind ON smatrix (rank);";
-            ;
+                //+ "CREATE INDEX smatrix_row_col_ind ON smatrix (row, column);"
+                + "CREATE INDEX dmatrix_rank_ind ON dmatrix (rank);";
+            //+ "CREATE INDEX smatrix_rank_ind ON smatrix (rank);";
             //+"CREATE INDEX grammar_id_ind ON grammar (id);" 
             //+"CREATE INDEX grammar_id_next_pos_ind ON grammar (id, next ASC, pos ASC);";
             cmd.ExecuteNonQuery();
@@ -293,7 +292,7 @@ namespace NLDB
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = value.count == -1
                 ? $"INSERT INTO dmatrix(row, column, count, sum, rank) SELECT {r}, {c}, 1, {s.ToString()}, {rank};"
-                : $"UPDATE dmatrix SET count={value.count + 1}, sum={s.ToString()} WHERE row={r} AND column={c};";
+                : $"UPDATE dmatrix SET count={value.count + 1}, sum={value.sum + s} WHERE row={r} AND column={c};";
             cmd.ExecuteNonQuery();
         }
 
@@ -393,21 +392,22 @@ namespace NLDB
             return result;
         }
 
-        public int SMatrixCalcTable(int rank, int from, int to)
+        public async void SMatrixCalcTable(IEnumerable<int> rows)
         {
-            if (from > to) return 0;
+            string rows_str = rows.Aggregate("", (c, n) => c == "" ? n.ToString() : c + "," + n.ToString());
             //Расчет расстояния L1 для строк матрицы dmatrix с from-строки по to-строку и вставка в таблицу smatrix
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"INSERT INTO smatrix(row, column, similarity, rank) " +
-                $"SELECT srow, scol, ssim, srank FROM (" +
-                $"SELECT dmatrix1.row AS srow, dmatrix2.row AS scol, SUM(ABS(dmatrix1.sum/dmatrix1.count-dmatrix2.sum/dmatrix2.count)) AS ssim, dmatrix1.rank AS srank " +
+                $"SELECT r, c, s, rnk FROM (" +
+                $"SELECT dmatrix1.row AS r, dmatrix2.row AS c, SUM(ABS(dmatrix1.sum/dmatrix1.count-dmatrix2.sum/dmatrix2.count)) AS s, dmatrix1.rank AS rnk " +
                 $"FROM dmatrix dmatrix1 INNER JOIN dmatrix dmatrix2 ON dmatrix1.column=dmatrix2.column " +
-                $"WHERE dmatrix1.rank='{rank}' AND dmatrix2.rank='{rank}' " +
-                //$"AND dmatrix1.row<dmatrix2.row " +
-                $"AND {from}<=dmatrix1.row AND dmatrix1.row<{to})" +
-                $"WHERE srow NOT NULL AND scol NOT NULL AND ssim NOT NULL AND srank NOT NULL;";
-            return cmd.ExecuteNonQuery();
+                $"WHERE dmatrix1.row IN ({rows_str}) " +
+                $"GROUP BY r, c " +
+                $"ORDER BY r, s " +
+                $"LIMIT 256) " +
+                $"WHERE r NOT NULL AND c NOT NULL AND s NOT NULL AND rnk NOT NULL;";
+            await cmd.ExecuteNonQueryAsync();
         }
 
 
