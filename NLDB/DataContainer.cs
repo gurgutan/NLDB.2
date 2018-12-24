@@ -101,8 +101,8 @@ namespace NLDB
                 "CREATE TABLE splitters (rank, expr);"
                 + "CREATE TABLE words (id PRIMARY KEY, rank, symbol, childs);"
                 + "CREATE TABLE parents (id, parent_id);"
-                + "CREATE TABLE dmatrix (row INTEGER NOT NULL, column integer NOT NULL, count INTEGER NOT NULL, sum REAL NOT NULL, PRIMARY KEY(row, column));"
-                + "CREATE TABLE smatrix (row INTEGER NOT NULL, column integer NOT NULL, similarity REAL NOT NULL, PRIMARY KEY(row, column));";
+                + "CREATE TABLE dmatrix (row INTEGER NOT NULL, column integer NOT NULL, count INTEGER NOT NULL, sum REAL NOT NULL, rank INTEGER NOT NULL, PRIMARY KEY(row, column));"
+                + "CREATE TABLE smatrix (row INTEGER NOT NULL, column integer NOT NULL, similarity REAL NOT NULL, rank INTEGER NOT NULL, PRIMARY KEY(row, column));";
             //+"CREATE TABLE grammar (id, next INTEGER NOT NULL, pos INTEGER NOT NULL, count INTEGER NOT NULL );";
             cmd.ExecuteNonQuery();
             //Добавляем разделители слов в таблицу splitters
@@ -120,7 +120,9 @@ namespace NLDB
                 + "CREATE INDEX dmatrix_row_ind ON dmatrix (row);"
                 + "CREATE INDEX dmatrix_col_ind ON dmatrix (column);"
                 + "CREATE INDEX dmatrix_row_col_ind ON dmatrix (row, column);"
-                + "CREATE INDEX smatrix_row_col_ind ON smatrix (row, column);";
+                + "CREATE INDEX dmatrix_rank_ind ON dmatrix (rank);"
+                + "CREATE INDEX smatrix_row_col_ind ON smatrix (row, column);"
+                + "CREATE INDEX smatrix_rank_ind ON smatrix (rank);";
             //+"CREATE INDEX grammar_id_ind ON grammar (id);" 
             //+"CREATE INDEX grammar_id_next_pos_ind ON grammar (id, next ASC, pos ASC);";
             cmd.ExecuteNonQuery();
@@ -334,11 +336,8 @@ namespace NLDB
             cmd.CommandText =
                 $"INSERT INTO smatrix(row, column, similarity) " +
                 $"SELECT dmatrix1.row, dmatrix2.row, SUM(ABS(dmatrix1.sum/dmatrix1.count - dmatrix2.sum/dmatrix2.count)) AS dist " +
-                $"FROM dmatrix dmatrix1 INNER JOIN dmatrix dmatrix2 on dmatrix1.column=dmatrix2.column " +
-                //$"FROM dmatrix dmatrix1 INNER JOIN dmatrix dmatrix2 on dmatrix1.column=dmatrix2.column AND dmatrix1.row<dmatrix2.row " +
-                $"INNER JOIN words words1 ON dmatrix1.row=words1.id AND words1.rank={rank} " +
-                $"INNER JOIN words words2 ON dmatrix2.row=words2.id AND words2.rank={rank} " +
-                $"WHERE {from}<=dmatrix1.row AND dmatrix1.row<={to} " +
+                $"FROM dmatrix dmatrix1 INNER JOIN dmatrix dmatrix2 on dmatrix1.column=dmatrix2.column AND dmatrix1.row<dmatrix2.row " +
+                $"WHERE {from}<=dmatrix1.row AND dmatrix1.row<={to} AND dmatrix1.rank={rank} AND dmatrix2.rank={rank}" +
                 $"GROUP BY dmatrix1.row, dmatrix2.row;";
             return cmd.ExecuteNonQuery();
         }
@@ -346,8 +345,7 @@ namespace NLDB
         public List<Tuple<int, float>> SMatrixGetMin(int id, int count)
         {
             SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText =
-                $"SELECT column, similarity FROM smatrix WHERE row={id} ORDER BY similarity ASC LIMIT {count}";
+            cmd.CommandText = $"SELECT column, similarity FROM smatrix WHERE row={id} ORDER BY similarity ASC LIMIT {count}";
             var result = new List<Tuple<int, float>>();
             var reader = cmd.ExecuteReader();
             while (reader.Read())
