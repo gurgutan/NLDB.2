@@ -18,24 +18,24 @@ namespace NLDB
             //применяемыми к нормализованному тексту.
             string[] splitters = new string[]
             {
-               "",                  //0-й ранг - символы, поэтому используется пустая строка
-               @"[^а-яё\d\{\}\-]+", //1-й ранг - любой символ не являющийся буквой русского алфавита или цифрой разделяет слова
-               @"[\n\r\.\:\;]+",    //2-й ранг - символы перевода строки разделяет предложения
-               @"\[\[{число}\]\]"   //3-й ранг - текст вида [[343467]] разделяет статьи
+               "",                 //0-й ранг - символы, поэтому используется пустая строка
+               @"[^а-яё\d\{\}\-]+",  //1-й ранг - любой символ не являющийся буквой русского алфавита или цифрой разделяет слова
+               @"[\n\r\.\:\;]+",         //2-й ранг - символы перевода строки разделяет предложения
+               @"\[\[{число}\]\]"  //3-й ранг - текст вида [[343467]] разделяет статьи
 			};
             //Создаем Словарь
             Language l = new Language(dbname, splitters);
             //После создания объекта создаем хранилище. Это нужно так как к созданному ранее хранилищу можно сразу подключиться
-            l.Create();
+            //l.Create();
             //Подключимся к хранилищу
             l.Connect();
             Console.WriteLine($"Начало обучения на файле {trainfile}");
             //Запускаем процесс построения структуры текста
-            l.Preprocessing(trainfile, Language.ProcessingType.Build);
-            l.Preprocessing(trainfile, Language.ProcessingType.Distance);
+            //l.Preprocessing(trainfile, Language.ProcessingType.Build);
+            //l.Preprocessing(trainfile, Language.ProcessingType.Distance);
             l.Preprocessing(trainfile, Language.ProcessingType.Similarity);
             //Теперь будем использовать полученные данные
-            Console.WriteLine("\n\nДля окончания диалога нажмите Enter");
+            Console.WriteLine("Для окончания диалога нажмите Enter");
             string line = "-";
             while (line != "")
             {
@@ -43,19 +43,22 @@ namespace NLDB
                 Console.Write($"\n\nФраза: ");
                 line = Console.ReadLine();
                 //Найдем 8 лучших совпадений с текстом line. rank=2 означает, что нас интересуют совпадения предложений
-                //List<Term> similars = l.Similars(text: line, rank: 2, count: 8);
-                //Console.WriteLine("\n\nПохожие предложения:\n" + similars.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+                List<Term> similars = l.Similars(text: line, rank: 2, count: 8);
+                Console.WriteLine("\n\nПохожие предложения:\n" + similars.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
                 //Получим предположение о предложении, следующем за line
                 //List<Term> next = l.Next(text: line, rank: 2);
                 //Console.WriteLine("\n\nОтветные предложения:\n" + next.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
                 //Получим предположение о предложении, следующем за line другим способом
                 //var next2 = l.NextNearest(text: line, rank: 2, count: 16);
-                //if (next2!=null && next2.Count > 0)
+                //if (next2.Count > 0)
                 //    Console.WriteLine("\n\nСледующее предложение:\n" + next2.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
                 //else
                 //    Console.Write("\n\nНе найдено подходящих продолжений");
-                var similarsByContext = l.SimilarsByContext(text: line, rank: 1, count: 8);
-                Console.WriteLine("\n\nПодобные:\n" + similarsByContext.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+                List<Term> alike = l.Alike(text: line, rank: 1, count: 8);
+                if (alike.Count > 0)
+                    Console.WriteLine("\n\nПохожие по смыслу:\n" + alike.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+                else
+                    Console.Write("\n\nНе найдено подходящих слов");
                 //Получим предоположение о сути статьи, в котором есть предложение, наиболее похожее на line
                 //IEnumerable<Term> core = l.GetCore(text: line, rank: 2);
                 //Console.WriteLine("\n\nЯдро текста статьи:\n" + core.Aggregate("", (c, n) => c + $"\n" + n.ToString()));

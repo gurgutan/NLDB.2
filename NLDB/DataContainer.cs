@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -15,8 +14,6 @@ namespace NLDB
     /// </summary>
     public class DataContainer : IEnumerable<Word>, IDisposable
     {
-        public const float max_dist = 1 << 10;
-
         private SQLiteTransaction transaction;
         private SQLiteConnection db;
 
@@ -98,11 +95,22 @@ namespace NLDB
             //Создаем таблицы
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
-                "CREATE TABLE splitters (rank, expr);"
-                + "CREATE TABLE words (id PRIMARY KEY, rank, symbol, childs);"
-                + "CREATE TABLE parents (id, parent_id);"
-                + "CREATE TABLE dmatrix (row INTEGER NOT NULL, column integer NOT NULL, count INTEGER NOT NULL, sum REAL NOT NULL, rank INTEGER NOT NULL, PRIMARY KEY(row, column));"
-                + "CREATE TABLE smatrix (row INTEGER NOT NULL, column integer NOT NULL, similarity REAL NOT NULL, rank INTEGER NOT NULL, PRIMARY KEY(row, column));";
+                "CREATE TABLE splitters (rank, expr);" +
+                "CREATE TABLE words (id PRIMARY KEY, rank, symbol, childs);" +
+                "CREATE TABLE parents (id, parent_id);" +
+                "CREATE TABLE dmatrix (" +
+                    "row INTEGER NOT NULL, " +
+                    "column integer NOT NULL, " +
+                    "count INTEGER NOT NULL, " +
+                    "sum REAL NOT NULL, " +
+                    "rank INTEGER NOT NULL, " +
+                    "PRIMARY KEY(row, column));"+
+                "CREATE TABLE smatrix (" +
+                    "row INTEGER NOT NULL, " +
+                    "column integer NOT NULL, " +
+                    "similarity REAL NOT NULL, " +
+                    "rank INTEGER NOT NULL, " +
+                    "PRIMARY KEY(row, column));";
             //+"CREATE TABLE grammar (id, next INTEGER NOT NULL, pos INTEGER NOT NULL, count INTEGER NOT NULL );";
             cmd.ExecuteNonQuery();
             //Добавляем разделители слов в таблицу splitters
@@ -120,9 +128,10 @@ namespace NLDB
                 + "CREATE INDEX dmatrix_row_ind ON dmatrix (row);"
                 + "CREATE INDEX dmatrix_col_ind ON dmatrix (column);"
                 + "CREATE INDEX dmatrix_row_col_ind ON dmatrix (row, column);"
-                + "CREATE INDEX dmatrix_rank_ind ON dmatrix (rank);"
                 + "CREATE INDEX smatrix_row_col_ind ON smatrix (row, column);"
+                + "CREATE INDEX dmatrix_rank_ind ON dmatrix (rank);"
                 + "CREATE INDEX smatrix_rank_ind ON smatrix (rank);";
+            ;
             //+"CREATE INDEX grammar_id_ind ON grammar (id);" 
             //+"CREATE INDEX grammar_id_next_pos_ind ON grammar (id, next ASC, pos ASC);";
             cmd.ExecuteNonQuery();
@@ -278,15 +287,13 @@ namespace NLDB
             return new DInfo(count, sum);
         }
 
-        public void DMatrixAddValue(int r, int c, float s)
+        public void DMatrixAddValue(int r, int c, float s, int rank)
         {
             DInfo value = DMatrixGetValue(r, c);
             SQLiteCommand cmd = db.CreateCommand();
-            value.sum += s;
-            value.count++;
-            cmd.CommandText = value.count == 0
-                ? $"INSERT INTO dmatrix(row, column, count, sum) VALUES({r}, {c}, 1, {s.ToString()});"
-                : $"UPDATE dmatrix SET count={value.count}, sum={value.sum.ToString()} WHERE row={r} AND column={c};";
+            cmd.CommandText = value.count == -1
+                ? $"INSERT INTO dmatrix(row, column, count, sum, rank) SELECT {r}, {c}, 1, {s.ToString()}, {rank};"
+                : $"UPDATE dmatrix SET count={value.count + 1}, sum={s.ToString()} WHERE row={r} AND column={c};";
             cmd.ExecuteNonQuery();
         }
 
@@ -318,52 +325,10 @@ namespace NLDB
             return new Pointer(column, count, sum);
         }
 
-        public float DMatrixRowsDistL1(int a, int b)
-        {
-            SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText =
-                $"SELECT SUM(ABS(dmatrix1.sum/dmatrix1.count - dmatrix2.sum/dmatrix2.count)) AS dist " +
-                $"FROM dmatrix dmatrix1 INNER JOIN dmatrix dmatrix2 on dmatrix1.column=dmatrix2.column " +
-                $"WHERE dmatrix1.row={a} AND dmatrix2.row={b};";
-            object result = cmd.ExecuteScalar();
-            var englishCulture = CultureInfo.GetCultureInfo("en-US");
-            return (result == null || result.ToString() == "") ? max_dist : float.Parse(result.ToString(), englishCulture);
-        }
-
-        public int SMatrixCalculateTable(int rank, int from, int to)
-        {
-            SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText =
-                $"INSERT INTO smatrix(row, column, similarity) " +
-                $"SELECT dmatrix1.row, dmatrix2.row, SUM(ABS(dmatrix1.sum/dmatrix1.count - dmatrix2.sum/dmatrix2.count)) AS dist " +
-                $"FROM dmatrix dmatrix1 INNER JOIN dmatrix dmatrix2 on dmatrix1.column=dmatrix2.column AND dmatrix1.row<dmatrix2.row " +
-                $"WHERE {from}<=dmatrix1.row AND dmatrix1.row<={to} AND dmatrix1.rank={rank} AND dmatrix2.rank={rank}" +
-                $"GROUP BY dmatrix1.row, dmatrix2.row;";
-            return cmd.ExecuteNonQuery();
-        }
-
-        public List<Tuple<int, float>> SMatrixGetMin(int id, int count)
-        {
-            SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText = $"SELECT column, similarity FROM smatrix WHERE row={id} ORDER BY similarity ASC LIMIT {count}";
-            var result = new List<Tuple<int, float>>();
-            var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                int col = reader.GetInt32(0);
-                float similarity = reader.GetFloat(1);
-                result.Add(new Tuple<int, float>(col, similarity));
-            }
-            return result;
-        }
-
 
         //--------------------------------------------------------------------------------------------
         //Матрица подобия слов
         //--------------------------------------------------------------------------------------------
-        /// <summary>
-        /// Стирает все строки таблицы
-        /// </summary>
         public void SMatrixClear()
         {
             SQLiteCommand cmd = db.CreateCommand();
@@ -392,7 +357,7 @@ namespace NLDB
         public Dictionary<int, float> SMatrixGetRow(int r)
         {
             SQLiteCommand cmd = db.CreateCommand();
-            cmd.CommandText = $"SELECT row, column, similarity FROM smatrix WHERE row={r} ORDER BY similarity DESC;";
+            cmd.CommandText = $"SELECT row, column, similarity FROM smatrix WHERE row={r} ORDER BY similarity ASC;";
             SQLiteDataReader reader = cmd.ExecuteReader();
             Dictionary<int, float> result = new Dictionary<int, float>();
             while (reader.Read())
@@ -403,6 +368,48 @@ namespace NLDB
             }
             return result;
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="r">номер строки (id слова)</param>
+        /// <param name="count">количество элементов вектора для возврата; если 0, то вернуть все</param>
+        /// <returns></returns>
+        public Dictionary<int, float> SMatrixGetRow(int r, int count = 0)
+        {
+            SQLiteCommand cmd = db.CreateCommand();
+            if (count == 0)
+                cmd.CommandText = $"SELECT column, similarity FROM smatrix WHERE row={r} ORDER BY similarity ASC;";
+            else
+                cmd.CommandText = $"SELECT column, similarity FROM smatrix WHERE row={r} ORDER BY similarity ASC LIMIT {count};";
+            SQLiteDataReader reader = cmd.ExecuteReader();
+            Dictionary<int, float> result = new Dictionary<int, float>();
+            while (reader.Read())
+            {
+                int id = reader.GetInt32(0);
+                float s = reader.GetFloat(1);
+                result[id] = s;
+            }
+            return result;
+        }
+
+        public int SMatrixCalcTable(int rank, int from, int to)
+        {
+            if (from > to) return 0;
+            //Расчет расстояния L1 для строк матрицы dmatrix с from-строки по to-строку и вставка в таблицу smatrix
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"INSERT INTO smatrix(row, column, similarity, rank) " +
+                $"SELECT srow, scol, ssim, srank FROM (" +
+                $"SELECT dmatrix1.row AS srow, dmatrix2.row AS scol, SUM(ABS(dmatrix1.sum/dmatrix1.count-dmatrix2.sum/dmatrix2.count)) AS ssim, dmatrix1.rank AS srank " +
+                $"FROM dmatrix dmatrix1 INNER JOIN dmatrix dmatrix2 ON dmatrix1.column=dmatrix2.column " +
+                $"WHERE dmatrix1.rank='{rank}' AND dmatrix2.rank='{rank}' " +
+                //$"AND dmatrix1.row<dmatrix2.row " +
+                $"AND {from}<=dmatrix1.row AND dmatrix1.row<{to})" +
+                $"WHERE srow NOT NULL AND scol NOT NULL AND ssim NOT NULL AND srank NOT NULL;";
+            return cmd.ExecuteNonQuery();
+        }
+
 
         //--------------------------------------------------------------------------------------------
         //Работа со Словами в БД
