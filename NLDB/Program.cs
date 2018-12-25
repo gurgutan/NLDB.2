@@ -11,9 +11,9 @@ namespace NLDB
         private static void Main(string[] args)
         {
             //Имя Словаря(а также базы данных). При отсутствии создаст.
-            string dbname = @"D:\Data\Result\1200kb.db";
+            string dbname = @"D:\Data\Result\5mb.db";
             //Укажем файл с текстом, который будем использовать для обучения. Должен присутствовать по указанному пути
-            string trainfile = @"D:\Data\Wiki\ru\1200kb.txt";
+            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
             //Массив разделителей текста на Слова. Разделители задаются регулярными выражениями, 
             //применяемыми к нормализованному тексту.
             string[] splitters = new string[]
