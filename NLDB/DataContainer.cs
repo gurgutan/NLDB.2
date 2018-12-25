@@ -14,6 +14,7 @@ namespace NLDB
     /// </summary>
     public class DataContainer : IEnumerable<Word>, IDisposable
     {
+        private const int max_similars_per_word = 256;
         private SQLiteTransaction transaction;
         private SQLiteConnection db;
 
@@ -128,7 +129,7 @@ namespace NLDB
                 + "CREATE INDEX dmatrix_row_ind ON dmatrix (row);"
                 + "CREATE INDEX dmatrix_col_ind ON dmatrix (column);"
                 + "CREATE INDEX dmatrix_row_col_ind ON dmatrix (row, column);"
-                //+ "CREATE INDEX smatrix_row_col_ind ON smatrix (row, column);"
+                + "CREATE INDEX smatrix_row_col_ind ON smatrix (row, column);"
                 + "CREATE INDEX dmatrix_rank_ind ON dmatrix (rank);";
             //+ "CREATE INDEX smatrix_rank_ind ON smatrix (rank);";
             //+"CREATE INDEX grammar_id_ind ON grammar (id);" 
@@ -324,6 +325,34 @@ namespace NLDB
             return new Pointer(column, count, sum);
         }
 
+        public Dictionary<int, Dictionary<int, float>> DMatrixGetRows(int from, int to, int rank)
+        {
+            if (from > to)
+            {
+                var tmp = from;
+                from = to;
+                to = tmp;
+            }
+            Dictionary<int, Dictionary<int, float>> rows = new Dictionary<int, Dictionary<int, float>>(1<<10);
+            SQLiteCommand cmd = db.CreateCommand();
+            cmd.CommandText =
+                $"SELECT row, column, sum/count AS value FROM dmatrix " +
+                $"WHERE {from}<=row AND row<{to} AND rank={rank} ";
+            var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var r = reader.GetInt32(0);
+                var c = reader.GetInt32(1);
+                var v = reader.GetFloat(2);
+                if (!rows.TryGetValue(r, out Dictionary<int, float> row))
+                {
+                    row = new Dictionary<int, float>();
+                    rows[r] = row;
+                }
+                row[c] = v;
+            }
+            return rows;
+        }
 
         //--------------------------------------------------------------------------------------------
         //Матрица подобия слов
@@ -343,12 +372,12 @@ namespace NLDB
             return (float)result;
         }
 
-        public float SMatrixSetValue(int r, int c, float s)
+        public float SMatrixSetValue(int r, int c, float s, int rank)
         {
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"DELETE FROM smatrix WHERE row={r} and column={c};" +
-                $"INSERT INTO smatrix(row, column, similarity) VALUES({r}, {c}, {s.ToString().Replace(',', '.')});";
+                $"INSERT INTO smatrix(row, column, similarity, rank) VALUES({r}, {c}, {s.ToString().Replace(',', '.')},{rank});";
             cmd.ExecuteNonQueryAsync();
             return s;
         }
@@ -394,18 +423,19 @@ namespace NLDB
 
         public async void SMatrixCalcTable(IEnumerable<int> rows)
         {
+            int rowsCount = rows.Count();
             string rows_str = rows.Aggregate("", (c, n) => c == "" ? n.ToString() : c + "," + n.ToString());
-            //Расчет расстояния L1 для строк матрицы dmatrix с from-строки по to-строку и вставка в таблицу smatrix
+            //Расчет расстояния L1 для строк матрицы rows и вставка в таблицу smatrix
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"INSERT INTO smatrix(row, column, similarity, rank) " +
                 $"SELECT r, c, s, rnk FROM (" +
                 $"SELECT dmatrix1.row AS r, dmatrix2.row AS c, SUM(ABS(dmatrix1.sum/dmatrix1.count-dmatrix2.sum/dmatrix2.count)) AS s, dmatrix1.rank AS rnk " +
-                $"FROM dmatrix dmatrix1 INNER JOIN dmatrix dmatrix2 ON dmatrix1.column=dmatrix2.column " +
+                $"FROM dmatrix dmatrix1 INNER JOIN dmatrix dmatrix2 ON dmatrix1.column=dmatrix2.column AND dmatrix1.row<dmatrix2.row " +
                 $"WHERE dmatrix1.row IN ({rows_str}) " +
                 $"GROUP BY r, c " +
                 $"ORDER BY r, s " +
-                $"LIMIT 256) " +
+                $"LIMIT {max_similars_per_word * rowsCount}) " +
                 $"WHERE r NOT NULL AND c NOT NULL AND s NOT NULL AND rnk NOT NULL;";
             await cmd.ExecuteNonQueryAsync();
         }
@@ -600,7 +630,7 @@ namespace NLDB
         /// <returns></returns>
         public IEnumerable<int> GetWordsGrandchildsId(IEnumerable<int> i)
         {
-            string i_str = i.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString() );
+            string i_str = i.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT DISTINCT words.childs FROM words " +
@@ -635,7 +665,7 @@ namespace NLDB
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
-            string ids = i.Select(e =>  e.ToString() ).Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
+            string ids = i.Select(e => e.ToString()).Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs, parents.id FROM words " +

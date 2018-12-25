@@ -596,7 +596,7 @@ namespace NLDB
             {
                 Console.WriteLine();
                 //Получаем список слов ранга r
-                List<int> words = data.GetWordsId(r).OrderBy(i => i).ToList();//data.Where(w => w.rank == r).OrderBy(w => w.id).ToList();
+                List<int> words = data.GetWordsId(r).OrderBy(i => i).ToList();
                 int maxCount = words.Count;
                 ProgressInformer informer = new ProgressInformer(
                     prompt: $"Матрица подобия слов ранга {r}:",
@@ -604,17 +604,18 @@ namespace NLDB
                     measurment: "слов",
                     barSize: 64);
                 //Матрица симметричная, с нулевой главной диагональю
-                int step = 32;
+                int step = 256;
                 //Parallel.For(0, maxCount / step, (j) =>
                 //{
-                for (int j = 0; j < maxCount / step; j++)
+                for (int j = 0; j <= maxCount / step; j++)
                 {
-
-                    int i = j * step;
-                    informer.Set(i);
-                    var rows = words.Where((id, ind) => ind >= i && ind < i + step).ToList();
-                    data.SMatrixCalcTable(rows);
-                    //data.Commit();
+                    int from = j * step;
+                    int to = Math.Min(maxCount - 1, from + step);
+                    informer.Set(from);
+                    CalculateSMatrix(words[from], words[to], r);
+                    //var rows = words.Where((id, ind) => ind >= i && ind < i + step).ToList();
+                    //data.SMatrixCalcTable(rows);
+                    data.Commit();
                 }
                 //});
                 data.Commit();
@@ -622,6 +623,54 @@ namespace NLDB
             }
             data.EndSession();
         }
+
+        private void CalculateSMatrix(int from, int to, int rank)
+        {
+            //Функция вычисляет попарные расстояния между векторами-строками матрицы расстояний dmatrix и сохраняет результат в БД
+            var rows = data.DMatrixGetRows(from, to, rank);
+            Dictionary<int, Dictionary<int, float>> result = new Dictionary<int, Dictionary<int, float>>();
+            //Parallel.ForEach(rows, (row_a) =>
+            foreach (var row_a in rows)
+            {
+                 foreach (var row_b in rows)
+                 {
+                     float sum = Multiply(row_a.Value, row_b.Value);
+                     if (sum != 0)
+                     {
+                         if (!result.TryGetValue(row_a.Key, out Dictionary<int, float> result_row))
+                         {
+                             result[row_a.Key] = new Dictionary<int, float>();
+                         }
+                         result[row_a.Key][row_b.Key] = sum;
+                     }
+                 }
+            };
+            if (result.Count == 0) return;
+            Parallel.ForEach(result.Keys, (row) =>
+            {
+                var columns = result[row];
+                if (columns.Count != 0)
+                {
+                    foreach (int column in columns.Keys)
+                        data.SMatrixSetValue(row, column, columns[column], rank);
+                }
+            });
+            data.Commit();
+        }
+
+        private float Multiply(Dictionary<int, float> row_a, Dictionary<int, float> row_b)
+        {
+            float sum = 0;
+            foreach (var key_a in row_a.Keys)
+            {
+                if (row_b.TryGetValue(key_a, out float value))
+                {
+                    sum += Math.Abs(row_a[key_a] - value);
+                }
+            }
+            return sum;
+        }
+
 
         /// <summary>
         /// Рассчитывает похожесть слов на основании вектора контекста
@@ -639,21 +688,8 @@ namespace NLDB
                 if (b_row.TryGetValue(key, out DInfo b_val))
                 {
                     result += Sqr(a_val.Average() - b_val.Average());
-                    //b_row.Remove(key);
-                    //a_row.Remove(key);
                 }
             });
-            //foreach (int key in keys)
-            //{
-            //    DInfo a_val = a_row[key];
-            //    if (b_row.TryGetValue(key, out DInfo b_val))
-            //    {
-            //        result += Sqr(a_val.Average() - b_val.Average());
-            //        //b_row.Remove(key);
-            //        //a_row.Remove(key);
-            //    }
-            //}
-            //TODO: решить что делать с несовпадающими компонентами веткоров соседства
             return result;
         }
 
@@ -679,7 +715,7 @@ namespace NLDB
             {
                 IEnumerable<Word> words = data.Where(w => w.rank == r);
                 Console.WriteLine();
-                ProgressInformer informer = new ProgressInformer($"Матрица расстояний слов ранга {r-1}:", words.Count())
+                ProgressInformer informer = new ProgressInformer($"Матрица расстояний слов ранга {r - 1}:", words.Count())
                 {
                     BarSize = 64,
                     UnitsOfMeasurment = "слов"
@@ -704,7 +740,7 @@ namespace NLDB
 
         private void CalcPositionDistances(Word w)
         {
-            for(int i=0; i<w.childs.Length - 1;i++)
+            for (int i = 0; i < w.childs.Length - 1; i++)
             {
                 for (int j = i + 1; j < w.childs.Length; j++)
                 {

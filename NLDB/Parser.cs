@@ -30,7 +30,7 @@ namespace NLDB
         {
             SplitExpr = splitExpr;
             splitRegex = new Regex(SplitExpr, RegexOptions.Compiled);
-            removeRegex = new Regex(@"[^а-яА-ЯёЁ\d\s\n\!\?\.\,\;\:\*\+\-\&\\\/\%\$\^\(\)\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
+            removeRegex = new Regex(@"[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\*\+\-\&\\\/\%\$\^\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
             replaceNumbersRegex = new Regex(@"\b\d+((\.|\,)\d+)?", RegexOptions.Compiled);
             replaceEnglishRegex = new Regex(@"[a-zA-Z]+", RegexOptions.Compiled);
             removeShorthands = new Regex(@"\b([а-яА-ЯёЁ]\s\.)", RegexOptions.Compiled);

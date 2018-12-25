@@ -67,7 +67,7 @@ namespace NLDB
             ShowProgressBar = true;
             ShowPercents = true;
             ShowCurrent = true;
-            BarSize = Math.Min(Console.BufferWidth - Prompt.Length - 7, barSize);
+            BarSize = Math.Min(Console.BufferWidth - Prompt.Length - 5 - max.ToString().Length * 2 - 1, barSize);
             Current = 0;
             PosX = Console.CursorLeft;
             PosY = Console.CursorTop;
