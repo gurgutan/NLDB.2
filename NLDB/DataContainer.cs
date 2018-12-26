@@ -329,21 +329,21 @@ namespace NLDB
         {
             if (from > to)
             {
-                var tmp = from;
+                int tmp = from;
                 from = to;
                 to = tmp;
             }
-            Dictionary<int, Dictionary<int, float>> rows = new Dictionary<int, Dictionary<int, float>>(1<<10);
+            Dictionary<int, Dictionary<int, float>> rows = new Dictionary<int, Dictionary<int, float>>(1 << 10);
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
                 $"SELECT row, column, sum/count AS value FROM dmatrix " +
                 $"WHERE {from}<=row AND row<{to} AND rank={rank} ";
-            var reader = cmd.ExecuteReader();
+            SQLiteDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                var r = reader.GetInt32(0);
-                var c = reader.GetInt32(1);
-                var v = reader.GetFloat(2);
+                int r = reader.GetInt32(0);
+                int c = reader.GetInt32(1);
+                float v = reader.GetFloat(2);
                 if (!rows.TryGetValue(r, out Dictionary<int, float> row))
                 {
                     row = new Dictionary<int, float>();
@@ -380,6 +380,27 @@ namespace NLDB
                 $"INSERT INTO smatrix(row, column, similarity, rank) VALUES({r}, {c}, {s.ToString().Replace(',', '.')},{rank});";
             cmd.ExecuteNonQueryAsync();
             return s;
+        }
+
+
+        internal async void SMatrixSetValue(List<Tuple<int, int, int, float>> row)
+        {
+            using (SQLiteCommand cmd = db.CreateCommand())
+            {
+                cmd.CommandText = $"INSERT INTO smatrix(row, column, similarity, rank) VALUES(@r, @c, @s, @rnk);"; ;
+                cmd.Parameters.AddWithValue("@r", 0);
+                cmd.Parameters.AddWithValue("@c", 0);
+                cmd.Parameters.AddWithValue("@s", 0.0);
+                cmd.Parameters.AddWithValue("@rnk", 0);
+                foreach (Tuple<int, int, int, float> quadriple in row)
+                {
+                    cmd.Parameters["@r"].Value = quadriple.Item1;
+                    cmd.Parameters["@c"].Value = quadriple.Item2;
+                    cmd.Parameters["@s"].Value = quadriple.Item4;
+                    cmd.Parameters["@rnk"].Value = quadriple.Item3;
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
         }
 
         public Dictionary<int, float> SMatrixGetRow(int r)
@@ -718,6 +739,7 @@ namespace NLDB
             return words;
         }
 
+
         /// <summary>
         /// Добавляет Слово в хранилище и возвращает сгенерированный id Слова
         /// </summary>
@@ -876,7 +898,7 @@ namespace NLDB
         {
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT id FROM words WHERE rank={rank}";
-            var result = new List<int>();
+            List<int> result = new List<int>();
             SQLiteDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
             {

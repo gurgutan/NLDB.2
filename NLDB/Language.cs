@@ -589,6 +589,8 @@ namespace NLDB
         /// </summary>
         private void CreateSMatrix()
         {
+            Stopwatch stopwatch = new Stopwatch();  //!!! отладочный таймер
+
             //Функция вычисляет попарные расстояния между векторами-строками матрицы расстояний dmatrix и сохраняет результат в БД
             data.StartSession();
             data.SMatrixClear();
@@ -604,21 +606,19 @@ namespace NLDB
                     measurment: "слов",
                     barSize: 64);
                 //Матрица симметричная, с нулевой главной диагональю
-                int step = 1024;
-                //Parallel.For(0, maxCount / step, (j) =>
-                //{
+                int step = 1 << 12;
                 for (int j = 0; j <= maxCount / step; j++)
                 {
+                    stopwatch.Restart();
                     int from = j * step;
                     int to = Math.Min(maxCount - 1, from + step);
+                    int size = to - from;
                     informer.Set(from);
                     CalculateSMatrix(words[from], words[to], r);
-                    //var rows = words.Where((id, ind) => ind >= i && ind < i + step).ToList();
-                    //data.SMatrixCalcTable(rows);
+                    stopwatch.Stop();
+                    Debug.WriteLine($"Подматрица подобия ({size}x{size}): {stopwatch.Elapsed.TotalSeconds} сек.");
                     data.Commit();
                 }
-                //});
-                data.Commit();
                 informer.Set(maxCount - 1);
             }
             data.EndSession();
@@ -628,25 +628,23 @@ namespace NLDB
         {
             //Функция вычисляет попарные расстояния между векторами-строками матрицы расстояний dmatrix и сохраняет результат в БД
             Dictionary<int, Dictionary<int, float>> rows = data.DMatrixGetRows(from, to, rank);
-            //Parallel.ForEach(rows, (row_a) =>
-            List<List<Tuple<int, int, float>>> result = new List<List<Tuple<int, int, float>>>(rows.Count);
+            List<List<Tuple<int, int, int, float>>> result = new List<List<Tuple<int, int, int, float>>>(rows.Count);
+            //Сначала вычисления с записью в несколько списков параллельно
             Parallel.ForEach(rows, (row_a) =>
             {
-                List<Tuple<int, int, float>> result_row = new List<Tuple<int, int, float>>();
+                //Значения в кортеже: row, column, rank, similarity
+                List<Tuple<int, int, int, float>> result_row = new List<Tuple<int, int, int, float>>();
                 foreach (KeyValuePair<int, Dictionary<int, float>> row_b in rows)
                 {
                     float sum = Multiply(row_a.Value, row_b.Value);
                     if (sum != 0)
-                        result_row.Add(new Tuple<int, int, float>(row_a.Key, row_b.Key, sum));
+                        result_row.Add(new Tuple<int, int, int, float>(row_a.Key, row_b.Key, rank, sum));
                 }
                 result.Add(result_row);
             });
             if (result.Count == 0) return;
-            Parallel.ForEach(result, (row) =>
-            {
-                foreach (Tuple<int, int, float> triplet in row)
-                    data.SMatrixSetValue(triplet.Item1, triplet.Item2, triplet.Item3, rank);
-            });
+            //Запись в данных БД каждого из списков значений
+            Parallel.ForEach(result, (row) => { data.SMatrixSetValue(row); });
             data.Commit();
         }
 
@@ -654,12 +652,8 @@ namespace NLDB
         {
             float sum = 0;
             foreach (int key_a in row_a.Keys)
-            {
-                if (row_b.TryGetValue(key_a, out float value))
-                {
+                if (row_b.TryGetValue(key_a, out float value))  //добавляем к сумме разницу значений, только если есть элемент с таким же номером в row_b
                     sum += Math.Abs(row_a[key_a] - value);
-                }
-            }
             return sum;
         }
 
