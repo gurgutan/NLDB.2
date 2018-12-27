@@ -663,17 +663,17 @@ namespace NLDB
         /// </summary>
         /// <param name="a"></param>
         /// <param name="b"></param>
-        private float CalcSimilarity(Dictionary<int, DInfo> a_row, Dictionary<int, DInfo> b_row)
+        private float CalcSimilarity(Dictionary<int, MeanValue> a_row, Dictionary<int, MeanValue> b_row)
         {
             float result = 0;
             //Вычисляем квадрат расстояния между векторами 
             List<int> keys = a_row.Keys.ToList();
             keys.AsParallel().ForAll(key =>
             {
-                DInfo a_val = a_row[key];
-                if (b_row.TryGetValue(key, out DInfo b_val))
+                MeanValue a_val = a_row[key];
+                if (b_row.TryGetValue(key, out MeanValue b_val))
                 {
-                    result += Sqr(a_val.Average() - b_val.Average());
+                    result += Sqr(a_val.Value() - b_val.Value());
                 }
             });
             return result;
@@ -726,8 +726,9 @@ namespace NLDB
 
         private void CalcPositionDistances(Word w)
         {
-            for (int i = 0; i < w.childs.Length - 1; i++)
-            {
+            List<Tuple<int, int, int, float>> result = new List<Tuple<int, int, int, float>>(w.childs.Length * w.childs.Length);
+            Parallel.For(0, w.childs.Length - 1, (i)=>
+            { 
                 for (int j = i + 1; j < w.childs.Length; j++)
                 {
                     if (w.childs[i] != w.childs[j])
@@ -736,7 +737,7 @@ namespace NLDB
                         data.DMatrixAddValue(w.childs[j], w.childs[i], j - i, w.rank - 1);
                     }
                 }
-            };
+            });
         }
 
         /// <summary>

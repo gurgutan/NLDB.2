@@ -259,37 +259,37 @@ namespace NLDB
             return result != null;
         }
 
-        public Dictionary<int, DInfo> DMatrixGetRow(int r)
+        public Dictionary<int, MeanValue> DMatrixGetRow(int r)
         {
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT row, column, count, sum FROM dmatrix WHERE row={r};";
             SQLiteDataReader reader = cmd.ExecuteReader();
-            Dictionary<int, DInfo> row = new Dictionary<int, DInfo>();
+            Dictionary<int, MeanValue> row = new Dictionary<int, MeanValue>();
             while (reader.Read())
             {
                 int c = reader.GetInt32(1);
                 int count = reader.GetInt32(2);
                 float sum = reader.GetFloat(3);
-                DInfo info = new DInfo(count, sum);
+                MeanValue info = new MeanValue(count, sum);
                 row.Add(c, info);
             }
             return row;
         }
 
-        public DInfo DMatrixGetValue(int r, int c)
+        public MeanValue DMatrixGetValue(int r, int c)
         {
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT row, column, count, sum FROM dmatrix WHERE row={r} and column={c} LIMIT 1;";
             SQLiteDataReader reader = cmd.ExecuteReader();
-            if (!reader.Read()) return new DInfo(-1, 0);
+            if (!reader.Read()) return new MeanValue(-1, 0);
             int count = reader.GetInt32(2);
             float sum = reader.GetFloat(3);
-            return new DInfo(count, sum);
+            return new MeanValue(count, sum);
         }
 
         public async void DMatrixAddValue(int r, int c, float s, int rank)
         {
-            DInfo value = DMatrixGetValue(r, c);
+            MeanValue value = DMatrixGetValue(r, c);
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = value.count == -1
                 ? $"INSERT INTO dmatrix(row, column, count, sum, rank) SELECT {r}, {c}, 1, {s.ToString()}, {rank};"
