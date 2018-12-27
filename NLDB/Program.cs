@@ -30,9 +30,10 @@ namespace NLDB
             Engine engine = new Engine(dbname);
             engine.Create();
             engine
-                .Preprocessing(trainfile)
-                .Preprocessing(ProcessingType.WordsMean)
-                .Preprocessing(ProcessingType.WordsSimilarity);
+                .Execute(ProcessingType.TextNormalization)
+                .Execute(ProcessingType.WordsExtraction)
+                .Execute(ProcessingType.WordsMean)
+                .Execute(ProcessingType.WordsSimilarity);
             
             //После создания объекта создаем хранилище. Это нужно так как к созданному ранее хранилищу можно сразу подключиться
             //l.Create();
@@ -117,7 +118,7 @@ namespace NLDB
         private static void NormilizeTest()
         {
             Parser parser = new Parser(@"[^а-яА-ЯёЁ0-9]");
-            string result = parser.Normilize("Привет ~~м^^ир/!");
+            string result = Parser.Normilize("Привет ~~м^^ир/!");
             Console.WriteLine(result);
             Console.ReadKey();
         }

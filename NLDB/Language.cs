@@ -130,7 +130,7 @@ namespace NLDB
         /// <returns></returns>
         public Term ToTerm(string text, int rank)
         {
-            text = parsers[rank].Normilize(text);
+            text = Parser.Normilize(text);
             return new Term(rank, 0, 0, text,
                 rank == 0 ? null :
                 parsers[rank - 1].
@@ -157,7 +157,7 @@ namespace NLDB
         ///добавляет слово в Словарь, иначе возвращает 0.
         private IEnumerable<int> Parse(string text, int rank, bool addIfNotExists = true)
         {
-            text = parsers[rank].Normilize(text);
+            text = Parser.Normilize(text);
             IEnumerable<string> strings = parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
             //Для слов ранга > 0 добавляем слова, которых еще нет
             List<int> result = strings.Select(s =>
@@ -255,7 +255,7 @@ namespace NLDB
         /// <returns></returns>
         public Term Similar(string text, int rank)
         {
-            text = parsers[rank].Normilize(text);
+            text = Parser.Normilize(text);
             Term term = ToTerm(text, rank);
             return Identify(term);
         }
@@ -269,7 +269,7 @@ namespace NLDB
         /// <returns></returns>
         public List<Term> Similars(string text, int rank = 2, int count = 0)
         {
-            text = parsers[rank].Normilize(text);
+            text = Parser.Normilize(text);
             Stopwatch sw = new Stopwatch(); //!!!
             sw.Start(); //!!!
             Term term = ToTerm(text, rank);

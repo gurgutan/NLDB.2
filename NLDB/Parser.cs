@@ -21,19 +21,15 @@ namespace NLDB
         private readonly string SplitExpr;
         //private string RemoveExpr = "";
         private readonly Regex splitRegex;
-        private readonly Regex removeRegex;
-        private readonly Regex replaceNumbersRegex;
-        private readonly Regex replaceEnglishRegex;
-        private readonly Regex removeShorthands;
+        private static Regex removeRegex = new Regex(@"[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\*\+\-\&\\\/\%\$\^\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
+        private static Regex replaceNumbersRegex = new Regex(@"\b\d+((\.|\,)\d+)?", RegexOptions.Compiled);
+        private static Regex replaceEnglishRegex = new Regex(@"[a-zA-Z]+", RegexOptions.Compiled);
+        private static Regex removeShorthands = new Regex(@"\b([а-яА-ЯёЁ]\s\.)", RegexOptions.Compiled);
 
         public Parser(string splitExpr)
         {
             SplitExpr = splitExpr;
             splitRegex = new Regex(SplitExpr, RegexOptions.Compiled);
-            removeRegex = new Regex(@"[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\*\+\-\&\\\/\%\$\^\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
-            replaceNumbersRegex = new Regex(@"\b\d+((\.|\,)\d+)?", RegexOptions.Compiled);
-            replaceEnglishRegex = new Regex(@"[a-zA-Z]+", RegexOptions.Compiled);
-            removeShorthands = new Regex(@"\b([а-яА-ЯёЁ]\s\.)", RegexOptions.Compiled);
         }
 
         public string[] Split(string text)
@@ -41,7 +37,7 @@ namespace NLDB
             return splitRegex.Split(text);
         }
 
-        public string Normilize(string text)
+        public static string Normilize(string text)
         {
             text = removeRegex.Replace(text.ToLower().Trim(), "");
             text = replaceNumbersRegex.Replace(text, specSymbolNumber);

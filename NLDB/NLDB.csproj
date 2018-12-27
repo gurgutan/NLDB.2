@@ -103,6 +103,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CalculationResult.cs" />
     <Compile Include="Confidence.cs" />
     <Compile Include="DAL\DataBase.cs" />
     <Compile Include="DAL\MeanDistancesTable.cs" />
