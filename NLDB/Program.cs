@@ -23,8 +23,8 @@ namespace NLDB
                 .Execute(OperationType.FileReading, @"D:\Data\Wiki\ru\5mb.txt")
                 .Then(OperationType.TextNormalization)
                 .Then(OperationType.TextSplitting)
-                .Then(OperationType.WordsExtraction)
-                .Then(OperationType.FileWriting);
+                .Then(OperationType.WordsExtraction);
+            engine.Execute(OperationType.FileWriting, @"D:\Data\Wiki\ru\5mb.Words");
             //.Then(ProcessingType.WordsMean)
             //.Then(ProcessingType.WordsSimilarity);
 

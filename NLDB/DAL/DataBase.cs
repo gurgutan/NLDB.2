@@ -1,5 +1,5 @@
 ﻿using SQLite;
-
+using System.Linq;
 
 namespace NLDB.DAL
 {
@@ -21,12 +21,16 @@ namespace NLDB.DAL
 
         internal Word GetWordByChilds(string childs)
         {
-            return Table<Word>().Where(w => w.Childs == childs).FirstOrDefault();
+            return Query<Word>("select * from WordsTable where Childs = ?", childs).FirstOrDefault();
+            //return Table<Word>().Where(w => w.Childs == childs).FirstOrDefault();            
         }
 
         public int Add(Word w)
         {
-            return Insert(w);
+            int id = Insert(w);
+            return id;
+            //Insert<Parent>(new Parent(id,))
+
         }
 
         internal Word GetWordBySymbol(string s)

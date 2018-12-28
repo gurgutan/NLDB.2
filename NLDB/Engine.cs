@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using NLDB.DAL;
@@ -27,13 +28,12 @@ namespace NLDB
     {
         public ExecuteMode ExecuteMode { get; set; }
         private readonly DataBase db;
-        public DataBase DB { get => db; }
+        public DataBase DB => db;
         private readonly string dbpath;
         private Parser[] parsers;
-        private readonly OperationType CurrentOperationType = OperationType.None;
 
         public CalculationResult CalculationResult { get; private set; }
-        public int Rank { get => parsers.Length - 1; }
+        public int Rank => parsers.Length - 1;
 
         public object Data;
 
@@ -75,31 +75,47 @@ namespace NLDB
 
         private CalculationResult ExtractWords(IEnumerable<string> strings, int rank)
         {
-            var wordsIds = strings.Select<string, int>(s =>
+            DB.BeginTransaction();
+            Data = strings.Select(s => ExtractWordsFromString(s, rank));
+            DB.Commit();
+            return new CalculationResult(this, OperationType.WordsExtraction, ResultType.Success, Data);
+        }
+
+        private int[] ExtractWordsFromString(string text, int rank)
+        {
+            IEnumerable<string> strings = parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
+            int[] wordsIds = strings.Select<string, int>(s =>
             {
+                int id;
                 int[] childsId = null;
                 if (rank > 0)
                 {
                     //получаем id дочерних слов ранга rank-1
-                    childsId = (int[])ExtractWords(parsers[rank - 1].Split(s), rank - 1).Data;
+                    childsId = ExtractWordsFromString(s, rank - 1);
                     if (childsId.Length == 0) return 0;
                     string childsString = childsId.Aggregate("", (c, n) => c + (c != "" ? "," : "") + n.ToString());
                     //Пробуем найти Слово по дочерним элементам
                     DAL.Word word = DB.GetWordByChilds(childsString);
                     if (word == null)
-                        return DB.Add(new DAL.Word() { Rank = rank, Symbol = "", Childs = childsString });
-                    return word.Id;
+                        id = DB.Add(new DAL.Word() { Rank = rank, Symbol = "", Childs = childsString });
+                    id = word.Id;
                 }
                 else
                 {
                     //Пробуем найти Слово по символу
                     DAL.Word word = DB.GetWordBySymbol(s);
                     if (word == null)
-                        return DB.Add(new DAL.Word() { Rank = rank, Symbol = s });
-                    return word.Id;
+                    {
+                        id = DB.Add(new DAL.Word() { Rank = rank, Symbol = s });
+                        if (id % 101 == 0) Debug.WriteLine(word.Id);  //!!!
+                    }
+                    id = word.Id;
                 }
-            }).Where(i => i != 0);
-            return new CalculationResult(this, OperationType.WordsExtraction, ResultType.Success, wordsIds);
+                return id;
+            })
+            .Where(i => i != 0) //нули - не идентифицированные слова - пропускаем
+            .ToArray();          //получим результат сразу
+            return wordsIds;
         }
 
         internal List<Term> Recognize(string text, int count)
@@ -128,7 +144,16 @@ namespace NLDB
             //TODO: продумать сохранение в файл разнух типов данных, хранимых по ссылке Data
             using (StreamWriter writer = File.CreateText(filename))
             {
-                writer.Write(Data.ToString());
+                if (Data is IList<int>)
+                {
+                    (Data as IList<int>).ToList().ForEach(i => writer.Write(i + ";"));
+                }
+                else if (Data is string[])
+                {
+                    (Data as string[]).ToList().ForEach(i => writer.Write(i + ";"));
+                }
+                else
+                    writer.Write(Data.ToString());
             }
             return new CalculationResult(this, OperationType.FileWriting, ResultType.Success);
         }
