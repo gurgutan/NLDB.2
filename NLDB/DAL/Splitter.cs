@@ -20,7 +20,7 @@ namespace NLDB.DAL
             Expr = expr;
         }
 
-        [PrimaryKey]
+        [PrimaryKey, Unique]
         public int Rank { get; set; }
         public string Expr { get; set; }
 

@@ -13,10 +13,10 @@ namespace NLDB
         {
             Engine engine = new Engine(@"D:\Data\Result\Engine_5mb.db");
             engine.Create();
-            engine.DB.InsertOrReplace(new Splitter(0, ""));
-            engine.DB.InsertOrReplace(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
-            engine.DB.InsertOrReplace(new Splitter(2, @"[\n\r\:\;]+"));
-            engine.DB.InsertOrReplace(new Splitter(3, @"\[\[{число}\]\]"));
+            engine.Insert(new Splitter(0, ""));
+            engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
+            engine.Insert(new Splitter(2, @"[\n\r\:\;]+"));
+            engine.Insert(new Splitter(3, @"\[\[{число}\]\]"));
 
             engine.ExecuteMode = ExecuteMode.Verbose;
             engine

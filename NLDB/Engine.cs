@@ -46,7 +46,7 @@ namespace NLDB
         public void Create()
         {
             db.Create();
-            parsers = db.Table<Splitter>().OrderBy(r => r.Rank).Select(r => new Parser(r.Expr)).ToArray();
+            parsers = DB.Table<Splitter>().OrderBy(s => s.Rank).Select(r => new Parser(r.Expr)).ToArray();
         }
 
         public CalculationResult Execute(OperationType ptype, object parameter = null)
@@ -76,7 +76,7 @@ namespace NLDB
         private CalculationResult ExtractWords(IEnumerable<string> strings, int rank)
         {
             DB.BeginTransaction();
-            Data = strings.Select(s => ExtractWordsFromString(s, rank));
+            Data = strings.Select(s => ExtractWordsFromString(s, rank)).ToList();
             DB.Commit();
             return new CalculationResult(this, OperationType.WordsExtraction, ResultType.Success, Data);
         }
@@ -98,7 +98,8 @@ namespace NLDB
                     DAL.Word word = DB.GetWordByChilds(childsString);
                     if (word == null)
                         id = DB.Add(new DAL.Word() { Rank = rank, Symbol = "", Childs = childsString });
-                    id = word.Id;
+                    else
+                        id = word.Id;
                 }
                 else
                 {
@@ -109,7 +110,8 @@ namespace NLDB
                         id = DB.Add(new DAL.Word() { Rank = rank, Symbol = s });
                         if (id % 101 == 0) Debug.WriteLine(word.Id);  //!!!
                     }
-                    id = word.Id;
+                    else
+                        id = word.Id;
                 }
                 return id;
             })
@@ -168,6 +170,12 @@ namespace NLDB
         {
             Data = parsers[Rank].Split(text);
             return new CalculationResult(this, OperationType.TextSplitting, ResultType.Success);
+        }
+
+        internal void Insert(Splitter splitter)
+        {
+            DB.Insert(splitter);
+            parsers = DB.Table<Splitter>().OrderBy(s => s.Rank).Select(r => new Parser(r.Expr)).ToArray();
         }
 
         //----------------------------------------------------------------------------------------------------------------------------------

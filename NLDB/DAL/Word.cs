@@ -6,7 +6,7 @@ namespace NLDB.DAL
     [Table("WordsTable")]
     public class Word
     {
-        [AutoIncrement, PrimaryKey]
+        [PrimaryKey]
         public int Id { get; set; }
 
         [Indexed, NotNull]
