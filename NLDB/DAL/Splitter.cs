@@ -8,8 +8,18 @@ using SQLite;
 namespace NLDB.DAL
 {
     [Table("SplittersTable")]
-    public class SplittersTable
+    public class Splitter
     {
+        public Splitter()
+        {
+        }
+
+        public Splitter(int rank, string expr)
+        {
+            Rank = rank;
+            Expr = expr;
+        }
+
         [PrimaryKey]
         public int Rank { get; set; }
         public string Expr { get; set; }

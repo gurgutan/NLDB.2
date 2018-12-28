@@ -11,30 +11,23 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
-            //Имя Словаря(а также базы данных). При отсутствии создаст.
-            string dbname = @"D:\Data\Result\5mb.db";
-            //Укажем файл с текстом, который будем использовать для обучения. Должен присутствовать по указанному пути
-            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
-            //Массив разделителей текста на Слова. Разделители задаются регулярными выражениями, 
-            //применяемыми к нормализованному тексту.
-            string[] splitters = new string[]
-            {
-               "",                      //0-й ранг - символы, поэтому используется пустая строка
-               @"[^а-яё\d\{\}\-]+",     //1-й ранг - любой символ не являющийся буквой русского алфавита или цифрой разделяет слова
-               @"[\n\r\:\;]+",          //2-й ранг - символы перевода строки разделяет абзацы
-               @"\[\[{число}\]\]"       //3-й ранг - текст вида [[343467]] разделяет статьи
-			};
-
-            //Создаем Словарь
-            //Language l = new Language(dbname, splitters);
-            Engine engine = new Engine(dbname);
+            Engine engine = new Engine(@"D:\Data\Result\Engine_5mb.db");
             engine.Create();
+            engine.DB.InsertOrReplace(new Splitter(0, ""));
+            engine.DB.InsertOrReplace(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
+            engine.DB.InsertOrReplace(new Splitter(2, @"[\n\r\:\;]+"));
+            engine.DB.InsertOrReplace(new Splitter(3, @"\[\[{число}\]\]"));
+
+            engine.ExecuteMode = ExecuteMode.Verbose;
             engine
-                .Execute(ProcessingType.TextNormalization)
-                .Execute(ProcessingType.WordsExtraction)
-                .Execute(ProcessingType.WordsMean)
-                .Execute(ProcessingType.WordsSimilarity);
-            
+                .Execute(OperationType.FileReading, @"D:\Data\Wiki\ru\5mb.txt")
+                .Then(OperationType.TextNormalization)
+                .Then(OperationType.TextSplitting)
+                .Then(OperationType.WordsExtraction)
+                .Then(OperationType.FileWriting);
+            //.Then(ProcessingType.WordsMean)
+            //.Then(ProcessingType.WordsSimilarity);
+
             //После создания объекта создаем хранилище. Это нужно так как к созданному ранее хранилищу можно сразу подключиться
             //l.Create();
             //Подключимся к хранилищу

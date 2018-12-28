@@ -106,10 +106,10 @@
     <Compile Include="CalculationResult.cs" />
     <Compile Include="Confidence.cs" />
     <Compile Include="DAL\DataBase.cs" />
-    <Compile Include="DAL\MeanDistancesTable.cs" />
-    <Compile Include="DAL\ParentsTable.cs" />
-    <Compile Include="DAL\SplittersTable.cs" />
-    <Compile Include="DAL\WordsSimilarityTable.cs" />
+    <Compile Include="DAL\MeanDistance.cs" />
+    <Compile Include="DAL\Parent.cs" />
+    <Compile Include="DAL\Splitter.cs" />
+    <Compile Include="DAL\WordsSimilarity.cs" />
     <Compile Include="DataContainer.cs" />
     <Compile Include="Engine.cs" />
     <Compile Include="GlobalSuppressions.cs" />
@@ -129,7 +129,7 @@
     <Compile Include="SQLiteAsync.cs" />
     <Compile Include="Term.cs" />
     <Compile Include="Word.cs" />
-    <Compile Include="DAL\WordsTable.cs" />
+    <Compile Include="DAL\Word.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

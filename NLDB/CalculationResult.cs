@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace NLDB
 {
@@ -13,23 +9,30 @@ namespace NLDB
 
     public class CalculationResult
     {
-        public ProcessingType ProcessingType;
+        public OperationType ProcessingType;
         public ResultType ResultType { get; private set; }
-        public object Data;
         public readonly Engine Engine;
+        public object Data;
 
-        public CalculationResult(Engine engine, ProcessingType processingType, ResultType resultType, object data)
+        public CalculationResult(Engine engine, OperationType processingType, ResultType resultType, object data = null)
         {
             ProcessingType = processingType;
             ResultType = resultType;
-            Data = data;
             Engine = engine;
+            Data = data;
         }
 
-        public CalculationResult Execute(ProcessingType ptype)
+        public CalculationResult Then(OperationType ptype)
         {
-            Engine.So
-            return Engine.Execute(ptype);
+            if (Engine.ExecuteMode == ExecuteMode.Verbose)
+                Console.WriteLine($"Операция {ProcessingType} завершилась с результатом {ResultType}");
+            if (ResultType == ResultType.Error)
+            {
+                Console.WriteLine($"Операция {ptype} не выполнена");
+                return this;
+            }
+            else
+                return Engine.Execute(ptype, Engine.Data);
         }
     }
 }

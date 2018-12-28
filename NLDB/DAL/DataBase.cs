@@ -1,5 +1,6 @@
 ﻿using SQLite;
 
+
 namespace NLDB.DAL
 {
     public class DataBase : SQLiteConnection
@@ -11,15 +12,26 @@ namespace NLDB.DAL
 
         public void Create()
         {
-            using (var db = new SQLiteConnection(DatabasePath))
-            {
-                db.CreateTable<SplittersTable>();
-                db.CreateTable<WordsTable>();
-                db.CreateTable<ParentsTable>();
-                db.CreateTable<MeanDistancesTable>();
-                db.CreateTable<WordsSimilarityTable>();
-            }
+            CreateTable<Splitter>();
+            CreateTable<Word>();
+            CreateTable<Parent>();
+            CreateTable<MeanDistance>();
+            CreateTable<WordsSimilarity>();
         }
 
+        internal Word GetWordByChilds(string childs)
+        {
+            return Table<Word>().Where(w => w.Childs == childs).FirstOrDefault();
+        }
+
+        public int Add(Word w)
+        {
+            return Insert(w);
+        }
+
+        internal Word GetWordBySymbol(string s)
+        {
+            return Table<Word>().Where(w => w.Symbol == s).FirstOrDefault();
+        }
     }
 }

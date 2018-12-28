@@ -3,7 +3,7 @@
 namespace NLDB.DAL
 {
     [Table("ParentsTable")]
-    public class ParentsTable
+    public class Parent
     {
         [Indexed, NotNull]
         public int WordId { get; set; }

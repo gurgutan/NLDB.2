@@ -3,7 +3,7 @@
 namespace NLDB.DAL
 {
     [Table("WordsSimilarityTable")]
-    public class WordsSimilarityTable
+    public class WordsSimilarity
     {
         [Indexed, NotNull]
         public int Rank { get; set; }

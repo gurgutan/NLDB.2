@@ -3,7 +3,7 @@
 namespace NLDB.DAL
 {
     [Table("MeanDistancesTable")]
-    public class MeanDistancesTable
+    public class MeanDistance
     {
         [Indexed, NotNull]
         public int Rank { get; set; }

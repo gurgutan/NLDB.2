@@ -32,6 +32,12 @@ namespace NLDB
             splitRegex = new Regex(SplitExpr, RegexOptions.Compiled);
         }
 
+        public Parser()
+        {
+            SplitExpr = "";
+            splitRegex = new Regex(SplitExpr, RegexOptions.Compiled);
+        }
+
         public string[] Split(string text)
         {
             return splitRegex.Split(text);
