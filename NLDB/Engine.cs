@@ -27,12 +27,11 @@ namespace NLDB
     public class Engine
     {
         public ExecuteMode ExecuteMode { get; set; }
-        private readonly DataBase db;
-        public DataBase DB => db;
-        private readonly string dbpath;
-        private Parser[] parsers;
+
+        public DataBase DB { get; }
 
         public CalculationResult CalculationResult { get; private set; }
+
         public int Rank => parsers.Length - 1;
 
         public object Data;
@@ -40,14 +39,11 @@ namespace NLDB
         public Engine(string dbpath)
         {
             this.dbpath = dbpath;
-            db = new DataBase(dbpath);
+            DB = new DataBase(dbpath);
+            parsers = DB.Splitters().Select(s => new Parser(s.Expression)).ToArray();
         }
 
-        public void Create()
-        {
-            db.Create();
-            parsers = DB.Table<Splitter>().OrderBy(s => s.Rank).Select(r => new Parser(r.Expr)).ToArray();
-        }
+        public void Clear() => DB.ClearAll();
 
         public CalculationResult Execute(OperationType ptype, object parameter = null)
         {
@@ -76,7 +72,12 @@ namespace NLDB
         private CalculationResult ExtractWords(IEnumerable<string> strings, int rank)
         {
             DB.BeginTransaction();
-            Data = strings.Select(s => ExtractWordsFromString(s, rank)).ToList();
+            ProgressInformer informer = new ProgressInformer($"Слова ранга {rank}:", strings.Count(), "байт", 64);
+            Data = strings.SelectMany((s, i) =>
+            {
+                informer.Set(i + 1);
+                return ExtractWordsFromString(s, rank);
+            }).ToList();
             DB.Commit();
             return new CalculationResult(this, OperationType.WordsExtraction, ResultType.Success, Data);
         }
@@ -84,7 +85,7 @@ namespace NLDB
         private int[] ExtractWordsFromString(string text, int rank)
         {
             IEnumerable<string> strings = parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
-            int[] wordsIds = strings.Select<string, int>(s =>
+            return strings.Select<string, int>(s =>
             {
                 int id;
                 int[] childsId = null;
@@ -117,15 +118,56 @@ namespace NLDB
             })
             .Where(i => i != 0) //нули - не идентифицированные слова - пропускаем
             .ToArray();          //получим результат сразу
-            return wordsIds;
         }
 
-        internal List<Term> Recognize(string text, int count)
+        internal Term Recognize(string text, int rank)
         {
-            throw new NotImplementedException();
+            Term term = ToTerm(text, rank);
+            if (term.rank == 0)
+            {
+                //При нулевом ранге терма (т.е. терм - это буква), confidence считаем исходя из наличия соответствующей буквы в алфавите
+                term.id = DB.GetWordBySymbol(term.text).Id;
+                term.confidence = (term.id == 0 ? 0 : 1);
+                term.Identified = true;
+                return term;
+            }
+            else
+            {
+                //Если ранг терма больше нуля, то confidence считаем по набору дочерних элементов
+                var childs = term.Childs.Distinct().
+                    Select(c => Identify(c)).
+                    Where(c => c.id != 0).
+                    Select(c => c.id).
+                    ToArray();
+                sw.Stop();  //!!!
+                Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
+                sw.Restart(); //!!!
+                List<int> parents = data.GetWordsParentsId(childs).ToList();
+                sw.Stop();  //!!!
+                Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
+                sw.Restart(); //!!!
+                List<Term_old> context = parents.Select(p => ToTerm(p)).ToList();
+                sw.Stop();  //!!!
+                Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
+                //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
+                Pointer max = context.AsParallel().Aggregate(
+                    new Pointer(),
+                    (subtotal, thread_term) =>
+                    {
+                        float confidence = Confidence.Compare(term, thread_term);
+                        if (subtotal.value < confidence) return new Pointer(thread_term.id, 0, confidence);
+                        return subtotal;
+                    },
+                    (total, subtotal) => total.value < subtotal.value ? subtotal : total,
+                    (final) => final);
+                term.id = max.id;
+                term.confidence = max.value;
+                term.Identified = true;
+                return term;
+            }
         }
 
-        internal List<Term> Similars(string text, int count)
+        internal List<Term_old> Similars(string text, int count)
         {
             throw new NotImplementedException();
         }
@@ -146,9 +188,9 @@ namespace NLDB
             //TODO: продумать сохранение в файл разнух типов данных, хранимых по ссылке Data
             using (StreamWriter writer = File.CreateText(filename))
             {
-                if (Data is IList<int>)
+                if (Data is List<int>)
                 {
-                    (Data as IList<int>).ToList().ForEach(i => writer.Write(i + ";"));
+                    (Data as List<int>).ForEach(i => writer.Write(i + ";"));
                 }
                 else if (Data is string[])
                 {
@@ -175,11 +217,42 @@ namespace NLDB
         internal void Insert(Splitter splitter)
         {
             DB.Insert(splitter);
-            parsers = DB.Table<Splitter>().OrderBy(s => s.Rank).Select(r => new Parser(r.Expr)).ToArray();
+            parsers = DB.Splitters().Select(s => new Parser(s.Expression)).ToArray();
         }
 
-        //----------------------------------------------------------------------------------------------------------------------------------
-        //private const int TEXT_BUFFER_SIZE = 1 << 18;
+        //--------------------------------------------------------------------------------------------
+        //Преобразование Слова в Терм
+        //--------------------------------------------------------------------------------------------
+        public DAL.Term ToTerm(DAL.Word w, float confidence = 1)
+        {
+            //if (this.terms.TryGetValue(w.Id, out Term t)) return t;
+            if (w == null) return null;
+            DAL.Term t = new DAL.Term(
+                w.Rank,
+                w.Id,
+                _confidence: confidence,
+                _text: w.Symbol,
+                _childs: w.Rank == 0 ? null : w.ChildsId.Select(c => ToTerm(DB.GetWord(c))));
+            //Сохраняем в кэш
+            //terms[w.Id] = t;
+            return t;
+        }
 
+        public DAL.Term ToTerm(string text, int rank)
+        {
+            text = Parser.Normilize(text);
+            return new DAL.Term(rank, 0, 0, text,
+                rank == 0 ? null :
+                parsers[rank - 1].
+                Split(text).
+                Where(s => !string.IsNullOrWhiteSpace(s)).
+                Select(s => ToTerm(s, rank - 1)));
+        }
+
+        //--------------------------------------------------------------------------------------------
+        //Закрытые свойства
+        //--------------------------------------------------------------------------------------------
+        private readonly string dbpath;
+        private Parser[] parsers;
     }
 }

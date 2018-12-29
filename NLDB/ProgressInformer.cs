@@ -6,7 +6,7 @@ namespace NLDB
     /// <summary>
     /// Класс для отображения полосы прогрессы операции в консольном режиме
     /// </summary>
-    internal class ProgressInformer
+    internal class ProgressInformer : IDisposable
     {
         /// <summary>
         /// Размер полосы по умолчанию в символах
@@ -118,6 +118,11 @@ namespace NLDB
         {
             current = n;
             Show();
+        }
+
+        public void Dispose()
+        {
+            Console.WriteLine();
         }
     }
 }

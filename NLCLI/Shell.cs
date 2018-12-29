@@ -147,7 +147,7 @@ namespace NLDB.NLCLI
             //Вывод информации о команде
             Stopwatch stopwatch = Stopwatch.StartNew();
             DebugMessage($"[{stopwatch.Elapsed.ToString()}] поиск ближайших {maxcount} к '{text}' в лексиконе ранга {rank}");
-            List<Term> terms = db.Similars(text, rank, maxcount);
+            List<Term_old> terms = db.Similars(text, rank, maxcount);
             stopwatch.Stop();
             DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
             ShowTerms(terms);
@@ -253,7 +253,7 @@ namespace NLDB.NLCLI
             Console.WriteLine(s);
         }
 
-        private void ShowTerms(IEnumerable<Term> terms)
+        private void ShowTerms(IEnumerable<Term_old> terms)
         {
             Console.WriteLine();
             terms.ToList().ForEach(term =>

@@ -54,7 +54,7 @@ namespace NLDB
         //    result.DataTable.
         //}
 
-        public Term Get(int id)
+        public Term_old Get(int id)
         {
             var cmd = db.CreateCommand();
             cmd.CommandText =
@@ -66,10 +66,10 @@ namespace NLDB
             if(!reader.Read()) return null;
             int rank = reader.GetInt32(0);
             string symbol = reader.GetString(1);
-            return new Term(rank, id, 1, symbol, null, null);
+            return new Term_old(rank, id, 1, symbol, null, null);
         }
 
-        public List<Term> GetChilds(int id)
+        public List<Term_old> GetChilds(int id)
         {
             var cmd = db.CreateCommand();
             cmd.CommandText =
@@ -81,7 +81,7 @@ namespace NLDB
             return CreateTermsFromReader(reader);
         }
 
-        public List<Term> GetChilds(int[] ids)
+        public List<Term_old> GetChilds(int[] ids)
         {
             string str_ids = ids.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
             var cmd = db.CreateCommand();
@@ -105,15 +105,15 @@ namespace NLDB
             throw new NotImplementedException();
         }
 
-        private List<Term> CreateTermsFromReader(SQLiteDataReader reader)
+        private List<Term_old> CreateTermsFromReader(SQLiteDataReader reader)
         {
-            List<Term> result = new List<Term>();
+            List<Term_old> result = new List<Term_old>();
             while (reader.Read())
             {
                 int id = reader.GetInt32(0);     
                 int rank = reader.GetInt32(1);
                 string symbol = reader.GetString(2);
-                result.Add(new Term(rank, id, 1, symbol));
+                result.Add(new Term_old(rank, id, 1, symbol));
             }
             return result;
         }

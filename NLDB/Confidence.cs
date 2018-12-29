@@ -19,7 +19,7 @@ namespace NLDB
         /// <param name="a"></param>
         /// <param name="b"></param>
         /// <returns></returns>
-        public static float Compare(Term a, Term b)
+        public static float Compare(Term_old a, Term_old b)
         {
             if (a.rank != b.rank) throw new ArgumentException("Попытка сравнить термы разных рангов");
             return Confidence.Operations[a.rank](a, b);
@@ -42,7 +42,7 @@ namespace NLDB
         /// <param name="a">терм</param>
         /// <param name="b">терм</param>
         /// <returns>оценка схожести из интервала [0,1], где 0 - не похожи, 1 - максимально похожи</returns>
-        private static float Inclusive(Term a, Term b)
+        private static float Inclusive(Term_old a, Term_old b)
         {
             int count = a.Childs.Sum(c => b.Contains(c) ? 1 : 0);
             return count / a.Count;
@@ -67,7 +67,7 @@ namespace NLDB
         /// <param name="a"></param>
         /// <param name="b"></param>
         /// <returns></returns>
-        private static float SoftInclusive(Term a, Term b)
+        private static float SoftInclusive(Term_old a, Term_old b)
         {
             float count = a.Childs.Sum(c => b.Childs.Max(bc => Confidence.Compare(bc, c)));
             return count / a.Count;
@@ -85,7 +85,7 @@ namespace NLDB
         /// <param name="a"></param>
         /// <param name="b"></param>
         /// <returns></returns>
-        private static float Cosine(Term a, Term b)
+        private static float Cosine(Term_old a, Term_old b)
         {
             int n = a.Count < b.Count ? a.Count : b.Count;
             float s = 0;
@@ -112,7 +112,7 @@ namespace NLDB
         /// <param name="a"></param>
         /// <param name="b"></param>
         /// <returns></returns>
-        private static float CosineLeft(Term a, Term b)
+        private static float CosineLeft(Term_old a, Term_old b)
         {
             int n = a.Count < b.Count ? a.Count : b.Count;
             float s = 0;
@@ -136,7 +136,7 @@ namespace NLDB
         /// <param name="a"></param>
         /// <param name="b"></param>
         /// <returns></returns>
-        private static float SoftCosine(Term a, Term b)
+        private static float SoftCosine(Term_old a, Term_old b)
         {
             float s = 0;
             float da = 0, db = 0;
@@ -174,7 +174,7 @@ namespace NLDB
         /// <param name="a"></param>
         /// <param name="b"></param>
         /// <returns></returns>
-        private static float Equality(Term a, Term b)
+        private static float Equality(Term_old a, Term_old b)
         {
             return a.id == b.id ? 1 : 0;
         }
@@ -200,7 +200,7 @@ namespace NLDB
         //----------------------------------------------------------------------------------------------------------------
         //Массив функций для поэлементного вычисления "похожести" векторов слов. Индекс в массиве - ранг сравниваемых слов.
         //Функция применяется к двум скалярным элементам веторов, в соответствующих позициях
-        private static readonly Func<Term, Term, float>[] Operations = new Func<Term, Term, float>[5]
+        private static readonly Func<Term_old, Term_old, float>[] Operations = new Func<Term_old, Term_old, float>[5]
         {
             Confidence.Equality,        //для букв
             Confidence.Cosine,          //для слов

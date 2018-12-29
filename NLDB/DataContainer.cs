@@ -21,7 +21,7 @@ namespace NLDB
         //public DMatrix dmatrix = new DMatrix();
 
         //Кэш термов для быстрого выполнения метода ToTerm
-        private readonly Dictionary<int, Term> terms = new Dictionary<int, Term>(1 << 18);
+        private readonly Dictionary<int, Term_old> terms = new Dictionary<int, Term_old>(1 << 18);
 
         //Кэш символов алфавита
         private readonly Dictionary<string, int> alphabet = new Dictionary<string, int>(1 << 10);
@@ -190,11 +190,11 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         //Преобразование Слова в Терм
         //--------------------------------------------------------------------------------------------
-        public Term ToTerm(Word w, float confidence = 1)
+        public Term_old ToTerm(Word w, float confidence = 1)
         {
             //if (this.terms.TryGetValue(w.id, out Term t)) return t;
             if (w == null) return null;
-            Term t = new Term(
+            Term_old t = new Term_old(
                 w.rank,
                 w.id,
                 _confidence: confidence,
@@ -205,16 +205,16 @@ namespace NLDB
             return t;
         }
 
-        public Term ToTerm(int i, float confidence = 1)
+        public Term_old ToTerm(int i, float confidence = 1)
         {
-            if (terms.TryGetValue(i, out Term t))
+            if (terms.TryGetValue(i, out Term_old t))
                 t.confidence = confidence;
             else
                 t = ToTerm(GetWord(i));
             return t;
         }
 
-        public IEnumerable<Term> ToTerms(IEnumerable<int> ids)
+        public IEnumerable<Term_old> ToTerms(IEnumerable<int> ids)
         {
             return GetWords(ids).Select(w => ToTerm(w));
         }
@@ -387,7 +387,7 @@ namespace NLDB
         {
             using (SQLiteCommand cmd = db.CreateCommand())
             {
-                cmd.CommandText = $"INSERT INTO smatrix(row, column, similarity, rank) VALUES(@r, @c, @s, @rnk);"; ;
+                cmd.CommandText = $"INSERT INTO smatrix(row, column, similarity, rank) VALUES(@r, @c, @s, @rnk);";
                 cmd.Parameters.AddWithValue("@r", 0);
                 cmd.Parameters.AddWithValue("@c", 0);
                 cmd.Parameters.AddWithValue("@s", 0.0);

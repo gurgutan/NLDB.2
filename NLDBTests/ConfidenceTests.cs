@@ -24,14 +24,14 @@ namespace NLDB.Tests
             int[] ichilds1 = { 1002, 1003, 1004, 1005 };    // набор из четырёх id
             int[] ichilds3 = { 1002, 1003, 1014, 1015 };    // набор из четырёх id, отличающихся наполовину от ichilds1
             //Подготовим список дочерних id
-            List<Term> childs = ichilds1.Select(c => new Term(0, c, 1, "", null)).ToList();
+            List<Term_old> childs = ichilds1.Select(c => new Term_old(0, c, 1, "", null)).ToList();
             //Подготовим список дочерних id полностью отличных от childs
-            List<Term> childs2 = ichilds1.Select(c => new Term(0, c + 1, 1, "", null)).ToList();
-            List<Term> childs3 = ichilds3.Select(c => new Term(0, c, 1, "", null)).ToList();
-            Term term_a = new Term(_rank: 1, _id: 2011, _confidence: 1, _text: "тест", _childs: childs);
-            Term term_b = new Term(_rank: 1, _id: 2012, _confidence: 1, _text: "тест", _childs: childs);
-            Term term_c = new Term(_rank: 1, _id: 2013, _confidence: 1, _text: "тест", _childs: childs2);
-            Term term_d = new Term(_rank: 1, _id: 2014, _confidence: 1, _text: "тест", _childs: childs3);
+            List<Term_old> childs2 = ichilds1.Select(c => new Term_old(0, c + 1, 1, "", null)).ToList();
+            List<Term_old> childs3 = ichilds3.Select(c => new Term_old(0, c, 1, "", null)).ToList();
+            Term_old term_a = new Term_old(_rank: 1, _id: 2011, _confidence: 1, _text: "тест", _childs: childs);
+            Term_old term_b = new Term_old(_rank: 1, _id: 2012, _confidence: 1, _text: "тест", _childs: childs);
+            Term_old term_c = new Term_old(_rank: 1, _id: 2013, _confidence: 1, _text: "тест", _childs: childs2);
+            Term_old term_d = new Term_old(_rank: 1, _id: 2014, _confidence: 1, _text: "тест", _childs: childs3);
             //Логика выбора метрики для Compare может меняться, так как свойство 
             //private static readonly Func<Term, Term, float>[] Operations = new Func<Term, Term, float>[5]
             //{

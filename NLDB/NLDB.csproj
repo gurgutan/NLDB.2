@@ -1,6 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\packages\SQLite.3.13.0\build\net45\SQLite.props" Condition="Exists('..\packages\SQLite.3.13.0\build\net45\SQLite.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -107,10 +106,11 @@
     <Compile Include="CalculationResult.cs" />
     <Compile Include="Confidence.cs" />
     <Compile Include="DAL\DataBase.cs" />
-    <Compile Include="DAL\MeanDistance.cs" />
+    <Compile Include="DAL\AValue.cs" />
     <Compile Include="DAL\Parent.cs" />
     <Compile Include="DAL\Splitter.cs" />
-    <Compile Include="DAL\WordsSimilarity.cs" />
+    <Compile Include="DAL\BValue.cs" />
+    <Compile Include="DAL\Term.cs" />
     <Compile Include="DataContainer.cs" />
     <Compile Include="Engine.cs" />
     <Compile Include="GlobalSuppressions.cs" />
@@ -126,8 +126,6 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Language.seq.cs" />
-    <Compile Include="SQLite.cs" />
-    <Compile Include="SQLiteAsync.cs" />
     <Compile Include="Term.cs" />
     <Compile Include="Word.cs" />
     <Compile Include="DAL\Word.cs" />
@@ -158,6 +156,5 @@
       <ErrorText>Данный проект ссылается на пакеты NuGet, отсутствующие на этом компьютере. Используйте восстановление пакетов NuGet, чтобы скачать их.  Дополнительную информацию см. по адресу: http://go.microsoft.com/fwlink/?LinkID=322105. Отсутствует следующий файл: {0}.</ErrorText>
     </PropertyGroup>
     <Error Condition="!Exists('..\packages\System.Data.SQLite.Core.1.0.109.0\build\net451\System.Data.SQLite.Core.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\System.Data.SQLite.Core.1.0.109.0\build\net451\System.Data.SQLite.Core.targets'))" />
-    <Error Condition="!Exists('..\packages\SQLite.3.13.0\build\net45\SQLite.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\SQLite.3.13.0\build\net45\SQLite.props'))" />
   </Target>
 </Project>

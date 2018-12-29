@@ -12,7 +12,7 @@ namespace NLDB
         private static void Main(string[] args)
         {
             Engine engine = new Engine(@"D:\Data\Result\Engine_5mb.db");
-            engine.Create();
+            engine.Clear();
             engine.Insert(new Splitter(0, ""));
             engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
             engine.Insert(new Splitter(2, @"[\n\r\:\;]+"));
@@ -45,9 +45,10 @@ namespace NLDB
                 if (line == "") continue;
                 Console.Write($"\n\nФраза: ");
                 line = Console.ReadLine();
-                List<Term> words = engine.Recognize(text: line, count: 8);
-                Console.WriteLine("\n\nПохожие предложения:\n" + words.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
-                List<Term> similars = engine.Similars(text: line, count: 8);
+                Console.WriteLine(engine.ToTerm(engine.DB.GetWord(int.Parse(line))).ToString());
+                //List<Term> words = engine.Recognize(text: line, count: 8);
+                //Console.WriteLine("\n\nПохожие предложения:\n" + words.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+                //List<Term> similars = engine.Similars(text: line, count: 8);
                 //Найдем 8 лучших совпадений с текстом line. rank=2 означает, что нас интересуют совпадения предложений
                 //List<Term> similars = l.Similars(text: line, rank: 2, count: 8);
                 //Console.WriteLine("\n\nПохожие предложения:\n" + similars.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
@@ -95,7 +96,7 @@ namespace NLDB
                 Stopwatch sw = new Stopwatch();
                 Console.WriteLine("\nПостроение цепочки");
                 sw.Restart();
-                IEnumerable<Term> core = l.GetCore(text, rank: 2);
+                IEnumerable<Term_old> core = l.GetCore(text, rank: 2);
                 //List<Term> next = l.Next(text, rank);
                 sw.Stop();
                 Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");

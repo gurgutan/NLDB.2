@@ -128,10 +128,10 @@ namespace NLDB
         /// <param name="text"></param>
         /// <param name="rank"></param>
         /// <returns></returns>
-        public Term ToTerm(string text, int rank)
+        public Term_old ToTerm(string text, int rank)
         {
             text = Parser.Normilize(text);
-            return new Term(rank, 0, 0, text,
+            return new Term_old(rank, 0, 0, text,
                 rank == 0 ? null :
                 parsers[rank - 1].
                 Split(text).
@@ -144,7 +144,7 @@ namespace NLDB
         //    return this.data.ToTerm(w, _confidence);
         //}
 
-        public Term ToTerm(int i, float _confidence = 1)
+        public Term_old ToTerm(int i, float _confidence = 1)
         {
             return data.ToTerm(i, _confidence);
         }
@@ -196,7 +196,7 @@ namespace NLDB
         /// </summary>
         /// <param name="term">изменяемый терм</param>
         /// <returns>возвращает ссылку на term (возврат значения для удобства использования в LINQ)</returns>
-        public Term Identify(Term term)
+        public Term_old Identify(Term_old term)
         {
             //Для данного терма ранее могла быть проведена идентификация
             if (term.Identified) return term;
@@ -226,7 +226,7 @@ namespace NLDB
                 sw.Stop();  //!!!
                 Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
-                List<Term> context = parents.Select(p => ToTerm(p)).ToList();
+                List<Term_old> context = parents.Select(p => ToTerm(p)).ToList();
                 sw.Stop();  //!!!
                 Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
                 //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
@@ -253,10 +253,10 @@ namespace NLDB
         /// <param name="text"></param>
         /// <param name="rank"></param>
         /// <returns></returns>
-        public Term Similar(string text, int rank)
+        public Term_old Similar(string text, int rank)
         {
             text = Parser.Normilize(text);
-            Term term = ToTerm(text, rank);
+            Term_old term = ToTerm(text, rank);
             return Identify(term);
         }
 
@@ -267,12 +267,12 @@ namespace NLDB
         /// <param name="rank"></param>
         /// <param name="count">количество термов для возвращения. 0 - все </param>
         /// <returns></returns>
-        public List<Term> Similars(string text, int rank = 2, int count = 0)
+        public List<Term_old> Similars(string text, int rank = 2, int count = 0)
         {
             text = Parser.Normilize(text);
             Stopwatch sw = new Stopwatch(); //!!!
             sw.Start(); //!!!
-            Term term = ToTerm(text, rank);
+            Term_old term = ToTerm(text, rank);
             sw.Stop();  //!!!
             Debug.WriteLine($"Similars->ToTerm: {sw.Elapsed.TotalSeconds}");
             sw.Restart(); //!!!
@@ -280,7 +280,7 @@ namespace NLDB
             sw.Stop();  //!!!
             Debug.WriteLine($"Similars->Identify: {sw.Elapsed.TotalSeconds}");
             //Для терма нулевого ранга возвращаем результат по наличию соответствующей буквы в алфавите
-            if (term.rank == 0) return new List<Term> { term };
+            if (term.rank == 0) return new List<Term_old> { term };
             //Определение контекста по дочерним словам
             sw.Restart(); //!!!
             int[] childs = term.Childs.
@@ -291,7 +291,7 @@ namespace NLDB
             sw.Stop();  //!!!
             Debug.WriteLine($"Similars->childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
             sw.Restart(); //!!!
-            List<Term> context = data.
+            List<Term_old> context = data.
                 GetWordsParentsId(childs).
                 Distinct().
                 Select(p => ToTerm(p)).
@@ -304,7 +304,7 @@ namespace NLDB
             sw.Stop();  //!!!
             Debug.WriteLine($"Similars->Compare [{context.Count}]: {sw.Elapsed.TotalSeconds}");
             //Сортировка по убыванию оценки
-            context.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
+            context.Sort(new Comparison<Term_old>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
             if (count == 0) return context.ToList();
             else
             if (count > 0) return context.Take(count).ToList();
@@ -318,12 +318,12 @@ namespace NLDB
         /// <param name="text"></param>
         /// <param name="rank"></param>
         /// <returns></returns>
-        public List<Term> Next(string text, int rank = 2)
+        public List<Term_old> Next(string text, int rank = 2)
         {
-            List<Term> result = new List<Term>();
+            List<Term_old> result = new List<Term_old>();
             Stopwatch sw = new Stopwatch(); //!!!
             sw.Start(); //!!!
-            IEnumerable<Term> similars = Similars(text, rank)
+            IEnumerable<Term_old> similars = Similars(text, rank)
                 .Where(t => t.confidence >= similars_min_confidence)
                 .Take(similars_max_count);
             sw.Stop();
@@ -393,11 +393,11 @@ namespace NLDB
         /// <param name="text"></param>
         /// <param name="rank"></param>
         /// <returns></returns>
-        public IEnumerable<Term> GetCore(string text, int rank = 2)
+        public IEnumerable<Term_old> GetCore(string text, int rank = 2)
         {
             //1. Найти Parent
-            List<Term> similars = Similars(text, rank, similars_max_count);
-            Dictionary<Term, double> parents = new Dictionary<Term, double>();
+            List<Term_old> similars = Similars(text, rank, similars_max_count);
+            Dictionary<Term_old, double> parents = new Dictionary<Term_old, double>();
             //Для каждого parent вычисляем оценку как сумму confidence его потомков из similars
             similars
                 .SelectMany(t => data
@@ -410,16 +410,16 @@ namespace NLDB
                     parents[t] += t.confidence;
                 });
             //Сортируем список пар по убыванию оценки и берем первый элемент
-            IOrderedEnumerable<KeyValuePair<Term, double>> best_parents = parents.OrderByDescending(kvp => kvp.Value);
-            Term best_parent = best_parents.First().Key;
-            List<Term> terms = best_parent.Childs.Distinct(new TermComparer()).ToList();
+            IOrderedEnumerable<KeyValuePair<Term_old, double>> best_parents = parents.OrderByDescending(kvp => kvp.Value);
+            Term_old best_parent = best_parents.First().Key;
+            List<Term_old> terms = best_parent.Childs.Distinct(new TermComparer()).ToList();
 
             //2. Вычислить матрицу расстояний для дочерних Слов Parent
             Dictionary<string, double> dmatrix = SDMatrix(terms);
 
             //3. Найти минимальный набор дочерних Слов, покрывающих Parent на половину радиуса
-            HashSet<Term> core = new HashSet<Term>();
-            Dictionary<int, Term> B = terms.ToDictionary(t => t.id, t => t);
+            HashSet<Term_old> core = new HashSet<Term_old>();
+            Dictionary<int, Term_old> B = terms.ToDictionary(t => t.id, t => t);
             double max_distance = MaxDistance(core, B.Values, dmatrix);
             double d = max_distance;
             //Вычисления проводятся либо пока не опустеет список B, либо пока макс. расстояние
@@ -442,13 +442,13 @@ namespace NLDB
         /// <param name="A"></param>
         /// <param name="B"></param>
         /// <returns>максимальное расстояние между множествами термов A и B</returns>
-        private double MaxDistance(IEnumerable<Term> A, IEnumerable<Term> B, Dictionary<string, double> dmatrix)
+        private double MaxDistance(IEnumerable<Term_old> A, IEnumerable<Term_old> B, Dictionary<string, double> dmatrix)
         {
             if (B.Count() == 0) return 0;
             if (A.Count() == 0) return double.MaxValue;
             double max = 0;
-            foreach (Term a in A)
-                foreach (Term b in B)
+            foreach (Term_old a in A)
+                foreach (Term_old b in B)
                 {
                     double dist = dmatrix[$"{a.id}-{b.id}"];
                     if (dist > max)
@@ -466,15 +466,15 @@ namespace NLDB
         /// <param name="terms">набор термов среди которых ищется оптимальный</param>
         /// <param name="dmatrix">заранее вычисленная матрица расстояний</param>
         /// <returns></returns>
-        private int MinSumDistance(Dictionary<int, Term> terms, Dictionary<string, double> dmatrix)
+        private int MinSumDistance(Dictionary<int, Term_old> terms, Dictionary<string, double> dmatrix)
         {
             double min = double.MaxValue;
             int id = 0;
             //Ищем строку с минимальной суммой значений dmatrix по всем столбцам
-            foreach (KeyValuePair<int, Term> r in terms)
+            foreach (KeyValuePair<int, Term_old> r in terms)
             {
                 double s = 0;
-                foreach (KeyValuePair<int, Term> c in terms)
+                foreach (KeyValuePair<int, Term_old> c in terms)
                 {
                     s += dmatrix[$"{r.Key}-{c.Key}"];
                 }
@@ -494,7 +494,7 @@ namespace NLDB
         /// </summary>
         /// <param name="terms">список термов, для которых считаются взаимные расстояния</param>
         /// <returns>Матрица в виде словаря, ключ состоит из id терма-строки и id терма-столбца</returns>
-        private Dictionary<string, double> SDMatrix(IList<Term> terms)
+        private Dictionary<string, double> SDMatrix(IList<Term_old> terms)
         {
             int n = terms.Count;
             Dictionary<string, double> d = new Dictionary<string, double>(n * n);
@@ -504,14 +504,14 @@ namespace NLDB
             return d;
         }
 
-        public List<Term> NextNearest(string text, int rank = 2, int count = 1)
+        public List<Term_old> NextNearest(string text, int rank = 2, int count = 1)
         {
             if (count <= 0)
                 throw new ArgumentOutOfRangeException("Параметр count не может быть меньше 1");
             Stopwatch sw = new Stopwatch(); //!!!
             sw.Start(); //!!!
             //Ищем Слова похожие на text
-            IEnumerable<Term> similars =
+            IEnumerable<Term_old> similars =
                 Similars(text: text, rank: rank, count: count)
                 .Where(t => t.confidence >= similars_min_confidence);
             sw.Stop();
@@ -547,14 +547,14 @@ namespace NLDB
             return arrows.Select(a => ToTerm(a.Item2, a.Item3)).Distinct(new TermComparer()).Take(count).ToList();
         }
 
-        public List<Term> Alike(string text, int rank = 2, int count = 1)
+        public List<Term_old> Alike(string text, int rank = 2, int count = 1)
         {
             if (count < 1)
                 throw new ArgumentException("Значение параметра count не может быть меньше 1");
-            List<Term> result = new List<Term>();
+            List<Term_old> result = new List<Term_old>();
             Stopwatch sw = new Stopwatch(); //!!!
             sw.Start(); //!!!
-            IEnumerable<Term> similars = Similars(text, rank)
+            IEnumerable<Term_old> similars = Similars(text, rank)
                 .Where(t => t.confidence >= similars_min_confidence)
                 .Take(1);
             sw.Stop();
