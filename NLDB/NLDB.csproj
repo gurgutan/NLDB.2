@@ -111,23 +111,23 @@
     <Compile Include="DAL\Splitter.cs" />
     <Compile Include="DAL\BValue.cs" />
     <Compile Include="DAL\Term.cs" />
-    <Compile Include="DataContainer.cs" />
+    <Compile Include="Deprecated\DataContainer.cs" />
     <Compile Include="Engine.cs" />
     <Compile Include="GlobalSuppressions.cs" />
-    <Compile Include="Grammar.cs" />
-    <Compile Include="Lexicon.cs" />
+    <Compile Include="Deprecated\Grammar.cs" />
+    <Compile Include="Deprecated\Lexicon.cs" />
     <Compile Include="MeanValue.cs" />
     <Compile Include="Pointer.cs" />
     <Compile Include="ProgressInformer.cs" />
     <Compile Include="Sequence.cs" />
     <Compile Include="Primes.cs" />
-    <Compile Include="Language.cs" />
+    <Compile Include="Deprecated\Language.cs" />
     <Compile Include="Parser.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Language.seq.cs" />
-    <Compile Include="Term.cs" />
-    <Compile Include="Word.cs" />
+    <Compile Include="Deprecated\Language.seq.cs" />
+    <Compile Include="Deprecated\Term.cs" />
+    <Compile Include="Deprecated\Word.cs" />
     <Compile Include="DAL\Word.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -16,7 +16,8 @@ namespace NLDB
         TextSplitting,
         WordsExtraction,
         WordsMeanCalculating,
-        WordsSimilarityCalculating
+        WordsSimilarityCalculating,
+        DistancesCalculation
     };
 
     public enum ExecuteMode
@@ -28,22 +29,29 @@ namespace NLDB
     {
         public ExecuteMode ExecuteMode { get; set; }
 
-        public DataBase DB { get; }
-
         public CalculationResult CalculationResult { get; private set; }
 
-        public int Rank => parsers.Length - 1;
+        public int Rank => DB.MaxRank;
 
         public object Data;
+
+        public IEnumerable<DAL.Word> Words(int rank = 0, int count = 0)
+        {
+            string limit = count == 0 ? "" : $"LIMIT {count}";
+            return DB.Words($"Rank={rank} {limit}");
+        }
+
 
         public Engine(string dbpath)
         {
             this.dbpath = dbpath;
             DB = new DataBase(dbpath);
-            parsers = DB.Splitters().Select(s => new Parser(s.Expression)).ToArray();
         }
 
-        public void Clear() => DB.ClearAll();
+        public void Clear()
+        {
+            DB.ClearAll();
+        }
 
         public CalculationResult Execute(OperationType ptype, object parameter = null)
         {
@@ -63,28 +71,72 @@ namespace NLDB
                     CalculationResult = SplitText((string)parameter); break;
                 case OperationType.WordsExtraction:
                     CalculationResult = ExtractWords((IEnumerable<string>)parameter, Rank); break;
+                case OperationType.DistancesCalculation:
+                    CalculationResult = CalculateDistances((IEnumerable<Word>)parameter); break;
                 default:
                     throw new NotImplementedException();
             }
             return CalculationResult;
         }
 
+        private CalculationResult CalculateDistances(IEnumerable<Word> words)
+        {
+            ProgressInformer informer = new ProgressInformer($"Матрица расстояний слов:", words.Count(), measurment: "слов", barSize: 64);
+            int i = 0;
+            int divider = 111;
+            DB.BeginTransaction();
+            foreach (DAL.Word word in words)
+            {
+                i++;
+                if (i % divider == 0)
+                {
+                    informer.Set(i);
+                }
+                CalcPositionDistances(word);
+            }
+            informer.Set(i); // показать завершенный результат
+            DB.Commit();
+            Data = null;
+            return new CalculationResult(this, OperationType.DistancesCalculation, ResultType.Success);
+        }
+
+        private void CalcPositionDistances(DAL.Word w)
+        {
+            //List<Tuple<int, int, int, float>> result = new List<Tuple<int, int, int, float>>(w.childs.Length * w.childs.Length);
+            int[] childs = w.ChildsId;
+            //Parallel.For(0, childs.Length - 1, (i) =>
+            for (int i = 0; i < childs.Length - 1; i++)
+            {
+                for (int j = i + 1; j < childs.Length; j++)
+                {
+                    if (childs[i] != childs[j])
+                    {
+                        DB.SetAValue(w.Rank - 1, childs[i], childs[j], j - i);
+                        DB.SetAValue(w.Rank - 1, childs[j], childs[i], j - i);
+                    }
+                }
+            }
+        }
+
+
         private CalculationResult ExtractWords(IEnumerable<string> strings, int rank)
         {
             DB.BeginTransaction();
-            ProgressInformer informer = new ProgressInformer($"Слова ранга {rank}:", strings.Count(), "байт", 64);
-            Data = strings.SelectMany((s, i) =>
+            using (ProgressInformer informer = new ProgressInformer($"Слова ранга {rank}:", strings.Count(), "", 64))
             {
-                informer.Set(i + 1);
-                return ExtractWordsFromString(s, rank);
-            }).ToList();
+                Data = strings.SelectMany((s, i) =>
+                {
+                    informer.Set(i + 1);
+                    return ExtractWordsFromString(s, rank);
+                }).ToList();
+            }
             DB.Commit();
             return new CalculationResult(this, OperationType.WordsExtraction, ResultType.Success, Data);
         }
 
         private int[] ExtractWordsFromString(string text, int rank)
         {
-            IEnumerable<string> strings = parsers[rank].Split(text).Where(s => !string.IsNullOrEmpty(s));
+            IEnumerable<string> strings = DB.Split(text, rank).Where(s => !string.IsNullOrEmpty(s));
             return strings.Select<string, int>(s =>
             {
                 int id;
@@ -94,7 +146,7 @@ namespace NLDB
                     //получаем id дочерних слов ранга rank-1
                     childsId = ExtractWordsFromString(s, rank - 1);
                     if (childsId.Length == 0) return 0;
-                    string childsString = childsId.Aggregate("", (c, n) => c + (c != "" ? "," : "") + n.ToString());
+                    string childsString = string.Join(",", childsId);//.Aggregate("", (c, n) => c + (c != "" ? "," : "") + n.ToString());
                     //Пробуем найти Слово по дочерним элементам
                     DAL.Word word = DB.GetWordByChilds(childsString);
                     if (word == null)
@@ -107,10 +159,7 @@ namespace NLDB
                     //Пробуем найти Слово по символу
                     DAL.Word word = DB.GetWordBySymbol(s);
                     if (word == null)
-                    {
                         id = DB.Add(new DAL.Word() { Rank = rank, Symbol = s });
-                        if (id % 101 == 0) Debug.WriteLine(word.Id);  //!!!
-                    }
                     else
                         id = word.Id;
                 }
@@ -120,9 +169,8 @@ namespace NLDB
             .ToArray();          //получим результат сразу
         }
 
-        internal Term Recognize(string text, int rank)
+        internal Term Recognize(Term term, int rank)
         {
-            Term term = ToTerm(text, rank);
             if (term.rank == 0)
             {
                 //При нулевом ранге терма (т.е. терм - это буква), confidence считаем исходя из наличия соответствующей буквы в алфавите
@@ -133,20 +181,24 @@ namespace NLDB
             }
             else
             {
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
                 //Если ранг терма больше нуля, то confidence считаем по набору дочерних элементов
-                var childs = term.Childs.Distinct().
-                    Select(c => Identify(c)).
-                    Where(c => c.id != 0).
-                    Select(c => c.id).
-                    ToArray();
+                int[] childs = term
+                    .Childs
+                    .Distinct(new DAL.TermComparer())
+                    .Select(c => Recognize(c, rank - 1))
+                    .Where(c => c.id != 0)
+                    .Select(c => c.id)
+                    .ToArray();
                 sw.Stop();  //!!!
                 Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
-                List<int> parents = data.GetWordsParentsId(childs).ToList();
+                List<DAL.Word> parents = DB.GetParents(childs).ToList();
                 sw.Stop();  //!!!
                 Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
-                List<Term_old> context = parents.Select(p => ToTerm(p)).ToList();
+                List<Term> context = parents.Select(p => DB.ToTerm(p)).ToList();
                 sw.Stop();  //!!!
                 Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
                 //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
@@ -167,9 +219,47 @@ namespace NLDB
             }
         }
 
-        internal List<Term_old> Similars(string text, int count)
+        internal List<Term> Similars(string text, int rank, int count)
         {
-            throw new NotImplementedException();
+            if (count <= 0) throw new ArgumentException("Количество возращаемых значений должно быть положительным");
+            text = Parser.Normilize(text);
+            Stopwatch sw = new Stopwatch(); //!!!
+            sw.Start(); //!!!
+            Term term = DB.ToTerm(text, rank);
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->ToTerm: {sw.Elapsed.TotalSeconds}");
+            sw.Restart(); //!!!
+            Recognize(term, rank);
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->Identify: {sw.Elapsed.TotalSeconds}");
+            //Для терма нулевого ранга возвращаем результат по наличию соответствующей буквы в алфавите
+            if (term.rank == 0) return new List<Term> { term };
+            //Определение контекста по дочерним словам
+            sw.Restart(); //!!!
+            int[] childs = term
+                .Childs
+                .Where(c => c.id != 0)
+                .Select(c => c.id)
+                .Distinct()
+                .ToArray();
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
+            sw.Restart(); //!!!
+            List<Term> context = DB
+                .GetParents(childs)
+                .Distinct()
+                .Select(p => DB.ToTerm(p)).
+                ToList();
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
+            //Расчет оценок Confidence для каждого из соседей
+            sw.Restart(); //!!!
+            context.AsParallel().ForAll(p => p.confidence = Confidence.Compare(term, p));
+            sw.Stop();  //!!!
+            Debug.WriteLine($"Similars->Compare [{context.Count}]: {sw.Elapsed.TotalSeconds}");
+            //Сортировка по убыванию оценки
+            context.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
+            return context.Take(count).ToList();
         }
 
         private CalculationResult ReadFile(string filename)
@@ -210,49 +300,24 @@ namespace NLDB
 
         private CalculationResult SplitText(string text)
         {
-            Data = parsers[Rank].Split(text);
+            Data = DB.Split(text);
             return new CalculationResult(this, OperationType.TextSplitting, ResultType.Success);
         }
 
         internal void Insert(Splitter splitter)
         {
             DB.Insert(splitter);
-            parsers = DB.Splitters().Select(s => new Parser(s.Expression)).ToArray();
         }
 
-        //--------------------------------------------------------------------------------------------
-        //Преобразование Слова в Терм
-        //--------------------------------------------------------------------------------------------
-        public DAL.Term ToTerm(DAL.Word w, float confidence = 1)
+        public Term ToTerm(DAL.Word word)
         {
-            //if (this.terms.TryGetValue(w.Id, out Term t)) return t;
-            if (w == null) return null;
-            DAL.Term t = new DAL.Term(
-                w.Rank,
-                w.Id,
-                _confidence: confidence,
-                _text: w.Symbol,
-                _childs: w.Rank == 0 ? null : w.ChildsId.Select(c => ToTerm(DB.GetWord(c))));
-            //Сохраняем в кэш
-            //terms[w.Id] = t;
-            return t;
-        }
-
-        public DAL.Term ToTerm(string text, int rank)
-        {
-            text = Parser.Normilize(text);
-            return new DAL.Term(rank, 0, 0, text,
-                rank == 0 ? null :
-                parsers[rank - 1].
-                Split(text).
-                Where(s => !string.IsNullOrWhiteSpace(s)).
-                Select(s => ToTerm(s, rank - 1)));
+            return DB.ToTerm(word);
         }
 
         //--------------------------------------------------------------------------------------------
         //Закрытые свойства
         //--------------------------------------------------------------------------------------------
+        private DataBase DB { get; }
         private readonly string dbpath;
-        private Parser[] parsers;
     }
 }

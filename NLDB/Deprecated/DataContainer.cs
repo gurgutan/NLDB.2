@@ -12,7 +12,7 @@ namespace NLDB
     /// <summary>
     /// Класс для работы данными. Реализует работу со Словами лексикона, скрывая подробности работы с базой данных SQLite
     /// </summary>
-    public class DataContainer : IEnumerable<Word>, IDisposable
+    public class DataContainer : IEnumerable<Word_old>, IDisposable
     {
         private const int max_similars_per_word = 256;
         private SQLiteTransaction transaction;
@@ -190,7 +190,7 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         //Преобразование Слова в Терм
         //--------------------------------------------------------------------------------------------
-        public Term_old ToTerm(Word w, float confidence = 1)
+        public Term_old ToTerm(Word_old w, float confidence = 1)
         {
             //if (this.terms.TryGetValue(w.id, out Term t)) return t;
             if (w == null) return null;
@@ -477,7 +477,7 @@ namespace NLDB
         /// </summary>
         /// <param name="i"></param>
         /// <returns></returns>
-        public Word GetWord(int i)
+        public Word_old GetWord(int i)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
@@ -488,7 +488,7 @@ namespace NLDB
             int rank = reader.GetInt32(1);
             string symbol = reader.GetString(2);
             int[] childs = StringToIntArray(reader.GetString(3));
-            return new Word(i, rank, symbol, childs, null /*parents*/);
+            return new Word_old(i, rank, symbol, childs, null /*parents*/);
         }
 
         /// <summary>
@@ -496,7 +496,7 @@ namespace NLDB
         /// </summary>
         /// <param name="ids"></param>
         /// <returns></returns>
-        public List<Word> GetWords(IEnumerable<int> ids)
+        public List<Word_old> GetWords(IEnumerable<int> ids)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
@@ -504,14 +504,14 @@ namespace NLDB
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT id,rank,symbol,childs FROM words WHERE id IN ({ids_str});";
             SQLiteDataReader reader = cmd.ExecuteReader();
-            List<Word> result = new List<Word>();
+            List<Word_old> result = new List<Word_old>();
             while (reader.Read())
             {
                 int i = int.Parse(reader.GetString(0));
                 int rank = int.Parse(reader.GetString(1));
                 string symbol = reader.GetString(2);
                 int[] childs = StringToIntArray(reader.GetString(3));
-                result.Add(new Word(i, rank, symbol, childs, null /*parents*/));
+                result.Add(new Word_old(i, rank, symbol, childs, null /*parents*/));
             }
             return result;
         }
@@ -541,9 +541,9 @@ namespace NLDB
         /// </summary>
         /// <param name="s"></param>
         /// <returns></returns>
-        public Word GetWord(string s)
+        public Word_old GetWord(string s)
         {
-            if (alphabet.TryGetValue(s, out int id)) return new Word(id, 0, s, null, null);
+            if (alphabet.TryGetValue(s, out int id)) return new Word_old(id, 0, s, null, null);
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT words.id FROM words WHERE symbol='{s}' LIMIT 1;";
             object result = cmd.ExecuteScalar();
@@ -551,7 +551,7 @@ namespace NLDB
             if (int.TryParse(result.ToString(), out id))
             {
                 alphabet[s] = id;
-                return new Word(id, 0, s, null, null);
+                return new Word_old(id, 0, s, null, null);
             }
             else return null;
         }
@@ -584,7 +584,7 @@ namespace NLDB
         /// </summary>
         /// <param name="_childs"></param>
         /// <returns></returns>
-        public Word GetWordByChilds(int[] _childs)
+        public Word_old GetWordByChilds(int[] _childs)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
@@ -597,7 +597,7 @@ namespace NLDB
             string symbol = word[2];
             //var parents_qry = SQLiteHelper.SelectValues(db, tablename: "parents", columns: "id,parent_id", where: $"id={id}");
             //int[] parents = parents_qry.Select(s => int.Parse(s[1])).ToArray();
-            return new Word(id, rank, symbol, _childs, null/*parents*/);
+            return new Word_old(id, rank, symbol, _childs, null/*parents*/);
         }
 
         /// <summary>
@@ -605,7 +605,7 @@ namespace NLDB
         /// </summary>
         /// <param name="i"></param>
         /// <returns></returns>
-        public IEnumerable<Word> GetWordParents(int i)
+        public IEnumerable<Word_old> GetWordParents(int i)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
@@ -615,11 +615,11 @@ namespace NLDB
                 $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id={i} ;";
             //$"WHERE words.id IN (SELECT parents.parent_id FROM parents WHERE parents.id = {i});";
             SQLiteDataReader reader = cmd.ExecuteReader();
-            List<Word> words = new List<Word>();
+            List<Word_old> words = new List<Word_old>();
             while (reader.Read())
             {
                 int[] childs = StringToIntArray(reader.GetString(3));
-                Word w = new Word(int.Parse(reader.GetString(0)), int.Parse(reader.GetString(1)), reader.GetString(2), childs, null);
+                Word_old w = new Word_old(int.Parse(reader.GetString(0)), int.Parse(reader.GetString(1)), reader.GetString(2), childs, null);
                 words.Add(w);
             }
             return words;
@@ -682,7 +682,7 @@ namespace NLDB
         /// </summary>
         /// <param name="i"></param>
         /// <returns></returns>
-        public IEnumerable<Tuple<int, Word>> GetWordsParentsWithChilds(int[] i)
+        public IEnumerable<Tuple<int, Word_old>> GetWordsParentsWithChilds(int[] i)
         {
             if (db == null || db.State != System.Data.ConnectionState.Open)
                 throw new Exception($"Подключение к БД не установлено");
@@ -692,12 +692,12 @@ namespace NLDB
                 $"SELECT DISTINCT words.id, words.rank, words.symbol, words.childs, parents.id FROM words " +
                 $"INNER JOIN parents ON words.id = parents.parent_id WHERE parents.id IN ({ids})";
             SQLiteDataReader reader = cmd.ExecuteReader();
-            List<Tuple<int, Word>> words = new List<Tuple<int, Word>>();
+            List<Tuple<int, Word_old>> words = new List<Tuple<int, Word_old>>();
             while (reader.Read())
             {
                 int[] childs = StringToIntArray(reader.GetString(3));
-                Word w = new Word(int.Parse(reader.GetString(0)), int.Parse(reader.GetString(1)), reader.GetString(2), childs, null);
-                words.Add(new Tuple<int, Word>(int.Parse(reader.GetString(4)), w));
+                Word_old w = new Word_old(int.Parse(reader.GetString(0)), int.Parse(reader.GetString(1)), reader.GetString(2), childs, null);
+                words.Add(new Tuple<int, Word_old>(int.Parse(reader.GetString(4)), w));
             }
             return words;
         }
@@ -745,7 +745,7 @@ namespace NLDB
         /// </summary>
         /// <param name="w"></param>
         /// <returns></returns>
-        public int AddWord(Word w)
+        public int AddWord(Word_old w)
         {
             w.id = NextId();
             string childs = IntArrayToString(w.childs);
@@ -765,7 +765,7 @@ namespace NLDB
         /// </summary>
         /// <param name="w"></param>
         /// <returns></returns>
-        private string BuildWordParentsString(Word w)
+        private string BuildWordParentsString(Word_old w)
         {
             if (w.childs == null || w.childs.Length == 0) return "";
             StringBuilder builder = new StringBuilder();
@@ -789,7 +789,7 @@ namespace NLDB
             SQLiteDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                Word a = new Word(
+                Word_old a = new Word_old(
                     _id: reader.GetInt32(0),
                     _rank: reader.GetInt32(1),
                     _symbol: reader.GetString(2),
@@ -884,14 +884,14 @@ namespace NLDB
             }
         }
 
-        private Word StringsToWord(string s_id, string s_rank, string s_symbol, string s_childs, IEnumerable<string> s_parents)
+        private Word_old StringsToWord(string s_id, string s_rank, string s_symbol, string s_childs, IEnumerable<string> s_parents)
         {
             int id = int.Parse(s_id);
             int rank = int.Parse(s_rank);
             string symbol = s_symbol;
             int[] childs = StringToIntArray(s_childs);
             int[] parents = s_parents?.Select(p => int.Parse(p)).ToArray();
-            return new Word(id, rank, symbol, childs, parents);
+            return new Word_old(id, rank, symbol, childs, parents);
         }
 
         public IList<int> GetWordsId(int rank)
@@ -908,14 +908,14 @@ namespace NLDB
         }
 
         // Методы IEnumerable
-        public IEnumerator<Word> GetEnumerator()
+        public IEnumerator<Word_old> GetEnumerator()
         {
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT id,rank,symbol,childs FROM words";
             SQLiteDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                Word w = new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), StringToIntArray(reader.GetString(3)), null);
+                Word_old w = new Word_old(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), StringToIntArray(reader.GetString(3)), null);
                 yield return w;
                 //return StringsToWord(s_id: row[0], s_rank: row[1], s_symbol: row[2], s_childs: row[3], s_parents: null/*parents*/);
             }

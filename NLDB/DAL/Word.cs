@@ -26,7 +26,7 @@ namespace NLDB.DAL
             Childs = childs;
         }
 
-        public DAL.Term AsTerm(Engine engine) => engine.ToTerm(this);
+        public Term AsTerm(Engine engine) => engine.ToTerm(this);
 
         /// <summary>
         /// Хэш-код слова зависит от ранга rank, id, childs. Используется алгоритм известный под именем Ly

@@ -9,8 +9,20 @@ namespace NLDB.DAL
     {
         private SQLiteConnection db;
         private SQLiteTransaction transaction;
+        private Parser[] parsers;
+
+        private readonly Dictionary<int, Term> termsCash = new Dictionary<int, Term>(TERMS_CASH_SIZE);
+        private readonly Dictionary<int, Word> wordsCash = new Dictionary<int, Word>(WORDS_CASH_SIZE);
+        private readonly Dictionary<string, Word> symbolsCash = new Dictionary<string, Word>(SYMBOLS_CASH_SIZE);
+
+        private const int TERMS_CASH_SIZE = 1 << 18;
+        private const int WORDS_CASH_SIZE = 1 << 18;
+        private const int SYMBOLS_CASH_SIZE = 1 << 10;
 
 
+        //---------------------------------------------------------------------------------------------------------
+        //Конструкторы, деструктор
+        //---------------------------------------------------------------------------------------------------------
         public DataBase(string databasePath)
         {
             db = new SQLiteConnection($"Data Source={databasePath}; Version=3;");
@@ -30,19 +42,16 @@ namespace NLDB.DAL
         {
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText =
-                "CREATE TABLE IF NOT EXISTS Splitters (Rank, Expression, PRIMARY KEY(Rank, Expression));" +
-                "CREATE TABLE IF NOT EXISTS Words (Id INTEGER PRIMARY KEY, Rank INTEGER NOT NULL, Symbol TEXT, Childs TEXT);" +
-                "CREATE TABLE IF NOT EXISTS Parents (WordId INTEGER NOT NULL, ParentId INTEGER NOT NULL);" +
-                "CREATE TABLE IF NOT EXISTS MatrixA (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Count INTEGER NOT NULL, Sum REAL NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
-                "CREATE TABLE IF NOT EXISTS MatrixB (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Similarity REAL NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
-                "DROP INDEX IF EXISTS IWords_childs;" +
-                "DROP INDEX IF EXISTS IParents_id;" +
-                "DROP INDEX IF EXISTS IParents_parentid;" +
-                "DROP INDEX IF EXISTS IMatrixA_row;" +
-                "DROP INDEX IF EXISTS IMatrixA_col;" +
-                "DROP INDEX IF EXISTS IMatrixA_row_col;" +
-                "DROP INDEX IF EXISTS IMatrixA_rank;" +
-                "DROP INDEX IF EXISTS IMatrixB_row_col;" +
+                "DROP TABLE IF EXISTS Splitters;" +
+                "DROP TABLE IF EXISTS Words;" +
+                "DROP TABLE IF EXISTS Parents;" +
+                "DROP TABLE IF EXISTS MatrixA;" +
+                "DROP TABLE IF EXISTS MatrixB;" +
+                "CREATE TABLE Splitters (Rank, Expression, PRIMARY KEY(Rank, Expression));" +
+                "CREATE TABLE Words (Id INTEGER PRIMARY KEY, Rank INTEGER NOT NULL, Symbol TEXT, Childs TEXT);" +
+                "CREATE TABLE Parents (WordId INTEGER NOT NULL, ParentId INTEGER NOT NULL);" +
+                "CREATE TABLE MatrixA (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Count INTEGER NOT NULL, Sum INTEGER NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
+                "CREATE TABLE MatrixB (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Similarity REAL NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
                 "CREATE INDEX IWords_childs ON Words(Childs); " +
                 "CREATE INDEX IParents_id ON Parents(WordId);" +
                 "CREATE INDEX IParents_parentid ON Parents(ParentId);" +
@@ -124,6 +133,8 @@ namespace NLDB.DAL
             }
         }
 
+        public int MaxRank => parsers.Length - 1;
+
         //---------------------------------------------------------------------------------------------------------
         //CRUD для Splitters
         //---------------------------------------------------------------------------------------------------------
@@ -132,7 +143,7 @@ namespace NLDB.DAL
             List<Splitter> result = new List<Splitter>();
             using (SQLiteCommand cmd = new SQLiteCommand("SELECT * FROM Splitters ORDER BY Rank;", db))
             {
-                var reader = cmd.ExecuteReader();
+                SQLiteDataReader reader = cmd.ExecuteReader();
                 while (reader.Read())
                     result.Add(new Splitter(reader.GetInt32(0), reader.GetString(1)));
             }
@@ -142,10 +153,11 @@ namespace NLDB.DAL
         public void Insert(Splitter s)
         {
             ExecuteCommand($"INSERT INTO Splitters(Rank, Expression) VALUES({s.Rank}, '{s.Expression}');");
+            parsers = Splitters().Select(splitter => new Parser(splitter.Expression)).ToArray();
         }
 
         //---------------------------------------------------------------------------------------------------------
-        //CRUD для Words
+        //CRUD для Parents
         //---------------------------------------------------------------------------------------------------------
         public void Insert(Parent p)
         {
@@ -157,7 +169,7 @@ namespace NLDB.DAL
             string text = "INSERT INTO Parents(WordId, ParentId) VALUES (@w,@p);";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
             {
-                foreach (var p in parents)
+                foreach (Parent p in parents)
                 {
                     cmd.Parameters.AddWithValue("@w", p.WordId);
                     cmd.Parameters.AddWithValue("@p", p.ParentId);
@@ -174,7 +186,7 @@ namespace NLDB.DAL
             List<Word> result = new List<Word>();
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words WHERE {where};", db))
             {
-                var reader = cmd.ExecuteReader();
+                SQLiteDataReader reader = cmd.ExecuteReader();
                 while (reader.Read())
                     result.Add(new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3)));
             }
@@ -183,20 +195,22 @@ namespace NLDB.DAL
 
         public Word GetWord(int id)
         {
+            if (wordsCash.TryGetValue(id, out Word word)) return word;
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words WHERE Id={id};", db))
             {
-                var reader = cmd.ExecuteReader();
+                SQLiteDataReader reader = cmd.ExecuteReader();
                 if (reader.Read())
-                    return new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3));
+                    word = new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3));
             }
-            return null;
+            SaveToCash(word);
+            return word;
         }
 
         public int Add(Word w)
         {
             w.Id = NewId();
             Insert(w);
-            InsertAll(w.ChildsId.Select(i => new Parent(w.Id, i)));
+            InsertAll(w.ChildsId.Select(i => new Parent(i, w.Id)));
             return w.Id;
         }
 
@@ -210,7 +224,7 @@ namespace NLDB.DAL
             string text = "INSERT INTO Words(Id, Rank, Symbol, Childs) VALUES (@a,@b,@c,@d);";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
             {
-                foreach (var w in words)
+                foreach (Word w in words)
                 {
                     cmd.Parameters.AddWithValue("@a", w.Id);
                     cmd.Parameters.AddWithValue("@b", w.Rank);
@@ -225,7 +239,7 @@ namespace NLDB.DAL
         {
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words WHERE Childs='{childs}' LIMIT 1", db))
             {
-                var reader = cmd.ExecuteReader();
+                SQLiteDataReader reader = cmd.ExecuteReader();
                 if (reader.Read())
                 {
                     return new Word()
@@ -242,12 +256,14 @@ namespace NLDB.DAL
 
         internal Word GetWordBySymbol(string s)
         {
-            using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words WHERE Symbol='{s}' LIMIT 1", db))
+            if (symbolsCash.TryGetValue(s, out Word word)) return word;
+            using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words WHERE Symbol=@s LIMIT 1", db))
             {
-                var reader = cmd.ExecuteReader();
+                cmd.Parameters.AddWithValue("@s", s);
+                SQLiteDataReader reader = cmd.ExecuteReader();
                 if (reader.Read())
                 {
-                    return new Word()
+                    word = new Word()
                     {
                         Id = reader.GetInt32(0),
                         Rank = reader.GetInt32(1),
@@ -256,7 +272,86 @@ namespace NLDB.DAL
                     };
                 }
             }
-            return null;
+            SaveToCash(s, word);
+            return word;
+        }
+
+        //---------------------------------------------------------------------------------------------------------
+        //Работа с таблицей Parents
+        //---------------------------------------------------------------------------------------------------------
+        internal List<Word> GetParents(int wordId)
+        {
+            List<Word> result = new List<Word>();
+            using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words INNER JOIN Parents ON Words.Id=Parents.ParentId WHERE Parents.WordId={wordId};", db))
+            {
+                SQLiteDataReader reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    result.Add(new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3)));
+            }
+            return result;
+        }
+
+        internal List<Word> GetParents(IEnumerable<int> wordsId)
+        {
+            string ids = string.Join(",", wordsId);
+            List<Word> result = new List<Word>();
+            using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words INNER JOIN Parents ON Words.Id=Parents.ParentId WHERE Parents.WordId IN ({ids});", db))
+            {
+                SQLiteDataReader reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    result.Add(new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3)));
+            }
+            return result;
+        }
+
+        //---------------------------------------------------------------------------------------------------------
+        //CRUD для MatrixA
+        //---------------------------------------------------------------------------------------------------------
+        private void InsertAsync(AValue v)
+        {
+            ExecuteCommandAsync($"INSERT INTO MatrixA(Row, Column, Count, Sum, Rank) VALUES({v.R}, {v.C}, {v.Count}, {v.Sum}, {v.Rank});");
+        }
+
+        private void UpdateAsync(AValue v)
+        {
+            ExecuteCommandAsync($"UPDATE MatrixA SET Count={v.Count}, Sum={v.Sum} WHERE Row={v.R} AND Column={v.C};");
+        }
+
+        public AValue GetAValue(int row, int column, int rank)
+        {
+            using (SQLiteCommand cmd = new SQLiteCommand($"SELECT Row, Column, Count, Sum FROM MatrixA WHERE Row={row} AND Column={column} LIMIT 1", db))
+            {
+                SQLiteDataReader reader = cmd.ExecuteReader();
+                if (!reader.Read()) return null;
+                return new AValue()
+                {
+                    Rank = rank,
+                    R = row,
+                    C = column,
+                    Count = reader.GetInt32(2),
+                    Sum = reader.GetInt32(3)
+                };
+            }
+        }
+
+        public void SetAValue(int rank, int row, int column, int d)
+        {
+            AValue exists = GetAValue(row, column, rank);
+            string text;
+            if (exists == null)
+            {
+                text = $"INSERT INTO MatrixA(Row, Column, Count, Sum, Rank) SELECT {row}, {column}, 1, {d}, {rank};";
+            }
+            else
+            {
+                exists.Sum += d;
+                exists.Count++;
+                text = $"UPDATE MatrixA SET Count={exists.Count}, Sum={exists.Sum} WHERE Row={row} AND Column={column};";
+            }
+            using (SQLiteCommand cmd = new SQLiteCommand(text, db))
+            {
+                cmd.ExecuteNonQuery();
+            }
         }
 
         //---------------------------------------------------------------------------------------------------------
@@ -268,6 +363,12 @@ namespace NLDB.DAL
                 cmd.ExecuteNonQuery();
         }
 
+        private async void ExecuteCommandAsync(string text)
+        {
+            using (SQLiteCommand cmd = new SQLiteCommand(text, db))
+                await cmd.ExecuteNonQueryAsync();
+        }
+
         private void ExecuteCommand(string text, params Tuple<string, object>[] parameters)
         {
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
@@ -275,6 +376,94 @@ namespace NLDB.DAL
                 Array.ForEach(parameters, p => cmd.Parameters.AddWithValue(p.Item1, p.Item2));
                 cmd.ExecuteNonQuery();
             }
+        }
+
+        //---------------------------------------------------------------------------------------------------------
+        //Методы для работы с Термами
+        //---------------------------------------------------------------------------------------------------------
+        /// <summary>
+        /// Преобразование Слова в Терм
+        /// </summary>
+        /// <param name="w"></param>
+        /// <param name="confidence"></param>
+        /// <returns></returns>
+        public Term ToTerm(Word w, float confidence = 1)
+        {
+            if (termsCash.TryGetValue(w.Id, out Term t)) return t;
+            if (w == null) return null;
+            t = new Term(
+                w.Rank,
+                w.Id,
+                _confidence: confidence,
+                _text: w.Symbol,
+                _childs: w.Rank == 0 ? null : w.ChildsId.Select(c => ToTerm(GetWord(c))));
+            SaveToCash(t);
+            return t;
+        }
+
+        public Term ToTerm(string text, int rank)
+        {
+            text = Parser.Normilize(text);
+            return new DAL.Term(rank, 0, 0, text,
+                rank == 0 ? null :
+                parsers[rank - 1].
+                Split(text).
+                Where(s => !string.IsNullOrWhiteSpace(s)).
+                Select(s => ToTerm(s, rank - 1)));
+        }
+
+        //---------------------------------------------------------------------------------------------------------
+        //Методы для работы с парсерами
+        //---------------------------------------------------------------------------------------------------------
+        internal string[] Split(string text, int rank = -1)
+        {
+            if (rank == -1) rank = MaxRank;
+            return parsers[rank].Split(text);
+        }
+
+        //---------------------------------------------------------------------------------------------------------
+        //Методы работы с кэшем
+        //---------------------------------------------------------------------------------------------------------
+        internal Word GetWordFromCash(int id)
+        {
+            if (wordsCash.TryGetValue(id, out Word result)) return result;
+            return null;
+        }
+
+        internal Word GetSymbolFromCash(string symbol)
+        {
+            if (symbolsCash.TryGetValue(symbol, out Word result)) return result;
+            return null;
+        }
+
+        internal Term GetTermFromCash(int id)
+        {
+            if (termsCash.TryGetValue(id, out Term result)) return result;
+            return null;
+        }
+
+        private void SaveToCash(Term t)
+        {
+            if (t == null) return;
+            if (termsCash.Count > TERMS_CASH_SIZE)
+                termsCash.Remove(termsCash.Keys.First());
+            termsCash[t.id] = t;
+        }
+
+        private void SaveToCash(Word w)
+        {
+            if (w == null) return;
+            if (wordsCash.Count > WORDS_CASH_SIZE)
+                wordsCash.Remove(wordsCash.Keys.First());
+            wordsCash[w.Id] = w;
+        }
+
+        private void SaveToCash(string s, Word w)
+        {
+            if (w == null) return;
+            if (symbolsCash.Count > SYMBOLS_CASH_SIZE)
+                symbolsCash.Remove(symbolsCash.Keys.First());
+            symbolsCash[s] = w;
         }
     }
 }

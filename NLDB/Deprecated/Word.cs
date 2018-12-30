@@ -14,7 +14,7 @@ namespace NLDB
     /// Дочерние Слова представлены своими идентификаторами.
     /// </summary>
     [Serializable]
-    public class Word
+    public class Word_old
     {
         //TODO: Заменить поля на свойства. В целях быстродействия в режиме отладки пока оставляю поля.
         /// <summary>
@@ -45,7 +45,7 @@ namespace NLDB
 
         //public int[] parents = new int[0];
 
-        public Word(int _id, int _rank, string _symbol, int[] _childs, int[] _parents)
+        public Word_old(int _id, int _rank, string _symbol, int[] _childs, int[] _parents)
         {
             //if (_childs == null) throw new ArgumentNullException("_childs не может быть равен null. Используйте int[0] вместо null");
             id = _id;
@@ -86,7 +86,7 @@ namespace NLDB
         /// <returns></returns>
         public override bool Equals(object obj)
         {
-            Word w = (Word)obj;
+            Word_old w = (Word_old)obj;
             if (id == w.id) return true;
             //if (childs == null || w.childs == null) return false;
             if (childs?.Length != w.childs?.Length) return false;
@@ -120,14 +120,14 @@ namespace NLDB
     /// <summary>
     /// Класс-сравнитель для использования в Linq.Distinct
     /// </summary>
-    public class WordComparer : IEqualityComparer<Word>
+    public class WordComparer : IEqualityComparer<Word_old>
     {
-        public bool Equals(Word x, Word y)
+        public bool Equals(Word_old x, Word_old y)
         {
             return x.id == y.id;
         }
 
-        public int GetHashCode(Word obj)
+        public int GetHashCode(Word_old obj)
         {
             return obj.GetHashCode();
         }

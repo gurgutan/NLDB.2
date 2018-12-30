@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using NLDB.DAL;
 
@@ -11,7 +11,9 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
-            Engine engine = new Engine(@"D:\Data\Result\Engine_5mb.db");
+            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
+            string dbpath = @"D:\Data\Result\5mb.db";
+            Engine engine = new Engine(dbpath);
             engine.Clear();
             engine.Insert(new Splitter(0, ""));
             engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
@@ -20,11 +22,14 @@ namespace NLDB
 
             engine.ExecuteMode = ExecuteMode.Verbose;
             engine
-                .Execute(OperationType.FileReading, @"D:\Data\Wiki\ru\5mb.txt")
+                .Execute(OperationType.FileReading, trainfile)
                 .Then(OperationType.TextNormalization)
                 .Then(OperationType.TextSplitting)
                 .Then(OperationType.WordsExtraction);
-            engine.Execute(OperationType.FileWriting, @"D:\Data\Wiki\ru\5mb.Words");
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
+            //engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath,"words"));
             //.Then(ProcessingType.WordsMean)
             //.Then(ProcessingType.WordsSimilarity);
 
@@ -45,13 +50,11 @@ namespace NLDB
                 if (line == "") continue;
                 Console.Write($"\n\nФраза: ");
                 line = Console.ReadLine();
-                Console.WriteLine(engine.ToTerm(engine.DB.GetWord(int.Parse(line))).ToString());
-                //List<Term> words = engine.Recognize(text: line, count: 8);
-                //Console.WriteLine("\n\nПохожие предложения:\n" + words.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
-                //List<Term> similars = engine.Similars(text: line, count: 8);
+                //Console.WriteLine(engine.ToTerm(engine.DB.GetWord(int.Parse(line))).ToString());
+                List<Term> similars = engine.Similars(text: line, rank: 2, count: 8);
                 //Найдем 8 лучших совпадений с текстом line. rank=2 означает, что нас интересуют совпадения предложений
-                //List<Term> similars = l.Similars(text: line, rank: 2, count: 8);
-                //Console.WriteLine("\n\nПохожие предложения:\n" + similars.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+                //List<Term> similars = engine.Similars(text: line, rank: 2, count: 8);
+                Console.WriteLine("\n\nПохожие предложения:\n" + similars.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
                 //Получим предположение о предложении, следующем за line
                 //List<Term> next = l.Next(text: line, rank: 2);
                 //Console.WriteLine("\n\nОтветные предложения:\n" + next.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
@@ -76,38 +79,38 @@ namespace NLDB
             //l.Disconnect();
         }
 
-        private static void TestLangConsole(Language l)
-        {
-            int rank = 2;
-            if (!l.IsConnected()) l.Connect();
-            Queue<string> lines = new Queue<string>();
-            int que_size = 1;
-            string line = ">>";
-            Console.WriteLine();
-            while (line != "")
-            {
-                Console.WriteLine();
-                Console.Write($"{rank}>>");
-                line = Console.ReadLine();
-                if (line == "") continue;
-                lines.Enqueue(line);
-                if (lines.Count > que_size) lines.Dequeue();
-                string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "\n" + n);
-                Stopwatch sw = new Stopwatch();
-                Console.WriteLine("\nПостроение цепочки");
-                sw.Restart();
-                IEnumerable<Term_old> core = l.GetCore(text, rank: 2);
-                //List<Term> next = l.Next(text, rank);
-                sw.Stop();
-                Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-                if (core.Count() != 0)
-                    Console.WriteLine(core.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
-                //if (next.Count != 0)
-                //    Console.WriteLine(next.Aggregate("", (c, n) => c + $" " + n.ToString()));
-                //l.FreeMemory();
-            }
-            l.Disconnect();
-        }
+        //private static void TestLangConsole(Language l)
+        //{
+        //    int rank = 2;
+        //    if (!l.IsConnected()) l.Connect();
+        //    Queue<string> lines = new Queue<string>();
+        //    int que_size = 1;
+        //    string line = ">>";
+        //    Console.WriteLine();
+        //    while (line != "")
+        //    {
+        //        Console.WriteLine();
+        //        Console.Write($"{rank}>>");
+        //        line = Console.ReadLine();
+        //        if (line == "") continue;
+        //        lines.Enqueue(line);
+        //        if (lines.Count > que_size) lines.Dequeue();
+        //        string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "\n" + n);
+        //        Stopwatch sw = new Stopwatch();
+        //        Console.WriteLine("\nПостроение цепочки");
+        //        sw.Restart();
+        //        IEnumerable<Term_old> core = l.GetCore(text, rank: 2);
+        //        //List<Term> next = l.Next(text, rank);
+        //        sw.Stop();
+        //        Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
+        //        if (core.Count() != 0)
+        //            Console.WriteLine(core.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+        //        //if (next.Count != 0)
+        //        //    Console.WriteLine(next.Aggregate("", (c, n) => c + $" " + n.ToString()));
+        //        //l.FreeMemory();
+        //    }
+        //    l.Disconnect();
+        //}
 
         private static void NormilizeTest()
         {
