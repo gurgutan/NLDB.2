@@ -14,18 +14,18 @@ namespace NLDB
             string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
             string dbpath = @"D:\Data\Result\5mb.db";
             Engine engine = new Engine(dbpath);
-            engine.Clear();
-            engine.Insert(new Splitter(0, ""));
-            engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
-            engine.Insert(new Splitter(2, @"[\n\r\:\;]+"));
-            engine.Insert(new Splitter(3, @"\[\[{число}\]\]"));
-
+            //engine.Clear();// "Splitters");
+            engine.Clear("MatrixA");
+            //engine.Insert(new Splitter(0, ""));
+            //engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
+            //engine.Insert(new Splitter(2, @"[\n\r\:\;]+"));
+            //engine.Insert(new Splitter(3, @"\[\[{число}\]\]"));
             engine.ExecuteMode = ExecuteMode.Verbose;
-            engine
-                .Execute(OperationType.FileReading, trainfile)
-                .Then(OperationType.TextNormalization)
-                .Then(OperationType.TextSplitting)
-                .Then(OperationType.WordsExtraction);
+            //engine
+            //    .Execute(OperationType.FileReading, trainfile)
+            //    .Then(OperationType.TextNormalization)
+            //    .Then(OperationType.TextSplitting)
+            //    .Then(OperationType.WordsExtraction);
             engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
             engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
             engine.Execute(OperationType.DistancesCalculation, engine.Words(3));

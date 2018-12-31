@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Data.SQLite;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace NLDB.DAL
 {
@@ -9,12 +11,23 @@ namespace NLDB.DAL
     {
         private SQLiteConnection db;
         private SQLiteTransaction transaction;
-        private Parser[] parsers;
+        private Parser[] parsers = null;
+        public Parser[] Parsers
+        {
+            get
+            {
+                if (parsers == null)
+                    parsers = Splitters().Select(splitter => new Parser(splitter.Expression)).ToArray();
+                return parsers;
+            }
+        }
 
+        private readonly Dictionary<long, AValue> matrixACash = new Dictionary<long, AValue>(MATRIXA_CASH_SIZE);
         private readonly Dictionary<int, Term> termsCash = new Dictionary<int, Term>(TERMS_CASH_SIZE);
         private readonly Dictionary<int, Word> wordsCash = new Dictionary<int, Word>(WORDS_CASH_SIZE);
         private readonly Dictionary<string, Word> symbolsCash = new Dictionary<string, Word>(SYMBOLS_CASH_SIZE);
 
+        private const int MATRIXA_CASH_SIZE = 1 << 18;
         private const int TERMS_CASH_SIZE = 1 << 18;
         private const int WORDS_CASH_SIZE = 1 << 18;
         private const int SYMBOLS_CASH_SIZE = 1 << 10;
@@ -27,7 +40,7 @@ namespace NLDB.DAL
         {
             db = new SQLiteConnection($"Data Source={databasePath}; Version=3;");
             db.Open();
-            Create();
+            //Create();
         }
 
         public void Dispose()
@@ -47,11 +60,11 @@ namespace NLDB.DAL
                 "DROP TABLE IF EXISTS Parents;" +
                 "DROP TABLE IF EXISTS MatrixA;" +
                 "DROP TABLE IF EXISTS MatrixB;" +
-                "CREATE TABLE Splitters (Rank, Expression, PRIMARY KEY(Rank, Expression));" +
-                "CREATE TABLE Words (Id INTEGER PRIMARY KEY, Rank INTEGER NOT NULL, Symbol TEXT, Childs TEXT);" +
-                "CREATE TABLE Parents (WordId INTEGER NOT NULL, ParentId INTEGER NOT NULL);" +
-                "CREATE TABLE MatrixA (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Count INTEGER NOT NULL, Sum INTEGER NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
-                "CREATE TABLE MatrixB (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Similarity REAL NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
+                "CREATE TABLE NOT IF EXISTS Splitters (Rank, Expression, PRIMARY KEY(Rank, Expression));" +
+                "CREATE TABLE NOT IF EXISTS Words (Id INTEGER PRIMARY KEY, Rank INTEGER NOT NULL, Symbol TEXT, Childs TEXT);" +
+                "CREATE TABLE NOT IF EXISTS Parents (WordId INTEGER NOT NULL, ParentId INTEGER NOT NULL);" +
+                "CREATE TABLE NOT IF EXISTS MatrixA (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Count INTEGER NOT NULL, Sum INTEGER NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
+                "CREATE TABLE NOT IF EXISTS MatrixB (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Similarity REAL NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
                 "CREATE INDEX IWords_childs ON Words(Childs); " +
                 "CREATE INDEX IParents_id ON Parents(WordId);" +
                 "CREATE INDEX IParents_parentid ON Parents(ParentId);" +
@@ -83,6 +96,12 @@ namespace NLDB.DAL
         //---------------------------------------------------------------------------------------------------------
         //Удаление данных из таблиц
         //---------------------------------------------------------------------------------------------------------
+        public void Clear(string tableName)
+        {
+            ExecuteCommand($"DELETE FROM {tableName}");
+            parsers = null;
+        }
+
         public void ClearAll()
         {
             ExecuteCommand("DELETE FROM Splitters");
@@ -91,19 +110,7 @@ namespace NLDB.DAL
             ExecuteCommand("DELETE FROM MatrixA");
             ExecuteCommand("DELETE FROM MatrixB");
             currentId = 0;
-        }
-
-        public void ClearMatrixA()
-        {
-            ExecuteCommand("DELETE FROM MatrixA");
-        }
-        public void ClearMatrixB()
-        {
-            ExecuteCommand("DELETE FROM MatrixB");
-        }
-        public void ClearSplitters()
-        {
-            ExecuteCommand("DELETE FROM Splitters");
+            parsers = null;
         }
 
         //---------------------------------------------------------------------------------------------------------
@@ -133,7 +140,7 @@ namespace NLDB.DAL
             }
         }
 
-        public int MaxRank => parsers.Length - 1;
+        public int MaxRank => Parsers.Length - 1;
 
         //---------------------------------------------------------------------------------------------------------
         //CRUD для Splitters
@@ -153,7 +160,7 @@ namespace NLDB.DAL
         public void Insert(Splitter s)
         {
             ExecuteCommand($"INSERT INTO Splitters(Rank, Expression) VALUES({s.Rank}, '{s.Expression}');");
-            parsers = Splitters().Select(splitter => new Parser(splitter.Expression)).ToArray();
+            parsers = null;
         }
 
         //---------------------------------------------------------------------------------------------------------
@@ -195,7 +202,7 @@ namespace NLDB.DAL
 
         public Word GetWord(int id)
         {
-            if (wordsCash.TryGetValue(id, out Word word)) return word;
+            if (GetFromCash(id, out Word word)) return word;
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words WHERE Id={id};", db))
             {
                 SQLiteDataReader reader = cmd.ExecuteReader();
@@ -256,7 +263,7 @@ namespace NLDB.DAL
 
         internal Word GetWordBySymbol(string s)
         {
-            if (symbolsCash.TryGetValue(s, out Word word)) return word;
+            if (GetFromCash(s, out Word word)) return word;
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words WHERE Symbol=@s LIMIT 1", db))
             {
                 cmd.Parameters.AddWithValue("@s", s);
@@ -317,11 +324,12 @@ namespace NLDB.DAL
             ExecuteCommandAsync($"UPDATE MatrixA SET Count={v.Count}, Sum={v.Sum} WHERE Row={v.R} AND Column={v.C};");
         }
 
-        public AValue GetAValue(int row, int column, int rank)
+        public async Task<AValue> GetAValue(int row, int column, int rank)
         {
+            if (GetFromCash(row, column, out AValue value)) return value;
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT Row, Column, Count, Sum FROM MatrixA WHERE Row={row} AND Column={column} LIMIT 1", db))
             {
-                SQLiteDataReader reader = cmd.ExecuteReader();
+                DbDataReader reader = await cmd.ExecuteReaderAsync();
                 if (!reader.Read()) return null;
                 return new AValue()
                 {
@@ -334,25 +342,25 @@ namespace NLDB.DAL
             }
         }
 
-        public void SetAValue(int rank, int row, int column, int d)
+        public async void SetAValue(int rank, int row, int column, int d)
         {
-            AValue exists = GetAValue(row, column, rank);
+            AValue value = GetAValue(row, column, rank).Result;
             string text;
-            if (exists == null)
+            if (value == null)
             {
                 text = $"INSERT INTO MatrixA(Row, Column, Count, Sum, Rank) SELECT {row}, {column}, 1, {d}, {rank};";
             }
             else
             {
-                exists.Sum += d;
-                exists.Count++;
-                text = $"UPDATE MatrixA SET Count={exists.Count}, Sum={exists.Sum} WHERE Row={row} AND Column={column};";
+                value.Sum += d;
+                value.Count++;
+                text = $"UPDATE MatrixA SET Count={value.Count}, Sum={value.Sum} WHERE Row={row} AND Column={column};";
             }
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
-            {
-                cmd.ExecuteNonQuery();
-            }
+                await cmd.ExecuteNonQueryAsync();
+            SaveToCash(value);
         }
+
 
         //---------------------------------------------------------------------------------------------------------
         //Универсальные CRUD 
@@ -389,8 +397,8 @@ namespace NLDB.DAL
         /// <returns></returns>
         public Term ToTerm(Word w, float confidence = 1)
         {
-            if (termsCash.TryGetValue(w.Id, out Term t)) return t;
             if (w == null) return null;
+            if (GetFromCash(w.Id, out Term t)) return t;
             t = new Term(
                 w.Rank,
                 w.Id,
@@ -406,7 +414,7 @@ namespace NLDB.DAL
             text = Parser.Normilize(text);
             return new DAL.Term(rank, 0, 0, text,
                 rank == 0 ? null :
-                parsers[rank - 1].
+                Parsers[rank - 1].
                 Split(text).
                 Where(s => !string.IsNullOrWhiteSpace(s)).
                 Select(s => ToTerm(s, rank - 1)));
@@ -418,28 +426,31 @@ namespace NLDB.DAL
         internal string[] Split(string text, int rank = -1)
         {
             if (rank == -1) rank = MaxRank;
-            return parsers[rank].Split(text);
+            return Parsers[rank].Split(text);
         }
 
         //---------------------------------------------------------------------------------------------------------
         //Методы работы с кэшем
         //---------------------------------------------------------------------------------------------------------
-        internal Word GetWordFromCash(int id)
+        private bool GetFromCash(int id, out Word result)
         {
-            if (wordsCash.TryGetValue(id, out Word result)) return result;
-            return null;
+            return wordsCash.TryGetValue(id, out result);
         }
 
-        internal Word GetSymbolFromCash(string symbol)
+        private bool GetFromCash(string symbol, out Word result)
         {
-            if (symbolsCash.TryGetValue(symbol, out Word result)) return result;
-            return null;
+            return symbolsCash.TryGetValue(symbol, out result);
         }
 
-        internal Term GetTermFromCash(int id)
+        private bool GetFromCash(int id, out Term result)
         {
-            if (termsCash.TryGetValue(id, out Term result)) return result;
-            return null;
+            return termsCash.TryGetValue(id, out result);
+        }
+
+        private bool GetFromCash(int row, int column, out AValue value)
+        {
+            long key = (((long)row) << 32) | (uint)column;
+            return (matrixACash.TryGetValue(key, out value));
         }
 
         private void SaveToCash(Term t)
@@ -464,6 +475,15 @@ namespace NLDB.DAL
             if (symbolsCash.Count > SYMBOLS_CASH_SIZE)
                 symbolsCash.Remove(symbolsCash.Keys.First());
             symbolsCash[s] = w;
+        }
+
+        private void SaveToCash(AValue value)
+        {
+            if (value == null) return;
+            long key = (((long)value.R) << 32) | (uint)value.C;
+            if (matrixACash.Count > MATRIXA_CASH_SIZE)
+                matrixACash.Remove(matrixACash.Keys.First());
+            matrixACash[key] = value;
         }
     }
 }

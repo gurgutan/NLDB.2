@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using NLDB.DAL;
 
 namespace NLDB
@@ -41,16 +42,30 @@ namespace NLDB
             return DB.Words($"Rank={rank} {limit}");
         }
 
-
         public Engine(string dbpath)
         {
             this.dbpath = dbpath;
             DB = new DataBase(dbpath);
         }
 
-        public void Clear()
+        public void Create()
         {
-            DB.ClearAll();
+            DB.Create();
+        }
+
+        public void Clear(string tableName = "")
+        {
+            if (tableName == "")
+                DB.ClearAll();
+            else
+                try
+                {
+                    DB.Clear(tableName);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Ошибка очистки таблицы {tableName}:{e.Message}");
+                }
         }
 
         public CalculationResult Execute(OperationType ptype, object parameter = null)
@@ -81,15 +96,19 @@ namespace NLDB
 
         private CalculationResult CalculateDistances(IEnumerable<Word> words)
         {
-            ProgressInformer informer = new ProgressInformer($"Матрица расстояний слов:", words.Count(), measurment: "слов", barSize: 64);
+            var sw = new Stopwatch();   //!!!
+            sw.Start();
+            ProgressInformer informer = new ProgressInformer($"Матрица расстояний:", words.Count(), measurment: "слов", barSize: 64);
             int i = 0;
-            int divider = 111;
+            int divider = 117;
             DB.BeginTransaction();
-            foreach (DAL.Word word in words)
+            foreach (Word word in words)
             {
-                i++;
-                if (i % divider == 0)
+                if (++i % divider == 0)
                 {
+                    sw.Stop();
+                    Debug.WriteLine(sw.Elapsed.TotalSeconds);
+                    sw.Restart();
                     informer.Set(i);
                 }
                 CalcPositionDistances(word);
@@ -100,24 +119,45 @@ namespace NLDB
             return new CalculationResult(this, OperationType.DistancesCalculation, ResultType.Success);
         }
 
-        private void CalcPositionDistances(DAL.Word w)
+        private void CalcPositionDistances(Word w)
         {
-            //List<Tuple<int, int, int, float>> result = new List<Tuple<int, int, int, float>>(w.childs.Length * w.childs.Length);
             int[] childs = w.ChildsId;
-            //Parallel.For(0, childs.Length - 1, (i) =>
-            for (int i = 0; i < childs.Length - 1; i++)
+            List<Tuple<int, int, int, int>>[] result = new List<Tuple<int, int, int, int>>[childs.Length - 1];
+            Parallel.For(0, childs.Length - 1, (i) =>
             {
+                result[i] = new List<Tuple<int, int, int, int>>(childs.Length - i);
                 for (int j = i + 1; j < childs.Length; j++)
                 {
                     if (childs[i] != childs[j])
                     {
-                        DB.SetAValue(w.Rank - 1, childs[i], childs[j], j - i);
-                        DB.SetAValue(w.Rank - 1, childs[j], childs[i], j - i);
+                        result[i].Add(new Tuple<int, int, int, int>(w.Rank - 1, childs[i], childs[j], i - j));
+                        result[i].Add(new Tuple<int, int, int, int>(w.Rank - 1, childs[i], childs[j], i - j));
                     }
                 }
-            }
+            });
+            //Сброс данных в БД
+            for (int i = 0; i < childs.Length - 1; i++)
+                foreach (Tuple<int, int, int, int> e in result[i])
+                {
+                    DB.SetAValue(e.Item1, e.Item2, e.Item3, e.Item4);
+                }
         }
 
+        //private void CalcPositionDistances(Word w)
+        //{
+        //    int[] childs = w.ChildsId;
+        //    for (int i = 0; i < childs.Length - 1; i++)
+        //    {
+        //        for (int j = i + 1; j < childs.Length; j++)
+        //        {
+        //            if (childs[i] != childs[j])
+        //            {
+        //                DB.SetAValue(w.Rank - 1, childs[i], childs[j], i - j);
+        //                DB.SetAValue(w.Rank - 1, childs[j], childs[i], i - j);
+        //            }
+        //        }
+        //    }
+        //}
 
         private CalculationResult ExtractWords(IEnumerable<string> strings, int rank)
         {
