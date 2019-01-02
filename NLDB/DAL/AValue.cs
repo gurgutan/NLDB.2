@@ -8,20 +8,20 @@
 
         public int C { get; set; }
 
-        public int Sum { get; set; }
+        public double Sum { get; set; }
         public int Count { get; set; }
 
-        public float Mean { get => (float)Sum / Count; }
+        public double Mean { get => Sum / Count; }
 
         public AValue()
         {
         }
 
-        public AValue(int rank, int r, int c, int sum, int count)
+        public AValue(int rank, int row, int column, double sum, int count)
         {
             Rank = rank;
-            R = r;
-            C = c;
+            R = row;
+            C = column;
             Sum = sum;
             Count = count;
         }

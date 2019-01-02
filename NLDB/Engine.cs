@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -16,9 +17,8 @@ namespace NLDB
         TextNormalization,
         TextSplitting,
         WordsExtraction,
-        WordsMeanCalculating,
-        WordsSimilarityCalculating,
-        DistancesCalculation
+        DistancesCalculation,
+        SimilarityCalculation
     };
 
     public enum ExecuteMode
@@ -88,33 +88,110 @@ namespace NLDB
                     CalculationResult = ExtractWords((IEnumerable<string>)parameter, Rank); break;
                 case OperationType.DistancesCalculation:
                     CalculationResult = CalculateDistances((IEnumerable<Word>)parameter); break;
+                case OperationType.SimilarityCalculation:
+                    CalculationResult = CalculateSimilarity((IList<Word>)parameter); break;
                 default:
                     throw new NotImplementedException();
             }
             return CalculationResult;
         }
 
+        //-------------------------------------------------------------------------------------------------------------------------------------------------------
+        private CalculationResult CalculateSimilarity(IList<Word> words)
+        {
+            Stopwatch stopwatch = new Stopwatch();  //!!! отладочный таймер
+            //Функция вычисляет попарные сходства между векторами-строками матрицы расстояний MatrixA и сохраняет результат в БД
+            //Матрица симметричная, с нулевой главной диагональю
+            int maxCount = words.Count();
+            if (maxCount == 0) return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Error);
+            using (ProgressInformer informer = new ProgressInformer(prompt: $"Матрица подобия:", max: maxCount - 1, measurment: $"слов р[{words.First().Rank}]", barSize: 64))
+            {
+                //Вычисления производятся порциями по step строк. Выбирается диапазон величиной step индексов
+                int step = 1 << 10;
+                for (int j = 0; j <= maxCount / step; j++)
+                {
+                    DB.BeginTransaction();
+                    stopwatch.Restart();    //!!!
+                    int from = j * step;                            //левый индекс диапазона
+                    int to = Math.Min(maxCount - 1, from + step);   //правый индекс диапазона
+                    int size = to - from;
+                    informer.Set(from);
+                    CalculateSubmatrixB(words[from].Id, words[to].Id, words[from].Rank);
+                    stopwatch.Stop();   //!!!
+                    Debug.WriteLine($"Подматрица подобия ({size}x{size}): {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
+                    DB.Commit();
+                }
+                informer.Set(maxCount - 1);
+            }
+            Data = null;
+            return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Success);
+        }
+
+        private void CalculateSubmatrixB(int from, int to, int rank)
+        {
+            //Функция вычисляет попарные расстояния между векторами-строками матрицы расстояний dmatrix и сохраняет результат в БД
+            Dictionary<int, SparseRow<double>> rows = DB.GetARows(from, to, rank);
+            List<List<BValue>> result = new List<List<BValue>>(rows.Count);
+            //Сначала вычисления с сохранением в несколько списков параллельно
+            rows.AsParallel().ForAll(row_a =>
+            {
+                List<BValue> result_row = new List<BValue>();
+                foreach (KeyValuePair<int, SparseRow<double>> row_b in rows)
+                {
+                    double s = CosDistance(row_a.Value, row_b.Value);
+                    if (s != 0)
+                        result_row.Add(new BValue(rank, row_a.Key, row_b.Key, s));
+                }
+                if (result_row.Count > 0) result.Add(result_row);
+            });
+            if (result.Count == 0) return;
+            //Запись в данных БД каждого из списков значений
+            result.AsParallel().ForAll(row => { DB.InsertAll(row); });
+        }
+
+        private double CosDistance(SparseRow<double> row_a, SparseRow<double> row_b)
+        {
+            double m = 0, asize = 0, bsize = 0;
+            foreach (int key_a in row_a.Keys)
+            {
+                double valueA = row_a[key_a];
+                if (row_b.TryGetValue(key_a, out double valueB))
+                {
+                    asize += valueA * valueA;
+                    bsize += valueB * valueB;
+                    m += valueA * valueB;
+                }
+            }
+            double divisor = Math.Sqrt(asize) * Math.Sqrt(bsize);
+            if (divisor > 0)
+                return m / divisor;
+            else
+                return 0;
+        }
+
+        //-------------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult CalculateDistances(IEnumerable<Word> words)
         {
-            var sw = new Stopwatch();   //!!!
-            sw.Start();
-            ProgressInformer informer = new ProgressInformer($"Матрица расстояний:", words.Count(), measurment: "слов", barSize: 64);
-            int i = 0;
-            int divider = 117;
-            DB.BeginTransaction();
-            foreach (Word word in words)
+            //Stopwatch sw = new Stopwatch();   //!!!
+            //sw.Start(); //!!!
+            using (ProgressInformer informer = new ProgressInformer($"Матрица расстояний:", words.Count(), measurment: "слов", barSize: 64))
             {
-                if (++i % divider == 0)
+                int i = 0, divider = 123;
+                DB.BeginTransaction();
+                foreach (Word word in words)
                 {
-                    sw.Stop();
-                    Debug.WriteLine(sw.Elapsed.TotalSeconds);
-                    sw.Restart();
-                    informer.Set(i);
+                    if (++i % divider == 0)
+                    {
+                        //sw.Stop();      //!!!
+                        //Debug.WriteLine(sw.Elapsed.TotalSeconds);
+                        //sw.Restart();   //!!!
+                        informer.Set(i);
+                    }
+                    CalcPositionDistances(word);
                 }
-                CalcPositionDistances(word);
+                informer.Set(i); // показать завершенный результат
+                DB.Commit();
             }
-            informer.Set(i); // показать завершенный результат
-            DB.Commit();
             Data = null;
             return new CalculationResult(this, OperationType.DistancesCalculation, ResultType.Success);
         }
@@ -122,43 +199,24 @@ namespace NLDB
         private void CalcPositionDistances(Word w)
         {
             int[] childs = w.ChildsId;
-            List<Tuple<int, int, int, int>>[] result = new List<Tuple<int, int, int, int>>[childs.Length - 1];
-            Parallel.For(0, childs.Length - 1, (i) =>
+
+            ConcurrentDictionary<int, List<AValue>> result = new ConcurrentDictionary<int, List<AValue>>(4, childs.Length - 1);
+            Parallel.For(0, childs.Length, (i) =>
             {
-                result[i] = new List<Tuple<int, int, int, int>>(childs.Length - i);
-                for (int j = i + 1; j < childs.Length; j++)
+                result[i] = new List<AValue>(childs.Length - i);
+                for (int j = 0; j < childs.Length; j++)
                 {
                     if (childs[i] != childs[j])
                     {
-                        result[i].Add(new Tuple<int, int, int, int>(w.Rank - 1, childs[i], childs[j], i - j));
-                        result[i].Add(new Tuple<int, int, int, int>(w.Rank - 1, childs[i], childs[j], i - j));
+                        result[i].Add(new AValue(w.Rank - 1, childs[i], childs[j], j - i, 1));
                     }
                 }
             });
             //Сброс данных в БД
-            for (int i = 0; i < childs.Length - 1; i++)
-                foreach (Tuple<int, int, int, int> e in result[i])
-                {
-                    DB.SetAValue(e.Item1, e.Item2, e.Item3, e.Item4);
-                }
+            result.Values.ToList().ForEach(r => DB.InsertAll(r));
         }
 
-        //private void CalcPositionDistances(Word w)
-        //{
-        //    int[] childs = w.ChildsId;
-        //    for (int i = 0; i < childs.Length - 1; i++)
-        //    {
-        //        for (int j = i + 1; j < childs.Length; j++)
-        //        {
-        //            if (childs[i] != childs[j])
-        //            {
-        //                DB.SetAValue(w.Rank - 1, childs[i], childs[j], i - j);
-        //                DB.SetAValue(w.Rank - 1, childs[j], childs[i], i - j);
-        //            }
-        //        }
-        //    }
-        //}
-
+        //-------------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult ExtractWords(IEnumerable<string> strings, int rank)
         {
             DB.BeginTransaction();
@@ -177,7 +235,7 @@ namespace NLDB
         private int[] ExtractWordsFromString(string text, int rank)
         {
             IEnumerable<string> strings = DB.Split(text, rank).Where(s => !string.IsNullOrEmpty(s));
-            return strings.Select<string, int>(s =>
+            return strings.Select(s =>
             {
                 int id;
                 int[] childsId = null;
@@ -188,18 +246,18 @@ namespace NLDB
                     if (childsId.Length == 0) return 0;
                     string childsString = string.Join(",", childsId);//.Aggregate("", (c, n) => c + (c != "" ? "," : "") + n.ToString());
                     //Пробуем найти Слово по дочерним элементам
-                    DAL.Word word = DB.GetWordByChilds(childsString);
+                    Word word = DB.GetWordByChilds(childsString);
                     if (word == null)
-                        id = DB.Add(new DAL.Word() { Rank = rank, Symbol = "", Childs = childsString });
+                        id = DB.Add(new Word() { Rank = rank, Symbol = "", Childs = childsString });
                     else
                         id = word.Id;
                 }
                 else
                 {
                     //Пробуем найти Слово по символу
-                    DAL.Word word = DB.GetWordBySymbol(s);
+                    Word word = DB.GetWordBySymbol(s);
                     if (word == null)
-                        id = DB.Add(new DAL.Word() { Rank = rank, Symbol = s });
+                        id = DB.Add(new Word() { Rank = rank, Symbol = s });
                     else
                         id = word.Id;
                 }
@@ -209,6 +267,7 @@ namespace NLDB
             .ToArray();          //получим результат сразу
         }
 
+        //-------------------------------------------------------------------------------------------------------------------------------------------------------
         internal Term Recognize(Term term, int rank)
         {
             if (term.rank == 0)
@@ -259,6 +318,7 @@ namespace NLDB
             }
         }
 
+        //-------------------------------------------------------------------------------------------------------------------------------------------------------
         internal List<Term> Similars(string text, int rank, int count)
         {
             if (count <= 0) throw new ArgumentException("Количество возращаемых значений должно быть положительным");
@@ -302,6 +362,7 @@ namespace NLDB
             return context.Take(count).ToList();
         }
 
+        //-------------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult ReadFile(string filename)
         {
             if (!File.Exists(filename))
@@ -313,6 +374,7 @@ namespace NLDB
             return new CalculationResult(this, OperationType.FileReading, ResultType.Success);
         }
 
+        //-------------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult WriteFile(string filename)
         {
             //TODO: продумать сохранение в файл разнух типов данных, хранимых по ссылке Data
@@ -349,7 +411,7 @@ namespace NLDB
             DB.Insert(splitter);
         }
 
-        public Term ToTerm(DAL.Word word)
+        public Term ToTerm(Word word)
         {
             return DB.ToTerm(word);
         }

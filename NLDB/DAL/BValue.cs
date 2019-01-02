@@ -8,6 +8,14 @@
 
         public int C { get; set; }
 
-        public int Similarity { get; set; }
+        public double Similarity { get; set; }
+
+        public BValue(int rank, int row, int column, double s)
+        {
+            Rank = rank;
+            R = row;
+            C = column;
+            Similarity = s;
+        }
     }
 }

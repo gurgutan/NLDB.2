@@ -5,6 +5,7 @@ using System.Data.SQLite;
 using System.Linq;
 using System.Threading.Tasks;
 
+
 namespace NLDB.DAL
 {
     public class DataBase : IDisposable
@@ -12,6 +13,20 @@ namespace NLDB.DAL
         private SQLiteConnection db;
         private SQLiteTransaction transaction;
         private Parser[] parsers = null;
+
+        private readonly Dictionary<long, AValue> matrixACash = new Dictionary<long, AValue>(MATRIXA_CASH_SIZE);
+        private readonly Dictionary<long, BValue> matrixBCash = new Dictionary<long, BValue>(MATRIXB_CASH_SIZE);
+        private readonly Dictionary<int, Term> termsCash = new Dictionary<int, Term>(TERMS_CASH_SIZE);
+        private readonly Dictionary<int, Word> wordsCash = new Dictionary<int, Word>(WORDS_CASH_SIZE);
+        private readonly Dictionary<string, Word> symbolsCash = new Dictionary<string, Word>(SYMBOLS_CASH_SIZE);
+
+        private const int MATRIXA_CASH_SIZE = 1 << 18;
+        private const int MATRIXB_CASH_SIZE = 1 << 18;
+        private const int TERMS_CASH_SIZE = 1 << 18;
+        private const int WORDS_CASH_SIZE = 1 << 18;
+        private const int SYMBOLS_CASH_SIZE = 1 << 10;
+
+
         public Parser[] Parsers
         {
             get
@@ -21,18 +36,6 @@ namespace NLDB.DAL
                 return parsers;
             }
         }
-
-        private readonly Dictionary<long, AValue> matrixACash = new Dictionary<long, AValue>(MATRIXA_CASH_SIZE);
-        private readonly Dictionary<int, Term> termsCash = new Dictionary<int, Term>(TERMS_CASH_SIZE);
-        private readonly Dictionary<int, Word> wordsCash = new Dictionary<int, Word>(WORDS_CASH_SIZE);
-        private readonly Dictionary<string, Word> symbolsCash = new Dictionary<string, Word>(SYMBOLS_CASH_SIZE);
-
-        private const int MATRIXA_CASH_SIZE = 1 << 18;
-        private const int TERMS_CASH_SIZE = 1 << 18;
-        private const int WORDS_CASH_SIZE = 1 << 18;
-        private const int SYMBOLS_CASH_SIZE = 1 << 10;
-
-
         //---------------------------------------------------------------------------------------------------------
         //Конструкторы, деструктор
         //---------------------------------------------------------------------------------------------------------
@@ -60,11 +63,11 @@ namespace NLDB.DAL
                 "DROP TABLE IF EXISTS Parents;" +
                 "DROP TABLE IF EXISTS MatrixA;" +
                 "DROP TABLE IF EXISTS MatrixB;" +
-                "CREATE TABLE NOT IF EXISTS Splitters (Rank, Expression, PRIMARY KEY(Rank, Expression));" +
-                "CREATE TABLE NOT IF EXISTS Words (Id INTEGER PRIMARY KEY, Rank INTEGER NOT NULL, Symbol TEXT, Childs TEXT);" +
-                "CREATE TABLE NOT IF EXISTS Parents (WordId INTEGER NOT NULL, ParentId INTEGER NOT NULL);" +
-                "CREATE TABLE NOT IF EXISTS MatrixA (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Count INTEGER NOT NULL, Sum INTEGER NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
-                "CREATE TABLE NOT IF EXISTS MatrixB (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Similarity REAL NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
+                "CREATE TABLE Splitters (Rank, Expression, PRIMARY KEY(Rank, Expression));" +
+                "CREATE TABLE Words (Id INTEGER PRIMARY KEY, Rank INTEGER NOT NULL, Symbol TEXT, Childs TEXT);" +
+                "CREATE TABLE Parents (WordId INTEGER NOT NULL, ParentId INTEGER NOT NULL);" +
+                "CREATE TABLE MatrixA (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Count INTEGER NOT NULL, Sum REAL NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
+                "CREATE TABLE MatrixB (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Similarity REAL NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
                 "CREATE INDEX IWords_childs ON Words(Childs); " +
                 "CREATE INDEX IParents_id ON Parents(WordId);" +
                 "CREATE INDEX IParents_parentid ON Parents(ParentId);" +
@@ -131,6 +134,8 @@ namespace NLDB.DAL
         }
 
         private int currentId;
+
+
         private int CurrentId
         {
             get
@@ -337,7 +342,7 @@ namespace NLDB.DAL
                     R = row,
                     C = column,
                     Count = reader.GetInt32(2),
-                    Sum = reader.GetInt32(3)
+                    Sum = reader.GetDouble(3)
                 };
             }
         }
@@ -348,6 +353,7 @@ namespace NLDB.DAL
             string text;
             if (value == null)
             {
+                value = new AValue(rank, row, column, d, 1);
                 text = $"INSERT INTO MatrixA(Row, Column, Count, Sum, Rank) SELECT {row}, {column}, 1, {d}, {rank};";
             }
             else
@@ -361,9 +367,136 @@ namespace NLDB.DAL
             SaveToCash(value);
         }
 
+        public async void InsertAll(IList<AValue> values)
+        {
+            string updateText = $"UPDATE MatrixA SET Count=@cnt, Sum=@sm WHERE Row=@r AND Column=@c;";
+            string insertText = $"INSERT INTO MatrixA(Row, Column, Count, Sum, Rank) SELECT @r, @c, @cnt, @sm, @rnk;";
+            using (SQLiteCommand cmdUpdate = new SQLiteCommand(updateText, db))
+            using (SQLiteCommand cmdInsert = new SQLiteCommand(insertText, db))
+            {
+                //Параметры команды вставки
+                cmdInsert.Parameters.Add("@rnk", System.Data.DbType.Int32);
+                cmdInsert.Parameters.Add("@r", System.Data.DbType.Int32);
+                cmdInsert.Parameters.Add("@c", System.Data.DbType.Int32);
+                cmdInsert.Parameters.Add("@cnt", System.Data.DbType.Int32);
+                cmdInsert.Parameters.Add("@sm", System.Data.DbType.Double);
+                //Параметры команды замены
+                cmdUpdate.Parameters.Add("@r", System.Data.DbType.Int32);
+                cmdUpdate.Parameters.Add("@c", System.Data.DbType.Int32);
+                cmdUpdate.Parameters.Add("@cnt", System.Data.DbType.Int32);
+                cmdUpdate.Parameters.Add("@sm", System.Data.DbType.Double);
+                foreach (AValue v in values)
+                {
+                    //Поиск в БД значения соответствующего v
+                    AValue value = GetAValue(v.R, v.C, v.Rank).Result;
+                    if (value == null)
+                    {
+                        value = v;
+                        cmdInsert.Parameters["@rnk"].Value = value.Rank;
+                        cmdInsert.Parameters["@r"].Value = value.R;
+                        cmdInsert.Parameters["@c"].Value = value.C;
+                        cmdInsert.Parameters["@cnt"].Value = value.Count;
+                        cmdInsert.Parameters["@sm"].Value = value.Sum;
+                        await cmdInsert.ExecuteNonQueryAsync();
+                    }
+                    else
+                    {
+                        value.Count += v.Count;
+                        value.Sum += v.Sum;
+                        cmdUpdate.Parameters["@r"].Value = value.R;
+                        cmdUpdate.Parameters["@c"].Value = value.C;
+                        cmdUpdate.Parameters["@cnt"].Value = value.Count;
+                        cmdUpdate.Parameters["@sm"].Value = value.Sum;
+                        await cmdUpdate.ExecuteNonQueryAsync();
+                    }
+                    //SaveToCash(value);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Возвращает строки матрицы MatrixA ранга rank с Row из интервала [from,to)
+        /// </summary>
+        /// <param name="from"></param>
+        /// <param name="to"></param>
+        /// <param name="rank"></param>
+        /// <returns></returns>
+        public Dictionary<int, SparseRow<double>> GetARows(int from, int to, int rank)
+        {
+            if (from > to) Swap(ref from, ref to);
+            Dictionary<int, SparseRow<double>> rows = new Dictionary<int, SparseRow<double>>(1 << 10);
+            string text = $"SELECT Row, Column, Sum, Count AS Value FROM MatrixA " +
+                          $"WHERE {from}<=Row AND Row<{to} AND Rank={rank} ";
+            using (SQLiteCommand cmd = new SQLiteCommand(text, db))
+            {
+                SQLiteDataReader reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    AValue value = new AValue(rank: rank, row: reader.GetInt32(0), column: reader.GetInt32(1), sum: reader.GetDouble(2), count: reader.GetInt32(3));
+                    if (!rows.TryGetValue(value.R, out SparseRow<double> row))
+                    {
+                        row = new SparseRow<double>();
+                        rows[value.R] = row;
+                    }
+                    row[value.C] = value.Mean;
+                }
+                return rows;
+            }
+        }
+
+        internal void Swap(ref int a, ref int b)
+        {
+            int tmp = a;
+            a = b;
+            b = tmp;
+        }
 
         //---------------------------------------------------------------------------------------------------------
-        //Универсальные CRUD 
+        //CRUD для MatrixB
+        //---------------------------------------------------------------------------------------------------------
+        //Row INTEGER NOT NULL, Column INTEGER NOT NULL, Similarity REAL NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column)
+        public async Task<BValue> GetBValue(int row, int column, int rank)
+        {
+            if (GetFromCash(row, column, out BValue value)) return value;
+            using (SQLiteCommand cmd = new SQLiteCommand($"SELECT Row, Column, Similarity, Rank FROM MatrixB WHERE Row={row} AND Column={column} LIMIT 1", db))
+            {
+                DbDataReader reader = await cmd.ExecuteReaderAsync();
+                if (!reader.Read()) return null;
+                return new BValue(rank, row, column, reader.GetInt32(2));
+            }
+        }
+
+        public async void SetBValue(int rank, int row, int column, int s)
+        {
+            BValue value = new BValue(rank, row, column, s);
+            string text = $"INSERT OR REPLACE INTO MatrixB(Row, Column, Similarity, Rank) SELECT {value.R}, {value.C}, {value.Similarity}, {value.Rank};";
+            using (SQLiteCommand cmd = new SQLiteCommand(text, db))
+                await cmd.ExecuteNonQueryAsync();
+            SaveToCash(value);
+        }
+
+        public async void InsertAll(IList<BValue> values)
+        {
+            string text = $"INSERT OR REPLACE INTO MatrixB(Row, Column, Similarity, Rank) VALUES (@r, @c, @s, @rnk);";
+            using (SQLiteCommand cmd = new SQLiteCommand(text, db))
+            {
+                cmd.Parameters.Add("@r", System.Data.DbType.Int32);
+                cmd.Parameters.Add("@c", System.Data.DbType.Int32);
+                cmd.Parameters.Add("@s", System.Data.DbType.Double);
+                cmd.Parameters.Add("@rnk", System.Data.DbType.Int32);
+                foreach (BValue v in values)
+                {
+                    cmd.Parameters["@rnk"].Value = v.Rank;
+                    cmd.Parameters["@r"].Value = v.R;
+                    cmd.Parameters["@c"].Value = v.C;
+                    cmd.Parameters["@s"].Value = v.Similarity;
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        //---------------------------------------------------------------------------------------------------------
+        //Универсальные CRUD
         //---------------------------------------------------------------------------------------------------------
         private void ExecuteCommand(string text)
         {
@@ -453,6 +586,12 @@ namespace NLDB.DAL
             return (matrixACash.TryGetValue(key, out value));
         }
 
+        private bool GetFromCash(int row, int column, out BValue value)
+        {
+            long key = (((long)row) << 32) | (uint)column;
+            return (matrixBCash.TryGetValue(key, out value));
+        }
+
         private void SaveToCash(Term t)
         {
             if (t == null) return;
@@ -484,6 +623,15 @@ namespace NLDB.DAL
             if (matrixACash.Count > MATRIXA_CASH_SIZE)
                 matrixACash.Remove(matrixACash.Keys.First());
             matrixACash[key] = value;
+        }
+
+        private void SaveToCash(BValue value)
+        {
+            if (value == null) return;
+            long key = (((long)value.R) << 32) | (uint)value.C;
+            if (matrixBCash.Count > MATRIXB_CASH_SIZE)
+                matrixBCash.Remove(matrixBCash.Keys.First());
+            matrixBCash[key] = value;
         }
     }
 }

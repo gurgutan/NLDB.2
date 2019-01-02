@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using NLDB.DAL;
 
@@ -11,24 +10,30 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
-            string dbpath = @"D:\Data\Result\5mb.db";
-            Engine engine = new Engine(dbpath);
-            //engine.Clear();// "Splitters");
-            engine.Clear("MatrixA");
+            string trainfile = @"D:\Data\Wiki\ru\254kb.txt";
+            string dbpath = @"D:\Data\Result\254kb.db";
+            Engine engine = new Engine(dbpath)
+            {
+                ExecuteMode = ExecuteMode.Verbose
+            };
+            //engine.Create();
             //engine.Insert(new Splitter(0, ""));
             //engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
             //engine.Insert(new Splitter(2, @"[\n\r\:\;]+"));
             //engine.Insert(new Splitter(3, @"\[\[{число}\]\]"));
-            engine.ExecuteMode = ExecuteMode.Verbose;
             //engine
             //    .Execute(OperationType.FileReading, trainfile)
             //    .Then(OperationType.TextNormalization)
             //    .Then(OperationType.TextSplitting)
             //    .Then(OperationType.WordsExtraction);
-            engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
-            engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
-            engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
+            //engine.Clear("MatrixA");
+            //engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
+            //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
+            //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
+            engine.Clear("MatrixB");
+            engine.Execute(OperationType.SimilarityCalculation, engine.Words(0));
+            engine.Execute(OperationType.SimilarityCalculation, engine.Words(1));
+            engine.Execute(OperationType.SimilarityCalculation, engine.Words(2));
             //engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath,"words"));
             //.Then(ProcessingType.WordsMean)
             //.Then(ProcessingType.WordsSimilarity);
