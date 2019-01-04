@@ -117,11 +117,11 @@
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="Deprecated\Grammar.cs" />
     <Compile Include="Deprecated\Lexicon.cs" />
-    <Compile Include="MeanValue.cs" />
+    <Compile Include="Deprecated\MeanValue.cs" />
     <Compile Include="Pointer.cs" />
     <Compile Include="ProgressInformer.cs" />
     <Compile Include="Sequence.cs" />
-    <Compile Include="Primes.cs" />
+    <Compile Include="Deprecated\Primes.cs" />
     <Compile Include="Deprecated\Language.cs" />
     <Compile Include="Parser.cs" />
     <Compile Include="Program.cs" />

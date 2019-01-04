@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Data.SQLite;
@@ -10,20 +11,21 @@ namespace NLDB.DAL
 {
     public class DataBase : IDisposable
     {
+        private const int PARALLELIZM = 4;
         private SQLiteConnection db;
         private SQLiteTransaction transaction;
         private Parser[] parsers = null;
 
-        private readonly Dictionary<long, AValue> matrixACash = new Dictionary<long, AValue>(MATRIXA_CASH_SIZE);
-        private readonly Dictionary<long, BValue> matrixBCash = new Dictionary<long, BValue>(MATRIXB_CASH_SIZE);
+        private readonly ConcurrentDictionary<long, AValue> matrixACash = new ConcurrentDictionary<long, AValue>(PARALLELIZM, MATRIXA_CASH_SIZE);
+        private readonly ConcurrentDictionary<long, BValue> matrixBCash = new ConcurrentDictionary<long, BValue>(PARALLELIZM, MATRIXB_CASH_SIZE);
         private readonly Dictionary<int, Term> termsCash = new Dictionary<int, Term>(TERMS_CASH_SIZE);
         private readonly Dictionary<int, Word> wordsCash = new Dictionary<int, Word>(WORDS_CASH_SIZE);
         private readonly Dictionary<string, Word> symbolsCash = new Dictionary<string, Word>(SYMBOLS_CASH_SIZE);
 
-        private const int MATRIXA_CASH_SIZE = 1 << 18;
-        private const int MATRIXB_CASH_SIZE = 1 << 18;
-        private const int TERMS_CASH_SIZE = 1 << 18;
-        private const int WORDS_CASH_SIZE = 1 << 18;
+        private const int MATRIXA_CASH_SIZE = 1 << 20;
+        private const int MATRIXB_CASH_SIZE = 1 << 20;
+        private const int TERMS_CASH_SIZE = 1 << 20;
+        private const int WORDS_CASH_SIZE = 1 << 20;
         private const int SYMBOLS_CASH_SIZE = 1 << 10;
 
 
@@ -214,7 +216,7 @@ namespace NLDB.DAL
                 if (reader.Read())
                     word = new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3));
             }
-            SaveToCash(word);
+            AddToCash(word);
             return word;
         }
 
@@ -284,7 +286,7 @@ namespace NLDB.DAL
                     };
                 }
             }
-            SaveToCash(s, word);
+            AddToCash(s, word);
             return word;
         }
 
@@ -364,10 +366,10 @@ namespace NLDB.DAL
             }
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
                 await cmd.ExecuteNonQueryAsync();
-            SaveToCash(value);
+            AddToCash(value);
         }
 
-        public async void InsertAll(IList<AValue> values)
+        public async void InsertAll(IEnumerable<AValue> values)
         {
             string updateText = $"UPDATE MatrixA SET Count=@cnt, Sum=@sm WHERE Row=@r AND Column=@c;";
             string insertText = $"INSERT INTO MatrixA(Row, Column, Count, Sum, Rank) SELECT @r, @c, @cnt, @sm, @rnk;";
@@ -409,7 +411,7 @@ namespace NLDB.DAL
                         cmdUpdate.Parameters["@sm"].Value = value.Sum;
                         await cmdUpdate.ExecuteNonQueryAsync();
                     }
-                    //SaveToCash(value);
+                    //AddToCash(value);
                 }
             }
         }
@@ -427,6 +429,29 @@ namespace NLDB.DAL
             Dictionary<int, SparseRow<double>> rows = new Dictionary<int, SparseRow<double>>(1 << 10);
             string text = $"SELECT Row, Column, Sum, Count AS Value FROM MatrixA " +
                           $"WHERE {from}<=Row AND Row<{to} AND Rank={rank} ";
+            using (SQLiteCommand cmd = new SQLiteCommand(text, db))
+            {
+                SQLiteDataReader reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    AValue value = new AValue(rank: rank, row: reader.GetInt32(0), column: reader.GetInt32(1), sum: reader.GetDouble(2), count: reader.GetInt32(3));
+                    if (!rows.TryGetValue(value.R, out SparseRow<double> row))
+                    {
+                        row = new SparseRow<double>();
+                        rows[value.R] = row;
+                    }
+                    row[value.C] = value.Mean;
+                }
+                return rows;
+            }
+        }
+
+        public Dictionary<int, SparseRow<double>> GetARows(IEnumerable<Word> words, int rank)
+        {
+            string rows_id = String.Join(",", words.Select(w => w.Id.ToString()));
+            Dictionary<int, SparseRow<double>> rows = new Dictionary<int, SparseRow<double>>(words.Count());
+            string text = $"SELECT Row, Column, Sum, Count AS Value FROM MatrixA " +
+                          $"WHERE Row IN ({rows_id});";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
             {
                 SQLiteDataReader reader = cmd.ExecuteReader();
@@ -472,11 +497,12 @@ namespace NLDB.DAL
             string text = $"INSERT OR REPLACE INTO MatrixB(Row, Column, Similarity, Rank) SELECT {value.R}, {value.C}, {value.Similarity}, {value.Rank};";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
                 await cmd.ExecuteNonQueryAsync();
-            SaveToCash(value);
+            AddToCash(value);
         }
 
         public async void InsertAll(IList<BValue> values)
         {
+            //Не предполагается изменение значений MatrixB, поэтому только замена: "INSERT OR REPLACE"
             string text = $"INSERT OR REPLACE INTO MatrixB(Row, Column, Similarity, Rank) VALUES (@r, @c, @s, @rnk);";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
             {
@@ -538,7 +564,7 @@ namespace NLDB.DAL
                 _confidence: confidence,
                 _text: w.Symbol,
                 _childs: w.Rank == 0 ? null : w.ChildsId.Select(c => ToTerm(GetWord(c))));
-            SaveToCash(t);
+            AddToCash(t);
             return t;
         }
 
@@ -592,7 +618,7 @@ namespace NLDB.DAL
             return (matrixBCash.TryGetValue(key, out value));
         }
 
-        private void SaveToCash(Term t)
+        private void AddToCash(Term t)
         {
             if (t == null) return;
             if (termsCash.Count > TERMS_CASH_SIZE)
@@ -600,7 +626,7 @@ namespace NLDB.DAL
             termsCash[t.id] = t;
         }
 
-        private void SaveToCash(Word w)
+        private void AddToCash(Word w)
         {
             if (w == null) return;
             if (wordsCash.Count > WORDS_CASH_SIZE)
@@ -608,7 +634,7 @@ namespace NLDB.DAL
             wordsCash[w.Id] = w;
         }
 
-        private void SaveToCash(string s, Word w)
+        private void AddToCash(string s, Word w)
         {
             if (w == null) return;
             if (symbolsCash.Count > SYMBOLS_CASH_SIZE)
@@ -616,22 +642,40 @@ namespace NLDB.DAL
             symbolsCash[s] = w;
         }
 
-        private void SaveToCash(AValue value)
+        private void AddToCash(AValue value)
         {
             if (value == null) return;
             long key = (((long)value.R) << 32) | (uint)value.C;
             if (matrixACash.Count > MATRIXA_CASH_SIZE)
-                matrixACash.Remove(matrixACash.Keys.First());
+                RemoveFromCash(matrixACash, 2);
+                //matrixACash.TryRemove(matrixACash.Keys.First(), out AValue anyValue);
             matrixACash[key] = value;
         }
 
-        private void SaveToCash(BValue value)
+        private void AddToCash(BValue value)
         {
             if (value == null) return;
             long key = (((long)value.R) << 32) | (uint)value.C;
             if (matrixBCash.Count > MATRIXB_CASH_SIZE)
-                matrixBCash.Remove(matrixBCash.Keys.First());
+                RemoveFromCash(matrixBCash, 2);
+            //matrixBCash.Remove(matrixBCash.Keys.First());
             matrixBCash[key] = value;
         }
+
+        private void RemoveFromCash(ConcurrentDictionary<long, AValue> cash, int count)
+        {
+            int current = 0;
+            while (current < count && cash.Count > 0)
+                current += cash.TryRemove(cash.First().Key, out AValue value) ? 1 : 0;
+        }
+
+        private void RemoveFromCash(ConcurrentDictionary<long, BValue> cash, int count)
+        {
+            int current = 0;
+            while (current < count && cash.Count > 0)
+                current += cash.TryRemove(cash.First().Key, out BValue value) ? 1 : 0;
+        }
+
+
     }
 }
