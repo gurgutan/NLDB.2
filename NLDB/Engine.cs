@@ -118,16 +118,16 @@ namespace NLDB
                 {
                     DB.BeginTransaction();
                     stopwatch.Restart();    //!!!
+                    int rowsLeft = i * step;
+                    List<Word> rows = words.Skip(rowsLeft).Take(step).ToList();
                     for (int j = 0; j <= maxCount / step; j++)
                     {
-                        int rowsLeft = i * step;
                         int columnsLeft = j * step;
-                        List<Word> rows = words.Skip(rowsLeft).Take(step).ToList();
                         List<Word> columns = words.Skip(columnsLeft).Take(step).ToList();
                         CalculateSubmatrixB(rows, columns, rank);
                     }
                     DB.Commit();
-                    informer.Set(i * step);
+                    informer.Set(i * step + rows.Count);
                     stopwatch.Stop();   //!!!
                     Debug.WriteLine($"Подматрица подобия ({maxCount}x{maxCount}): {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
                 }
@@ -141,8 +141,8 @@ namespace NLDB
         private void CalculateSubmatrixB(IList<Word> row_words, IList<Word> column_words, int rank)
         {
             //Функция вычисляет попарные расстояния между векторами-строками матрицы расстояний dmatrix и сохраняет результат в БД
-            Dictionary<int, SparseRow<double>> rows = DB.GetARows(row_words, rank);
-            Dictionary<int, SparseRow<double>> columns = DB.GetARows(column_words, rank);
+            SparseMatrix<double> rows = DB.GetARows(row_words, rank);
+            SparseMatrix<double> columns = DB.GetARows(column_words, rank);
             if (rows.Count == 0 || columns.Count == 0) return;
             List<List<BValue>> result = new List<List<BValue>>(row_words.Count);
             //Сначала вычисления с сохранением в несколько списков параллельно
@@ -152,8 +152,11 @@ namespace NLDB
                 List<BValue> result_row = new List<BValue>();
                 foreach (KeyValuePair<int, SparseRow<double>> column in columns)
                 {
-                    if (row.Key == column.Key) continue;
-                    double d = CosDistance(row.Value, column.Value);
+                    double d;
+                    if (row.Key == column.Key)
+                        d = 1;  //Cos(0)=1
+                    else
+                        d = CosDistance(row.Value, column.Value);
                     if (d != 0)
                         result_row.Add(new BValue(rank, row.Key, column.Key, d));
                 }
@@ -198,7 +201,7 @@ namespace NLDB
                 {
                     DB.BeginTransaction();
                     int from = j * step;    //левый индекс диапазона
-                    informer.Set(from);
+                    informer.Set(from + step);
                     IEnumerable<Word> wordsPacket = words.Skip(from).Take(step).ToList();
                     PositionsMean(wordsPacket);
                     DB.Commit();
@@ -446,6 +449,6 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         private DataBase DB { get; }
         private readonly string dbpath;
-        private readonly int STEPS_COUNT = 1024;
+        private const int STEPS_COUNT = 4096;
     }
 }

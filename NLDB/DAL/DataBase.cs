@@ -16,12 +16,14 @@ namespace NLDB.DAL
         private SQLiteTransaction transaction;
         private Parser[] parsers = null;
 
+        private readonly Dictionary<string, SparseMatrix<double>> sparseMatrixCash = new Dictionary<string, SparseMatrix<double>>(SPARSEMATRIX_CASH_SIZE);
         private readonly ConcurrentDictionary<long, AValue> matrixACash = new ConcurrentDictionary<long, AValue>(PARALLELIZM, MATRIXA_CASH_SIZE);
         private readonly ConcurrentDictionary<long, BValue> matrixBCash = new ConcurrentDictionary<long, BValue>(PARALLELIZM, MATRIXB_CASH_SIZE);
         private readonly Dictionary<int, Term> termsCash = new Dictionary<int, Term>(TERMS_CASH_SIZE);
         private readonly Dictionary<int, Word> wordsCash = new Dictionary<int, Word>(WORDS_CASH_SIZE);
         private readonly Dictionary<string, Word> symbolsCash = new Dictionary<string, Word>(SYMBOLS_CASH_SIZE);
 
+        private const int SPARSEMATRIX_CASH_SIZE = 1 << 20;
         private const int MATRIXA_CASH_SIZE = 1 << 20;
         private const int MATRIXB_CASH_SIZE = 1 << 20;
         private const int TERMS_CASH_SIZE = 1 << 20;
@@ -446,12 +448,13 @@ namespace NLDB.DAL
             }
         }
 
-        public Dictionary<int, SparseRow<double>> GetARows(IEnumerable<Word> words, int rank)
+        public SparseMatrix<double> GetARows(IList<Word> words, int rank)
         {
-            string rows_id = String.Join(",", words.Select(w => w.Id.ToString()));
-            Dictionary<int, SparseRow<double>> rows = new Dictionary<int, SparseRow<double>>(words.Count());
+            string rows_ids = string.Join(",", words.Select(w => w.Id.ToString()));
+            if (GetFromCash(rows_ids, out SparseMatrix<double> rows)) return rows;
+            rows = new SparseMatrix<double>();
             string text = $"SELECT Row, Column, Sum, Count AS Value FROM MatrixA " +
-                          $"WHERE Row IN ({rows_id});";
+                          $"WHERE Row IN ({rows_ids});";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
             {
                 SQLiteDataReader reader = cmd.ExecuteReader();
@@ -465,6 +468,7 @@ namespace NLDB.DAL
                     }
                     row[value.C] = value.Mean;
                 }
+                AddToCash(rows_ids, rows);
                 return rows;
             }
         }
@@ -648,7 +652,6 @@ namespace NLDB.DAL
             long key = (((long)value.R) << 32) | (uint)value.C;
             if (matrixACash.Count > MATRIXA_CASH_SIZE)
                 RemoveFromCash(matrixACash, 2);
-                //matrixACash.TryRemove(matrixACash.Keys.First(), out AValue anyValue);
             matrixACash[key] = value;
         }
 
@@ -658,8 +661,27 @@ namespace NLDB.DAL
             long key = (((long)value.R) << 32) | (uint)value.C;
             if (matrixBCash.Count > MATRIXB_CASH_SIZE)
                 RemoveFromCash(matrixBCash, 2);
-            //matrixBCash.Remove(matrixBCash.Keys.First());
             matrixBCash[key] = value;
+        }
+
+        private void AddToCash(string key, SparseMatrix<double> m)
+        {
+            if (m == null) return;
+            if (sparseMatrixCash.Count > SPARSEMATRIX_CASH_SIZE)
+                RemoveFromCash(sparseMatrixCash, 2);
+            sparseMatrixCash[key] = m;
+        }
+
+        private bool GetFromCash(string key, out SparseMatrix<double> m)
+        {
+            return (sparseMatrixCash.TryGetValue(key, out m));
+        }
+
+        private void RemoveFromCash(Dictionary<string, SparseMatrix<double>> cash, int count)
+        {
+            int current = 0;
+            while (current < count && cash.Count > 0)
+                current += cash.Remove(cash.First().Key) ? 1 : 0;
         }
 
         private void RemoveFromCash(ConcurrentDictionary<long, AValue> cash, int count)
@@ -675,7 +697,5 @@ namespace NLDB.DAL
             while (current < count && cash.Count > 0)
                 current += cash.TryRemove(cash.First().Key, out BValue value) ? 1 : 0;
         }
-
-
     }
 }
