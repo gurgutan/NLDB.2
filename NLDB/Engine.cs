@@ -107,6 +107,7 @@ namespace NLDB
             //Функция вычисляет попарные сходства между векторами-строками матрицы расстояний MatrixA и сохраняет результат в БД
             //Матрица симметричная, с нулевой главной диагональю
             int maxCount = words.Count();
+            long elementsCount = 0;
             int rank = words.First().Rank;
             if (maxCount == 0) return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Error);
             int iterationsCount = maxCount * maxCount;
@@ -119,15 +120,16 @@ namespace NLDB
                     DB.BeginTransaction();
                     stopwatch.Restart();    //!!!
                     int rowsLeft = i * step;
-                    List<Word> rows = words.Skip(rowsLeft).Take(step).ToList();
-                    for (int j = 0; j <= maxCount / step; j++)
+                    informer.Set(rowsLeft);
+                    SparseMatrix rows = DB.GetARows(words.Skip(rowsLeft).Take(step).ToList(), rank);
+                    for (int j = i; j <= maxCount / step; j++)
                     {
                         int columnsLeft = j * step;
-                        List<Word> columns = words.Skip(columnsLeft).Take(step).ToList();
-                        CalculateSubmatrixB(rows, columns, rank);
+                        SparseMatrix columns = DB.GetARows(words.Skip(columnsLeft).Take(step).ToList(), rank);
+                        elementsCount += CalculateSubmatrixB(rows, columns, rank);
+                        Debug.WriteLine($"i={i}, j={j} [max={maxCount/step}], элементов = {elementsCount}");
                     }
                     DB.Commit();
-                    informer.Set(i * step + rows.Count);
                     stopwatch.Stop();   //!!!
                     Debug.WriteLine($"Подматрица подобия ({maxCount}x{maxCount}): {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
                 }
@@ -137,49 +139,56 @@ namespace NLDB
             return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Success);
         }
 
-        //Функция вычисления подматрицы для id из интервала [from, to]
-        private void CalculateSubmatrixB(IList<Word> row_words, IList<Word> column_words, int rank)
+        //Функция вычисления произведения векторов
+        private long CalculateSubmatrixB(SparseMatrix rows, SparseMatrix columns, int rank)
         {
-            //Функция вычисляет попарные расстояния между векторами-строками матрицы расстояний dmatrix и сохраняет результат в БД
-            SparseMatrix<double> rows = DB.GetARows(row_words, rank);
-            SparseMatrix<double> columns = DB.GetARows(column_words, rank);
-            if (rows.Count == 0 || columns.Count == 0) return;
-            List<List<BValue>> result = new List<List<BValue>>(row_words.Count);
+            int count = 0;
+            if (rows.Count == 0 || columns.Count == 0) return 0;
+            List<List<BValue>> result = new List<List<BValue>>(rows.Count * columns.Count);
             //Сначала вычисления с сохранением в несколько списков параллельно
             rows.AsParallel().ForAll(row =>
-            //foreach (KeyValuePair<int, SparseRow<double>> row in rows)
+            //foreach (KeyValuePair<int, SparseVector> row in rows)
             {
                 List<BValue> result_row = new List<BValue>();
-                foreach (KeyValuePair<int, SparseRow<double>> column in columns)
+                foreach (KeyValuePair<int, SparseVector> column in columns)
                 {
                     double d;
                     if (row.Key == column.Key)
                         d = 1;  //Cos(0)=1
                     else
                         d = CosDistance(row.Value, column.Value);
+                    //TODO: вероятно не имеет смысла записывать в БД значения подобия из интервала [-e;e], 0<e<0.9. Т.к. d в этом интервале означает несовместимость слов.
                     if (d != 0)
+                    {
+                        //Матрица симметричная
                         result_row.Add(new BValue(rank, row.Key, column.Key, d));
+                        result_row.Add(new BValue(rank, column.Key, row.Key, d));
+                        count += 2;
+                    }
                 }
                 if (result_row.Count > 0) result.Add(result_row);
             });
-            if (result.Count == 0) return;
+            if (result.Count == 0) return 0;
             //Запись в данных БД каждого из списков значений
             result.AsParallel().ForAll(row => DB.InsertAll(row));
+            return count;
         }
 
-        private double CosDistance(SparseRow<double> row_a, SparseRow<double> row_b)
+        private double CosDistance(SparseVector a, SparseVector b)
         {
             double m = 0, asize = 0, bsize = 0;
-            foreach (int key_a in row_a.Keys)
+            foreach (int key_a in a.Keys)
             {
-                double valueA = row_a[key_a];
-                if (row_b.TryGetValue(key_a, out double valueB))
+                double valueA = a[key_a];
+                if (b.TryGetValue(key_a, out double valueB))
                 {
-                    asize += valueA * valueA;
-                    bsize += valueB * valueB;
+                    //asize += valueA * valueA;
+                    //bsize += valueB * valueB;
                     m += valueA * valueB;
                 }
             }
+            asize = a.Size;
+            bsize = b.Size;
             double divisor = Math.Sqrt(asize) * Math.Sqrt(bsize);
             if (divisor > 0 && m > 0)
                 return m / divisor;
@@ -449,6 +458,6 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         private DataBase DB { get; }
         private readonly string dbpath;
-        private const int STEPS_COUNT = 4096;
+        private const int STEPS_COUNT = 1 << 8;
     }
 }

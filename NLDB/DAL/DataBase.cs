@@ -16,14 +16,14 @@ namespace NLDB.DAL
         private SQLiteTransaction transaction;
         private Parser[] parsers = null;
 
-        private readonly Dictionary<string, SparseMatrix<double>> sparseMatrixCash = new Dictionary<string, SparseMatrix<double>>(SPARSEMATRIX_CASH_SIZE);
+        private readonly Dictionary<string, SparseMatrix> sparseMatrixCash = new Dictionary<string, SparseMatrix>(SPARSEMATRIX_CASH_SIZE);
         private readonly ConcurrentDictionary<long, AValue> matrixACash = new ConcurrentDictionary<long, AValue>(PARALLELIZM, MATRIXA_CASH_SIZE);
         private readonly ConcurrentDictionary<long, BValue> matrixBCash = new ConcurrentDictionary<long, BValue>(PARALLELIZM, MATRIXB_CASH_SIZE);
         private readonly Dictionary<int, Term> termsCash = new Dictionary<int, Term>(TERMS_CASH_SIZE);
         private readonly Dictionary<int, Word> wordsCash = new Dictionary<int, Word>(WORDS_CASH_SIZE);
         private readonly Dictionary<string, Word> symbolsCash = new Dictionary<string, Word>(SYMBOLS_CASH_SIZE);
 
-        private const int SPARSEMATRIX_CASH_SIZE = 1 << 20;
+        private const int SPARSEMATRIX_CASH_SIZE = 1 << 10;
         private const int MATRIXA_CASH_SIZE = 1 << 20;
         private const int MATRIXB_CASH_SIZE = 1 << 20;
         private const int TERMS_CASH_SIZE = 1 << 20;
@@ -425,10 +425,10 @@ namespace NLDB.DAL
         /// <param name="to"></param>
         /// <param name="rank"></param>
         /// <returns></returns>
-        public Dictionary<int, SparseRow<double>> GetARows(int from, int to, int rank)
+        public SparseMatrix GetARows(int from, int to, int rank)
         {
             if (from > to) Swap(ref from, ref to);
-            Dictionary<int, SparseRow<double>> rows = new Dictionary<int, SparseRow<double>>(1 << 10);
+            SparseMatrix rows = new SparseMatrix();
             string text = $"SELECT Row, Column, Sum, Count AS Value FROM MatrixA " +
                           $"WHERE {from}<=Row AND Row<{to} AND Rank={rank} ";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
@@ -436,23 +436,36 @@ namespace NLDB.DAL
                 SQLiteDataReader reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
-                    AValue value = new AValue(rank: rank, row: reader.GetInt32(0), column: reader.GetInt32(1), sum: reader.GetDouble(2), count: reader.GetInt32(3));
-                    if (!rows.TryGetValue(value.R, out SparseRow<double> row))
+                    //AValue value = new AValue(rank: rank, row: reader.GetInt32(0), column: reader.GetInt32(1), sum: reader.GetDouble(2), count: reader.GetInt32(3));
+                    //if (!rows.TryGetValue(value.R, out SparseRow<double> row))
+                    //{
+                    //    row = new SparseRow<double>();
+                    //    rows[value.R] = row;
+                    //}
+                    //row[value.C] = value.Mean;
+                    var r = reader.GetInt32(0);
+                    var c = reader.GetInt32(1);
+                    var sum = reader.GetDouble(2);
+                    var count = reader.GetInt32(3);
+                    if (!rows.TryGetValue(r, out SparseVector row))
                     {
-                        row = new SparseRow<double>();
-                        rows[value.R] = row;
+                        row = new SparseVector();
+                        rows[r] = row;
                     }
-                    row[value.C] = value.Mean;
+                    row[c] = sum / c;
                 }
+                
                 return rows;
+
+
             }
         }
 
-        public SparseMatrix<double> GetARows(IList<Word> words, int rank)
+        public SparseMatrix GetARows(IList<Word> words, int rank)
         {
             string rows_ids = string.Join(",", words.Select(w => w.Id.ToString()));
-            if (GetFromCash(rows_ids, out SparseMatrix<double> rows)) return rows;
-            rows = new SparseMatrix<double>();
+            if (GetFromCash(rows_ids, out SparseMatrix rows)) return rows;
+            rows = new SparseMatrix();
             string text = $"SELECT Row, Column, Sum, Count AS Value FROM MatrixA " +
                           $"WHERE Row IN ({rows_ids});";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
@@ -461,9 +474,9 @@ namespace NLDB.DAL
                 while (reader.Read())
                 {
                     AValue value = new AValue(rank: rank, row: reader.GetInt32(0), column: reader.GetInt32(1), sum: reader.GetDouble(2), count: reader.GetInt32(3));
-                    if (!rows.TryGetValue(value.R, out SparseRow<double> row))
+                    if (!rows.TryGetValue(value.R, out SparseVector row))
                     {
-                        row = new SparseRow<double>();
+                        row = new SparseVector();
                         rows[value.R] = row;
                     }
                     row[value.C] = value.Mean;
@@ -664,7 +677,7 @@ namespace NLDB.DAL
             matrixBCash[key] = value;
         }
 
-        private void AddToCash(string key, SparseMatrix<double> m)
+        private void AddToCash(string key, SparseMatrix m)
         {
             if (m == null) return;
             if (sparseMatrixCash.Count > SPARSEMATRIX_CASH_SIZE)
@@ -672,12 +685,12 @@ namespace NLDB.DAL
             sparseMatrixCash[key] = m;
         }
 
-        private bool GetFromCash(string key, out SparseMatrix<double> m)
+        private bool GetFromCash(string key, out SparseMatrix m)
         {
             return (sparseMatrixCash.TryGetValue(key, out m));
         }
 
-        private void RemoveFromCash(Dictionary<string, SparseMatrix<double>> cash, int count)
+        private void RemoveFromCash(Dictionary<string, SparseMatrix> cash, int count)
         {
             int current = 0;
             while (current < count && cash.Count > 0)

@@ -32,10 +32,10 @@ namespace NLDB
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
             ////Console.ReadKey();
-            //engine.Clear("MatrixB");
-            //engine.Execute(OperationType.SimilarityCalculation, engine.Words(0));
-            //engine.Execute(OperationType.SimilarityCalculation, engine.Words(1));
-            engine.Execute(OperationType.SimilarityCalculation, engine.Words(2));
+            engine.Clear("MatrixB");
+            engine.Execute(OperationType.SimilarityCalculation, engine.Words(0));
+            engine.Execute(OperationType.SimilarityCalculation, engine.Words(1));
+            //engine.Execute(OperationType.SimilarityCalculation, engine.Words(2));
             //engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath,"words"));
             //.Then(ProcessingType.WordsMean)
             //.Then(ProcessingType.WordsSimilarity);

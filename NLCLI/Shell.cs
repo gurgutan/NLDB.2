@@ -60,8 +60,10 @@ namespace NLDB.NLCLI
 
         private void ShowPrompt()
         {
-            string dbname = (db == null) ? "null" : db.Name;
-            Console.Write(dbname + PromptDelimiter);
+            //Нужна переделка под новую БД
+            throw new NotImplementedException();
+            //string dbname = (db == null) ? "null" : db.Name;
+            //Console.Write(dbname + PromptDelimiter);
         }
 
         public int Execute(Command c)
@@ -81,23 +83,27 @@ namespace NLDB.NLCLI
 
         private int Connect(Dictionary<string, string> parameters)
         {
-            if (db != null && db.IsConnected()) db.Disconnect();
-            string dbname = parameters["db"];
-            db = new Language(dbname);
-            db.Connect();
-            return 0;
+            //Нужна переделка под новую БД
+            throw new NotImplementedException();
+            //if (db != null && db.IsConnected()) db.Disconnect();
+            //string dbname = parameters["db"];
+            //db = new Language(dbname);
+            //db.Connect();
+            //return 0;
         }
 
         private int Build(Dictionary<string, string> parameters)
         {
-            string filename = parameters["fromfile"];
-            Console.WriteLine($"Начало обучения на файле {filename}");
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            db.Create(filename);
-            sw.Stop();
-            Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-            return 0;
+            //Нужна переделка под новую БД
+            throw new NotImplementedException();
+            //string filename = parameters["fromfile"];
+            //Console.WriteLine($"Начало обучения на файле {filename}");
+            //Stopwatch sw = new Stopwatch();
+            //sw.Start();
+            //db.Create(filename);
+            //sw.Stop();
+            //Debug.WriteLine(sw.Elapsed.TotalSeconds + " sec");
+            //return 0;
         }
 
         private int ShowHelp()
@@ -114,44 +120,47 @@ namespace NLDB.NLCLI
         /// <returns></returns>
         private int Find(Dictionary<string, string> parameters)
         {
-            if (db == null)
-            {
-                ErrorMessage("База данных не инициализирована. Сначала загрузите или создайте БД.");
-                return 0;
-            }
-            string text = "";
-            int rank = 1;
-            int maxcount = 1;
-            foreach (string key in parameters.Keys)
-                switch (key)
-                {
-                    case "text": text = parameters[key]; break;
-                    case "rank":
-                        {
-                            if (!int.TryParse(parameters[key], out rank))
-                            {
-                                IncorrectParameter(key, parameters[key]);
-                                return 1001;
-                            }; break;
-                        }
-                    case "top":
-                        {
-                            if (!int.TryParse(parameters[key], out maxcount))
-                            {
-                                IncorrectParameter(key, parameters[key]);
-                                return 1001;
-                            }; break;
-                        }
-                    default: UnknownParameter(key); break;
-                }
-            //Вывод информации о команде
-            Stopwatch stopwatch = Stopwatch.StartNew();
-            DebugMessage($"[{stopwatch.Elapsed.ToString()}] поиск ближайших {maxcount} к '{text}' в лексиконе ранга {rank}");
-            List<Term_old> terms = db.Similars(text, rank, maxcount);
-            stopwatch.Stop();
-            DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
-            ShowTerms(terms);
-            return 0;
+            //Нужна переделка под новую БД
+            throw new NotImplementedException();
+            
+            //if (db == null)
+            //{
+            //    ErrorMessage("База данных не инициализирована. Сначала загрузите или создайте БД.");
+            //    return 0;
+            //}
+            //string text = "";
+            //int rank = 1;
+            //int maxcount = 1;
+            //foreach (string key in parameters.Keys)
+            //    switch (key)
+            //    {
+            //        case "text": text = parameters[key]; break;
+            //        case "rank":
+            //            {
+            //                if (!int.TryParse(parameters[key], out rank))
+            //                {
+            //                    IncorrectParameter(key, parameters[key]);
+            //                    return 1001;
+            //                }; break;
+            //            }
+            //        case "top":
+            //            {
+            //                if (!int.TryParse(parameters[key], out maxcount))
+            //                {
+            //                    IncorrectParameter(key, parameters[key]);
+            //                    return 1001;
+            //                }; break;
+            //            }
+            //        default: UnknownParameter(key); break;
+            //    }
+            ////Вывод информации о команде
+            //Stopwatch stopwatch = Stopwatch.StartNew();
+            //DebugMessage($"[{stopwatch.Elapsed.ToString()}] поиск ближайших {maxcount} к '{text}' в лексиконе ранга {rank}");
+            //List<Term_old> terms = db.Similars(text, rank, maxcount);
+            //stopwatch.Stop();
+            //DebugMessage($"[{stopwatch.Elapsed.ToString()}] завершено");
+            //ShowTerms(terms);
+            //return 0;
         }
 
         /// <summary>
@@ -161,17 +170,20 @@ namespace NLDB.NLCLI
         /// <returns></returns>
         private int Create(Dictionary<string, string> parameters)
         {
-            string name = "";
-            List<string> splitters = new List<string>();
-            foreach (string key in parameters.Keys)
-                switch (key)
-                {
-                    case "name": name = parameters[key]; break;
-                    case "splitters": splitters.Add(parameters[key]); break;
-                    default: { UnknownParameter(key); return 1001; };
-                }
-            db = new Language(name, splitters.ToArray());
-            return 0;
+            //Нужна переделка под новую БД
+            throw new NotImplementedException();
+
+            //string name = "";
+            //List<string> splitters = new List<string>();
+            //foreach (string key in parameters.Keys)
+            //    switch (key)
+            //    {
+            //        case "name": name = parameters[key]; break;
+            //        case "splitters": splitters.Add(parameters[key]); break;
+            //        default: { UnknownParameter(key); return 1001; };
+            //    }
+            //db = new Language(name, splitters.ToArray());
+            //return 0;
         }
 
         //private int AddData(Dictionary<string, string> parameters)
