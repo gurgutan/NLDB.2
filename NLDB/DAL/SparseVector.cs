@@ -1,8 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using MathNet.Numerics;
 
 namespace NLDB.DAL
 {
+    
+
     public class SparseVector : Dictionary<int, double>
     {
         private double? size = null;

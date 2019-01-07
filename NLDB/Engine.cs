@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using MathNet.Numerics;
+using MathNet.Numerics.LinearAlgebra;
 using NLDB.DAL;
 
 namespace NLDB
@@ -88,11 +90,69 @@ namespace NLDB
                 case OperationType.DistancesCalculation:
                     CalculationResult = CalculateDistances((IEnumerable<Word>)parameter); break;
                 case OperationType.SimilarityCalculation:
-                    CalculationResult = CalculateSimilarity((IList<Word>)parameter); break;
+                    //CalculationResult = CalculateSimilarity((IList<Word>)parameter); break;
+                    CalculationResult = CalculateSimilarity2((int)parameter); break;
                 default:
                     throw new NotImplementedException();
             }
             return CalculationResult;
+        }
+
+        private CalculationResult CalculateSimilarity2(int rank)
+        {
+            Stopwatch stopwatch = new Stopwatch();
+
+            //Функция вычисляет попарные сходства между векторами-строками матрицы расстояний MatrixA и сохраняет результат в БД
+            DB.BeginTransaction();
+            stopwatch.Restart();
+            Tuple<int, int> size = DB.GetAMatrixAsTuples(rank, out List<Tuple<int, int, double>> m);
+            stopwatch.Stop();
+            Debug.WriteLine($"Матрица {rank} считана {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
+            stopwatch.Restart();
+            MatrixDotSquare(m, size, rank);
+            stopwatch.Stop();
+            Debug.WriteLine($"Результат получен {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
+            stopwatch.Restart();
+            DB.Commit();
+            stopwatch.Stop();
+            Debug.WriteLine($"Записан в БД {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
+            //Вычисления производятся порциями по step строк. Выбирается диапазон величиной step индексов
+            //int step = Math.Max(1, maxCount / STEPS_COUNT);
+            //for (int i = 0; i <= maxCount / step; i++)
+            //{
+            //    DB.BeginTransaction();
+            //    stopwatch.Restart();    //!!!
+            //    int rLeftIndex = i * step;
+            //    int rRightIndex = Math.Min(i * step + step, maxCount - 1);
+            //    informer.Set(rLeftIndex);
+            //    Tuple<int, int> m1Size = DB.GetAMatrixAsTuples(words[rLeftIndex].Id, words[rRightIndex].Id, rank, out List<Tuple<int, int, double>> m1);
+            //    for (int j = i; j <= maxCount / step; j++)
+            //    {
+            //        int cLeftIndex = j * step;
+            //        int cRightIndex = Math.Min(j * step + step, maxCount - 1);
+            //        Tuple<int, int> m2Size = DB.GetAMatrixAsTuples(words[cLeftIndex].Id, words[cRightIndex].Id, rank, out List<Tuple<int, int, double>> m2);
+            //        elementsCount += MatrixDotProduct(m1, m1Size, m2, m2Size, rank);
+            //        Debug.WriteLine($"i={i}, j={j} [max={maxCount / step}], элементов = {elementsCount}");
+            //    }
+            //    DB.Commit();
+            //    stopwatch.Stop();   //!!!
+            //    Debug.WriteLine($"Подматрица подобия ({maxCount}x{maxCount}): {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
+            //}
+            Data = null;
+            return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Success);
+        }
+
+        private long MatrixDotSquare(List<Tuple<int, int, double>> m, Tuple<int, int> size, int rank)
+        {
+            Control.UseNativeMKL();
+            Debug.WriteLine(Control.Describe());
+            Debug.WriteLine($"Создание матрицы [{rank}] из {m.Count} ...");
+            Matrix<double> M = Matrix<double>.Build.SparseOfIndexed(size.Item1 + 1, size.Item2 + 1, m);
+            Debug.WriteLine($"Умножение...");
+            var result = M.TransposeAndMultiply(M).EnumerateIndexed(Zeros.AllowSkip);
+            Debug.WriteLine($"Вставка в БД...");
+            DB.InsertAll(result, rank);
+            return 0;
         }
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -127,7 +187,7 @@ namespace NLDB
                         int columnsLeft = j * step;
                         SparseMatrix columns = DB.GetARows(words.Skip(columnsLeft).Take(step).ToList(), rank);
                         elementsCount += CalculateSubmatrixB(rows, columns, rank);
-                        Debug.WriteLine($"i={i}, j={j} [max={maxCount/step}], элементов = {elementsCount}");
+                        Debug.WriteLine($"i={i}, j={j} [max={maxCount / step}], элементов = {elementsCount}");
                     }
                     DB.Commit();
                     stopwatch.Stop();   //!!!
@@ -458,6 +518,6 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         private DataBase DB { get; }
         private readonly string dbpath;
-        private const int STEPS_COUNT = 1 << 8;
+        private const int STEPS_COUNT = 1 << 16;
     }
 }

@@ -436,17 +436,10 @@ namespace NLDB.DAL
                 SQLiteDataReader reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
-                    //AValue value = new AValue(rank: rank, row: reader.GetInt32(0), column: reader.GetInt32(1), sum: reader.GetDouble(2), count: reader.GetInt32(3));
-                    //if (!rows.TryGetValue(value.R, out SparseRow<double> row))
-                    //{
-                    //    row = new SparseRow<double>();
-                    //    rows[value.R] = row;
-                    //}
-                    //row[value.C] = value.Mean;
-                    var r = reader.GetInt32(0);
-                    var c = reader.GetInt32(1);
-                    var sum = reader.GetDouble(2);
-                    var count = reader.GetInt32(3);
+                    int r = reader.GetInt32(0);
+                    int c = reader.GetInt32(1);
+                    double sum = reader.GetDouble(2);
+                    int count = reader.GetInt32(3);
                     if (!rows.TryGetValue(r, out SparseVector row))
                     {
                         row = new SparseVector();
@@ -454,10 +447,7 @@ namespace NLDB.DAL
                     }
                     row[c] = sum / c;
                 }
-                
                 return rows;
-
-
             }
         }
 
@@ -483,6 +473,38 @@ namespace NLDB.DAL
                 }
                 AddToCash(rows_ids, rows);
                 return rows;
+            }
+        }
+
+        /// <summary>
+        /// Заполняет список m координатным представлением матрицы. Возвращает количество строк и столбцов
+        /// </summary>
+        /// <param name="from">Id слова, с которого начинается выборка</param>
+        /// <param name="to">Id конечного слова матрицы</param>
+        /// <param name="rank">Ранг слов</param>
+        /// <param name="m"></param>
+        /// <returns></returns>
+        public Tuple<int, int> GetAMatrixAsTuples(int rank, out List<Tuple<int, int, double>> m)
+        {
+            string text = $"SELECT Row, Column, Sum, Count AS Value FROM MatrixA " +
+                          $"WHERE Rank={rank} ";
+            m = new List<Tuple<int, int, double>>();
+            using (SQLiteCommand cmd = new SQLiteCommand(text, db))
+            {
+                SQLiteDataReader reader = cmd.ExecuteReader();
+                int rowsCount = 0;
+                int columnsCount = 0;
+                while (reader.Read())
+                {
+                    int r = reader.GetInt32(0);
+                    int c = reader.GetInt32(1);
+                    double sum = reader.GetDouble(2);
+                    int count = reader.GetInt32(3);
+                    m.Add(Tuple.Create(r, c, sum / count));
+                    if (r > rowsCount) rowsCount = r;
+                    if (c > columnsCount) columnsCount = c;
+                }
+                return Tuple.Create(rowsCount, columnsCount);
             }
         }
 
@@ -533,6 +555,27 @@ namespace NLDB.DAL
                     cmd.Parameters["@r"].Value = v.R;
                     cmd.Parameters["@c"].Value = v.C;
                     cmd.Parameters["@s"].Value = v.Similarity;
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        public async void InsertAll(IEnumerable<Tuple<int, int, double>> values, int rank)
+        {
+            //Не предполагается изменение значений MatrixB, поэтому только замена: "INSERT OR REPLACE"
+            string text = $"INSERT OR REPLACE INTO MatrixB(Row, Column, Similarity, Rank) VALUES (@r, @c, @s, @rnk);";
+            using (SQLiteCommand cmd = new SQLiteCommand(text, db))
+            {
+                cmd.Parameters.Add("@r", System.Data.DbType.Int32);
+                cmd.Parameters.Add("@c", System.Data.DbType.Int32);
+                cmd.Parameters.Add("@s", System.Data.DbType.Double);
+                cmd.Parameters.Add("@rnk", System.Data.DbType.Int32);
+                foreach (Tuple<int, int, double> v in values)
+                {
+                    cmd.Parameters["@rnk"].Value = rank;
+                    cmd.Parameters["@r"].Value = v.Item1;
+                    cmd.Parameters["@c"].Value = v.Item2;
+                    cmd.Parameters["@s"].Value = v.Item3;
                     await cmd.ExecuteNonQueryAsync();
                 }
             }

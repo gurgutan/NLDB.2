@@ -11,7 +11,7 @@ namespace NLDB
         private static void Main(string[] args)
         {
             //254kb.txt
-            string trainfile = @"D:\Data\Wiki\ru\884mb.txt";
+            //string trainfile = @"D:\Data\Wiki\ru\884mb.txt";
             string dbpath = @"D:\Data\Result\884mb.db";
             Engine engine = new Engine(dbpath)
             {
@@ -33,9 +33,11 @@ namespace NLDB
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
             ////Console.ReadKey();
             engine.Clear("MatrixB");
-            engine.Execute(OperationType.SimilarityCalculation, engine.Words(0));
-            engine.Execute(OperationType.SimilarityCalculation, engine.Words(1));
-            //engine.Execute(OperationType.SimilarityCalculation, engine.Words(2));
+            //engine.Execute(OperationType.SimilarityCalculation, engine.Words(0));
+            //engine.Execute(OperationType.SimilarityCalculation, engine.Words(1));
+            engine.Execute(OperationType.SimilarityCalculation, 0);
+            engine.Execute(OperationType.SimilarityCalculation, 1);
+            engine.Execute(OperationType.SimilarityCalculation, 2);
             //engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath,"words"));
             //.Then(ProcessingType.WordsMean)
             //.Then(ProcessingType.WordsSimilarity);
