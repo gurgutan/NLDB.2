@@ -11,28 +11,13 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
-            string dbpath = @"D:\Data\Result\5mb.db";
+            string trainfile = @"D:\Data\Wiki\ru\884mb.txt";
+            string dbpath = @"D:\Data\Result\884mb.db";
             Engine engine = new Engine(dbpath)
             {
                 ExecuteMode = ExecuteMode.Verbose
             };
 
-            Stopwatch sw = new Stopwatch();
-            Console.WriteLine("Создание...");
-            SparseMatrix a = new SparseMatrix(
-                Enumerable.Range(0, 1<<25).Select(i => Tuple.Create(i, 0, (double)i))
-                );
-            //SparseMatrix b = new SparseMatrix(
-            //    Enumerable.Range(0, 1<<25).Select(i => Tuple.Create(i * 2, 0, (double)i))
-            //    );
-            sw.Start();
-            Console.WriteLine("Вычисление...");
-            a.Transpose();
-            Console.WriteLine($"--");
-            sw.Stop();
-            Console.WriteLine(sw.Elapsed.TotalSeconds);
-            Console.ReadKey();
             //engine.Create();
             //engine.Insert(new Splitter(0, ""));
             //engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
@@ -43,10 +28,10 @@ namespace NLDB
             //    .Then(OperationType.TextNormalization)
             //    .Then(OperationType.TextSplitting)
             //    .Then(OperationType.WordsExtraction);
-            engine.Clear("MatrixA");
-            engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
-            engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
-            engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
+            //engine.Clear("MatrixA");
+            //engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
+            //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
+            //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
             engine.Clear("MatrixB");
             engine.Execute(OperationType.SimilarityCalculation, 0);
             engine.Execute(OperationType.SimilarityCalculation, 1);

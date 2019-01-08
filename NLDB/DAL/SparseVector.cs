@@ -2,60 +2,52 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace NLDB.DAL
 {
-    public struct TripletValue
+    public struct VectorValue
     {
-        public int Row;
-        public int Column;
+        public int Index;
         public double Val;
 
-        public ulong Index
+        public VectorValue(int index, double val)
         {
-            get => (ulong)Row << 32 | (uint)Column;
-        }
-
-        public TripletValue(int row, int column, double val)
-        {
-            Row = row;
-            Column = column;
+            Index = index;
             Val = val;
-        }
-
-        public void Transpose()
-        {
-            int tmp = Row;
-            Row = Column;
-            Column = tmp;
         }
 
         public override string ToString()
         {
-            return $"({Row},{Column},{Val})";
+            return $"({Index},{Val})";
         }
     }
 
-    public class SparseMatrix : IEnumerable
+    public class SparseVector : IEnumerable
     {
         private double? normL1 = null;
         private double? normL2 = null;
-        private List<TripletValue> data = new List<TripletValue>();
+        private List<VectorValue> data = new List<VectorValue>();
 
-        public SparseMatrix(IEnumerable<Tuple<int, int, double>> tuples)
+        public SparseVector(IEnumerable<Tuple<int, double>> tuples)
         {
             data = tuples
                 .AsParallel()
-                .OrderBy(t => (ulong)t.Item1 << 32 | (uint)t.Item2)
-                .Select(t => new TripletValue(t.Item1, t.Item2, t.Item3))
+                .OrderBy(t => (ulong)t.Item1)
+                .Select(t => new VectorValue(t.Item1, t.Item2))
                 .ToList();
         }
 
-        public int Count
+        public SparseVector(SparseVector v)
         {
-            get => data.Count;
+            data = v
+                .EnumerateIndexed()
+                .AsParallel()
+                .OrderBy(t => (ulong)t.Item1)
+                .Select(t => new VectorValue(t.Item1, t.Item2))
+                .ToList();
         }
+
+        public int Count => data.Count;
 
         public double NormL1
         {
@@ -75,28 +67,17 @@ namespace NLDB.DAL
             }
         }
 
-        public IEnumerator GetEnumerator()
+        public static double operator *(SparseVector a, SparseVector b)
         {
-            return ((IEnumerable)data).GetEnumerator();
-        }
-
-        public void Transpose()
-        {
-            data.AsParallel().ForAll(e => e.Transpose());
-            data.AsParallel().OrderBy(e => e.Index).ToList();
-        }
-
-        public static double operator *(SparseMatrix a, SparseMatrix b)
-        {
-            var a_enumerator = a.GetEnumerator();
-            var b_enumerator = b.GetEnumerator();
+            IEnumerator a_enumerator = a.GetEnumerator();
+            IEnumerator b_enumerator = b.GetEnumerator();
             bool end = !(a_enumerator.MoveNext() && b_enumerator.MoveNext());
             double result = 0;
             while (!end)
             {
-                var a_element = (TripletValue)a_enumerator.Current;
-                var b_element = (TripletValue)b_enumerator.Current;
-                if (a_element.Row == b_element.Row && a_element.Column == b_element.Column)
+                VectorValue a_element = (VectorValue)a_enumerator.Current;
+                VectorValue b_element = (VectorValue)b_enumerator.Current;
+                if (a_element.Index == b_element.Index)
                     result += a_element.Val * b_element.Val;
                 if (a_element.Index < b_element.Index)
                     end = !a_enumerator.MoveNext();
@@ -108,11 +89,13 @@ namespace NLDB.DAL
             return result;
         }
 
-        public override string ToString()
+        public IEnumerable<Tuple<int, double>> EnumerateIndexed()
         {
-            return data.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
+            return data.Select(t => Tuple.Create(t.Index, t.Val));
         }
 
-
+        public IEnumerator GetEnumerator()
+        {
+            return ((IEnumerable)data).GetEnumerator();
+        }
     }
-}

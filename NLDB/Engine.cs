@@ -122,14 +122,16 @@ namespace NLDB
 
         private long MatrixDotSquare(List<Tuple<int, int, double>> m, Tuple<int, int> size, int rank)
         {
+
             Control.UseNativeMKL();
             Debug.WriteLine(Control.Describe());
             Debug.WriteLine($"Создание матрицы [{rank}] из {m.Count} ...");
             Matrix<double> M = Matrix<double>.Build.SparseOfIndexed(size.Item1 + 1, size.Item2 + 1, m);
+            Matrix<double> N = Matrix<double>.Build.SparseOfIndexed(size.Item1 + 1, size.Item2 + 1, m);
             Debug.WriteLine($"Умножение...");
-            var result = M.TransposeAndMultiply(M).EnumerateIndexed(Zeros.AllowSkip);
+            var result = M.TransposeAndMultiply(N);
             Debug.WriteLine($"Вставка в БД...");
-            DB.InsertAll(result, rank);
+            DB.InsertAll(result.EnumerateIndexed(Zeros.AllowSkip), rank);
             return 0;
         }
 
