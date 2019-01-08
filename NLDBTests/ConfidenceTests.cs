@@ -1,11 +1,7 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NLDB;
-using NLDB.DAL;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using NLDB.DAL;
 
 namespace NLDB.Tests
 {

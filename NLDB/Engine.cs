@@ -27,7 +27,7 @@ namespace NLDB
         Silent, Verbose, Debug
     };
 
-    public class Engine
+    public class Engine 
     {
         public ExecuteMode ExecuteMode { get; set; }
 
@@ -116,28 +116,6 @@ namespace NLDB
             DB.Commit();
             stopwatch.Stop();
             Debug.WriteLine($"Записан в БД {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
-            //Вычисления производятся порциями по step строк. Выбирается диапазон величиной step индексов
-            //int step = Math.Max(1, maxCount / STEPS_COUNT);
-            //for (int i = 0; i <= maxCount / step; i++)
-            //{
-            //    DB.BeginTransaction();
-            //    stopwatch.Restart();    //!!!
-            //    int rLeftIndex = i * step;
-            //    int rRightIndex = Math.Min(i * step + step, maxCount - 1);
-            //    informer.Set(rLeftIndex);
-            //    Tuple<int, int> m1Size = DB.GetAMatrixAsTuples(words[rLeftIndex].Id, words[rRightIndex].Id, rank, out List<Tuple<int, int, double>> m1);
-            //    for (int j = i; j <= maxCount / step; j++)
-            //    {
-            //        int cLeftIndex = j * step;
-            //        int cRightIndex = Math.Min(j * step + step, maxCount - 1);
-            //        Tuple<int, int> m2Size = DB.GetAMatrixAsTuples(words[cLeftIndex].Id, words[cRightIndex].Id, rank, out List<Tuple<int, int, double>> m2);
-            //        elementsCount += MatrixDotProduct(m1, m1Size, m2, m2Size, rank);
-            //        Debug.WriteLine($"i={i}, j={j} [max={maxCount / step}], элементов = {elementsCount}");
-            //    }
-            //    DB.Commit();
-            //    stopwatch.Stop();   //!!!
-            //    Debug.WriteLine($"Подматрица подобия ({maxCount}x{maxCount}): {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
-            //}
             Data = null;
             return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Success);
         }
@@ -181,11 +159,11 @@ namespace NLDB
                     stopwatch.Restart();    //!!!
                     int rowsLeft = i * step;
                     informer.Set(rowsLeft);
-                    SparseMatrix rows = DB.GetARows(words.Skip(rowsLeft).Take(step).ToList(), rank);
+                    MatrixDictionary rows = DB.GetARows(words.Skip(rowsLeft).Take(step).ToList(), rank);
                     for (int j = i; j <= maxCount / step; j++)
                     {
                         int columnsLeft = j * step;
-                        SparseMatrix columns = DB.GetARows(words.Skip(columnsLeft).Take(step).ToList(), rank);
+                        MatrixDictionary columns = DB.GetARows(words.Skip(columnsLeft).Take(step).ToList(), rank);
                         elementsCount += CalculateSubmatrixB(rows, columns, rank);
                         Debug.WriteLine($"i={i}, j={j} [max={maxCount / step}], элементов = {elementsCount}");
                     }
@@ -200,7 +178,7 @@ namespace NLDB
         }
 
         //Функция вычисления произведения векторов
-        private long CalculateSubmatrixB(SparseMatrix rows, SparseMatrix columns, int rank)
+        private long CalculateSubmatrixB(MatrixDictionary rows, MatrixDictionary columns, int rank)
         {
             int count = 0;
             if (rows.Count == 0 || columns.Count == 0) return 0;
@@ -210,7 +188,7 @@ namespace NLDB
             //foreach (KeyValuePair<int, SparseVector> row in rows)
             {
                 List<BValue> result_row = new List<BValue>();
-                foreach (KeyValuePair<int, SparseVector> column in columns)
+                foreach (KeyValuePair<int, VectorDictionary> column in columns)
                 {
                     double d;
                     if (row.Key == column.Key)
@@ -234,7 +212,7 @@ namespace NLDB
             return count;
         }
 
-        private double CosDistance(SparseVector a, SparseVector b)
+        private double CosDistance(VectorDictionary a, VectorDictionary b)
         {
             double m = 0, asize = 0, bsize = 0;
             foreach (int key_a in a.Keys)
@@ -297,11 +275,11 @@ namespace NLDB
                     {
                         if (childs[i] == childs[j]) continue;
                         if (!row.TryGetValue(j, out AValue value))
-                            row[j] = new AValue(w.Rank - 1, childs[i], childs[j], Math.Abs(j - i), 1);
+                            row[j] = new AValue(w.Rank - 1, childs[i], childs[j], j - i, 1);
                         else
                         {
                             value.Count++;
-                            value.Sum += Math.Abs(j - i);
+                            value.Sum += j - i;
                             row[j] = value;
                         }
                     }
@@ -518,6 +496,6 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         private DataBase DB { get; }
         private readonly string dbpath;
-        private const int STEPS_COUNT = 1 << 16;
+        private const int STEPS_COUNT = 1 << 8;
     }
 }

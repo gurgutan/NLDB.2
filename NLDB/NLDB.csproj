@@ -111,6 +111,7 @@
     <Compile Include="CalculationResult.cs" />
     <Compile Include="Confidence.cs" />
     <Compile Include="DAL\SparseVector.cs" />
+    <Compile Include="DAL\VectorDictionary.cs" />
     <Compile Include="DAL\DataBase.cs" />
     <Compile Include="DAL\AValue.cs" />
     <Compile Include="DAL\Parent.cs" />

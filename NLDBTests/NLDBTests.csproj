@@ -8,7 +8,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>NLDB.Tests</RootNamespace>
     <AssemblyName>NLDBTests</AssemblyName>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
@@ -80,7 +80,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NLDB\NLDB.csproj">
-      <Project>{AD3EB4BF-9934-4C99-A9B8-3797093BFA7F}</Project>
+      <Project>{ad3eb4bf-9934-4c99-a9b8-3797093bfa7f}</Project>
       <Name>NLDB</Name>
     </ProjectReference>
   </ItemGroup>

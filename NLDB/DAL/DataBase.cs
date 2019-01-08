@@ -16,7 +16,7 @@ namespace NLDB.DAL
         private SQLiteTransaction transaction;
         private Parser[] parsers = null;
 
-        private readonly Dictionary<string, SparseMatrix> sparseMatrixCash = new Dictionary<string, SparseMatrix>(SPARSEMATRIX_CASH_SIZE);
+        private readonly Dictionary<string, MatrixDictionary> sparseMatrixCash = new Dictionary<string, MatrixDictionary>(SPARSEMATRIX_CASH_SIZE);
         private readonly ConcurrentDictionary<long, AValue> matrixACash = new ConcurrentDictionary<long, AValue>(PARALLELIZM, MATRIXA_CASH_SIZE);
         private readonly ConcurrentDictionary<long, BValue> matrixBCash = new ConcurrentDictionary<long, BValue>(PARALLELIZM, MATRIXB_CASH_SIZE);
         private readonly Dictionary<int, Term> termsCash = new Dictionary<int, Term>(TERMS_CASH_SIZE);
@@ -425,10 +425,10 @@ namespace NLDB.DAL
         /// <param name="to"></param>
         /// <param name="rank"></param>
         /// <returns></returns>
-        public SparseMatrix GetARows(int from, int to, int rank)
+        public MatrixDictionary GetARows(int from, int to, int rank)
         {
             if (from > to) Swap(ref from, ref to);
-            SparseMatrix rows = new SparseMatrix();
+            MatrixDictionary rows = new MatrixDictionary();
             string text = $"SELECT Row, Column, Sum, Count AS Value FROM MatrixA " +
                           $"WHERE {from}<=Row AND Row<{to} AND Rank={rank} ";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
@@ -440,9 +440,9 @@ namespace NLDB.DAL
                     int c = reader.GetInt32(1);
                     double sum = reader.GetDouble(2);
                     int count = reader.GetInt32(3);
-                    if (!rows.TryGetValue(r, out SparseVector row))
+                    if (!rows.TryGetValue(r, out VectorDictionary row))
                     {
-                        row = new SparseVector();
+                        row = new VectorDictionary();
                         rows[r] = row;
                     }
                     row[c] = sum / c;
@@ -451,11 +451,11 @@ namespace NLDB.DAL
             }
         }
 
-        public SparseMatrix GetARows(IList<Word> words, int rank)
+        public MatrixDictionary GetARows(IList<Word> words, int rank)
         {
             string rows_ids = string.Join(",", words.Select(w => w.Id.ToString()));
-            if (GetFromCash(rows_ids, out SparseMatrix rows)) return rows;
-            rows = new SparseMatrix();
+            if (GetFromCash(rows_ids, out MatrixDictionary rows)) return rows;
+            rows = new MatrixDictionary();
             string text = $"SELECT Row, Column, Sum, Count AS Value FROM MatrixA " +
                           $"WHERE Row IN ({rows_ids});";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
@@ -464,9 +464,9 @@ namespace NLDB.DAL
                 while (reader.Read())
                 {
                     AValue value = new AValue(rank: rank, row: reader.GetInt32(0), column: reader.GetInt32(1), sum: reader.GetDouble(2), count: reader.GetInt32(3));
-                    if (!rows.TryGetValue(value.R, out SparseVector row))
+                    if (!rows.TryGetValue(value.R, out VectorDictionary row))
                     {
-                        row = new SparseVector();
+                        row = new VectorDictionary();
                         rows[value.R] = row;
                     }
                     row[value.C] = value.Mean;
@@ -720,7 +720,7 @@ namespace NLDB.DAL
             matrixBCash[key] = value;
         }
 
-        private void AddToCash(string key, SparseMatrix m)
+        private void AddToCash(string key, MatrixDictionary m)
         {
             if (m == null) return;
             if (sparseMatrixCash.Count > SPARSEMATRIX_CASH_SIZE)
@@ -728,12 +728,12 @@ namespace NLDB.DAL
             sparseMatrixCash[key] = m;
         }
 
-        private bool GetFromCash(string key, out SparseMatrix m)
+        private bool GetFromCash(string key, out MatrixDictionary m)
         {
             return (sparseMatrixCash.TryGetValue(key, out m));
         }
 
-        private void RemoveFromCash(Dictionary<string, SparseMatrix> cash, int count)
+        private void RemoveFromCash(Dictionary<string, MatrixDictionary> cash, int count)
         {
             int current = 0;
             while (current < count && cash.Count > 0)
