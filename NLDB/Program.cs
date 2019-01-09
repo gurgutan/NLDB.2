@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using NLDB.DAL;
 
@@ -18,6 +17,30 @@ namespace NLDB
                 ExecuteMode = ExecuteMode.Verbose
             };
 
+            List<Tuple<int, int, double>> tuples = new List<Tuple<int, int, double>>
+            {
+                Tuple.Create(0,0,1.0),
+                Tuple.Create(1,1,2.0),
+                Tuple.Create(1,2,2.0),
+                Tuple.Create(1,3,2.0),
+                Tuple.Create(2,2,3.0),
+                Tuple.Create(3,3,4.0),
+                Tuple.Create(4,4,5.0),
+            };
+            SparseMatrix m = new SparseMatrix(tuples);
+            Console.WriteLine(m.ToString());
+
+            List<Tuple<int, double>> tuples2 = new List<Tuple<int, double>>
+            {
+                Tuple.Create(0,1.0),
+                Tuple.Create(1,1.0),
+                Tuple.Create(2,1.0),
+            };
+            SparseVector v1 = new SparseVector(tuples2);
+
+            Console.WriteLine(v1.NormL1.ToString() + "  " + v1.NormL2);
+            Console.ReadKey();
+
             //engine.Create();
             //engine.Insert(new Splitter(0, ""));
             //engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
@@ -32,10 +55,10 @@ namespace NLDB
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
-            engine.Clear("MatrixB");
-            engine.Execute(OperationType.SimilarityCalculation, 0);
-            engine.Execute(OperationType.SimilarityCalculation, 1);
-            engine.Execute(OperationType.SimilarityCalculation, 2);
+            //engine.Clear("MatrixB");
+            //engine.Execute(OperationType.SimilarityCalculation, 0);
+            //engine.Execute(OperationType.SimilarityCalculation, 1);
+            //engine.Execute(OperationType.SimilarityCalculation, 2);
             //engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath,"words"));
 
             //Теперь будем использовать полученные данные

@@ -7,18 +7,18 @@ namespace NLDB.DAL
 {
     public struct VectorValue
     {
-        public int Index;
-        public double Val;
+        public readonly int Index;
+        public readonly double V;
 
-        public VectorValue(int index, double val)
+        public VectorValue(int index, double value)
         {
             Index = index;
-            Val = val;
+            V = value;
         }
 
         public override string ToString()
         {
-            return $"({Index},{Val})";
+            return $"({Index},{V})";
         }
     }
 
@@ -26,6 +26,7 @@ namespace NLDB.DAL
     {
         private double? normL1 = null;
         private double? normL2 = null;
+        private double? mean = null;
         private List<VectorValue> data = new List<VectorValue>();
 
         public SparseVector(IEnumerable<Tuple<int, double>> tuples)
@@ -53,7 +54,7 @@ namespace NLDB.DAL
         {
             get
             {
-                if (normL1 == null) normL1 = data.AsParallel().Sum(e => Math.Abs(e.Val));
+                if (normL1 == null) normL1 = data.AsParallel().Sum(e => Math.Abs(e.V));
                 return (double)normL1;
             }
         }
@@ -62,40 +63,90 @@ namespace NLDB.DAL
         {
             get
             {
-                if (normL2 == null) normL2 = Math.Sqrt(data.AsParallel().Sum(e => e.Val * e.Val));
+                if (normL2 == null) normL2 = Math.Sqrt(data.AsParallel().Sum(e => e.V * e.V));
                 return (double)normL2;
             }
         }
 
-        public static double operator *(SparseVector a, SparseVector b)
+        public double SquareNormL2 => data.AsParallel().Sum(e => e.V * e.V);
+
+        public double Mean
         {
-            IEnumerator a_enumerator = a.GetEnumerator();
-            IEnumerator b_enumerator = b.GetEnumerator();
+            get
+            {
+                if (mean == null) mean = Sum / data.Count;
+                return (double)mean;
+            }
+        }
+
+        public double Sum => data.AsParallel().Sum(e => e.V);
+
+        public double Multiply(SparseVector v)
+        {
+            return this * v;
+        }
+
+        public double CosDistance(SparseVector v)
+        {
+            return this * v / (NormL2 * v.NormL2);
+        }
+
+        public SparseVector Centered
+        {
+            get
+            {
+                double mx = Mean;
+                return new SparseVector(data.Select(v => Tuple.Create(v.Index, v.V - mx)));
+            }
+        }
+
+        public double Dispersion
+        {
+            get
+            {
+                SparseVector center = Centered;
+                return center.SquareNormL2;
+            }
+        }
+
+        public static double operator *(SparseVector vector_a, SparseVector vector_b)
+        {
+            IEnumerator a_enumerator = vector_a.GetEnumerator();
+            IEnumerator b_enumerator = vector_b.GetEnumerator();
             bool end = !(a_enumerator.MoveNext() && b_enumerator.MoveNext());
             double result = 0;
             while (!end)
             {
-                VectorValue a_element = (VectorValue)a_enumerator.Current;
-                VectorValue b_element = (VectorValue)b_enumerator.Current;
-                if (a_element.Index == b_element.Index)
-                    result += a_element.Val * b_element.Val;
-                if (a_element.Index < b_element.Index)
+                VectorValue a = (VectorValue)a_enumerator.Current;
+                VectorValue b = (VectorValue)b_enumerator.Current;
+                if (a.Index == b.Index)
+                {
+                    result += a.V * b.V;
+                    end = !(a_enumerator.MoveNext() && b_enumerator.MoveNext());
+                }
+                else if (a.Index < b.Index)
                     end = !a_enumerator.MoveNext();
-                else if (a_element.Index > b_element.Index)
+                else if (a.Index > b.Index)
                     end = !b_enumerator.MoveNext();
                 else
-                    end = !(a_enumerator.MoveNext() && b_enumerator.MoveNext());
+                    throw new IndexOutOfRangeException($"Неизвестное значение нумераторов {a_enumerator.ToString() + b_enumerator.ToString()}");
             }
             return result;
         }
 
         public IEnumerable<Tuple<int, double>> EnumerateIndexed()
         {
-            return data.Select(t => Tuple.Create(t.Index, t.Val));
+            return data.Select(t => Tuple.Create(t.Index, t.V));
         }
 
         public IEnumerator GetEnumerator()
         {
             return ((IEnumerable)data).GetEnumerator();
         }
+
+        public override string ToString()
+        {
+            return "[" + string.Join(",", data.Select(v => v.ToString())) + "]";
+        }
     }
+}

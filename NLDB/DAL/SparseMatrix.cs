@@ -5,31 +5,20 @@ using System.Linq;
 
 namespace NLDB.DAL
 {
-    public struct MatrixElement
+    public struct MatrixRow
     {
-        public int Row;
-        public int Column;
-        public double Val;
+        public readonly int Index;
+        public readonly SparseVector V;
 
-        public ulong Index => (ulong)Row << 32 | (uint)Column;
-
-        public MatrixElement(int row, int column, double val)
+        public MatrixRow(int index, SparseVector v)
         {
-            Row = row;
-            Column = column;
-            Val = val;
-        }
-
-        public void Transpose()
-        {
-            int tmp = Row;
-            Row = Column;
-            Column = tmp;
+            Index = index;
+            V = v;
         }
 
         public override string ToString()
         {
-            return $"({Row},{Column},{Val})";
+            return $"({Index},{V.ToString()})";
         }
     }
 
@@ -37,56 +26,43 @@ namespace NLDB.DAL
     {
         private double? normL1 = null;
         private double? normL2 = null;
-        private List<MatrixElement> data = new List<MatrixElement>();
+        private List<MatrixRow> rows = new List<MatrixRow>();
+        public IEnumerable<MatrixRow> Rows => rows.AsEnumerable();
 
         public SparseMatrix(IEnumerable<Tuple<int, int, double>> tuples)
         {
-            data = tuples
-                .AsParallel()
-                .OrderBy(t => (ulong)t.Item1 << 32 | (uint)t.Item2)
-                .Select(t => new MatrixElement(t.Item1, t.Item2, t.Item3))
-                .ToList();
+            rows = FromTuples(tuples);
         }
 
         public SparseMatrix(SparseMatrix m)
         {
-            data = m
-                .EnumerateIndexed()
+            rows = FromTuples(m.EnumerateIndexed());
+        }
+
+        private List<MatrixRow> FromTuples(IEnumerable<Tuple<int, int, double>> tuples)
+        {
+            return tuples
                 .AsParallel()
                 .OrderBy(t => (ulong)t.Item1 << 32 | (uint)t.Item2)
-                .Select(t => new MatrixElement(t.Item1, t.Item2, t.Item3))
+                .GroupBy(t => t.Item1)
+                .Select((group, i) => new MatrixRow(i,
+                        new SparseVector(group.Select(v => Tuple.Create(v.Item2, v.Item3)))))
                 .ToList();
         }
 
-        public int Count => data.Count;
-
-        public double NormL1
-        {
-            get
-            {
-                if (normL1 == null) normL1 = data.AsParallel().Sum(e => Math.Abs(e.Val));
-                return (double)normL1;
-            }
-        }
-
-        public double NormL2
-        {
-            get
-            {
-                if (normL2 == null) normL2 = Math.Sqrt(data.AsParallel().Sum(e => e.Val * e.Val));
-                return (double)normL2;
-            }
-        }
+        public int Count => rows.Count;
 
         public IEnumerable<Tuple<int, int, double>> EnumerateIndexed()
         {
-            return data.Select(t => Tuple.Create(t.Row, t.Column, t.Val));
+            return rows
+                .SelectMany(row => row.V
+                    .EnumerateIndexed()
+                    .Select(v => Tuple.Create(row.Index, v.Item1, v.Item2)));
         }
 
         public void Transpose()
         {
-            data.AsParallel().ForAll(e => e.Transpose());
-            data.AsParallel().OrderBy(e => e.Index).ToList();
+            rows = FromTuples(EnumerateIndexed().Select(t => Tuple.Create(t.Item2, t.Item1, t.Item3)));
         }
 
         public static SparseMatrix Transpose(SparseMatrix a)
@@ -96,69 +72,73 @@ namespace NLDB.DAL
             return result;
         }
 
-        //public static SparseMatrix Square(SparseMatrix a)
-        //{
-        //    SparseMatrix b = new SparseMatrix(a);
-        //    List<Tuple<int, int, double>> tuples = new List<Tuple<int, int, double>>();
-        //    IEnumerator a_enumerator = a.GetEnumerator();
-        //    IEnumerator b_enumerator = b.GetEnumerator();
-        //    bool end = !(a_enumerator.MoveNext() && b_enumerator.MoveNext());
-        //    double result = 0;
-        //    while (!end)
-        //    {
-        //        MatrixElement a_element = (MatrixElement)a_enumerator.Current;
-        //        MatrixElement b_element = (MatrixElement)b_enumerator.Current;
-        //        int row = a_element.Row;
-        //        var column = b_element.Row;
-        //        if (a_element.Row == b_element.Row && a_element.Column == b_element.Column)
-        //            result += a_element.Val * b_element.Val;
-        //        if (a_element.Index < b_element.Index)
-        //            end = !a_enumerator.MoveNext();
-        //        else if (a_element.Index > b_element.Index)
-        //            end = !b_enumerator.MoveNext();
-        //        else
-        //            end = !(a_enumerator.MoveNext() && b_enumerator.MoveNext());
-        //        int next_row = a_element.Row;
-        //        int next_column = b_element.Row;
-        //        if (next_row != row || next_column != column)
-        //        {
+        public double NormL1
+        {
+            get
+            {
+                if (normL1 == null) normL1 = rows.AsParallel().Sum(e => Math.Abs(e.V.NormL1));
+                return (double)normL1;
+            }
+        }
 
-        //        }
-        //    }
-        //    return result;
-        //}
+        public double NormL2
+        {
+            get
+            {
+                if (normL2 == null) normL2 = Math.Sqrt(rows.AsParallel().Sum(e => e.V.NormL2));
+                return (double)normL2;
+            }
+        }
 
-        //public static double operator *(SparseMatrix a, SparseMatrix b)
-        //{
-        //    IEnumerator a_enumerator = a.GetEnumerator();
-        //    IEnumerator b_enumerator = b.GetEnumerator();
-        //    bool end = !(a_enumerator.MoveNext() && b_enumerator.MoveNext());
-        //    double result = 0;
-        //    while (!end)
-        //    {
-        //        TripletValue a_element = (TripletValue)a_enumerator.Current;
-        //        TripletValue b_element = (TripletValue)b_enumerator.Current;
-        //        if (a_element.Row == b_element.Row && a_element.Column == b_element.Column)
-        //            result += a_element.Val * b_element.Val;
-        //        if (a_element.Index < b_element.Index)
-        //            end = !a_enumerator.MoveNext();
-        //        else if (a_element.Index > b_element.Index)
-        //            end = !b_enumerator.MoveNext();
-        //        else
-        //            end = !(a_enumerator.MoveNext() && b_enumerator.MoveNext());
-        //    }
-        //    return result;
-        //}
+        public double Mean => throw new NotImplementedException();
 
         public override string ToString()
         {
-            return data.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
+            return rows.Aggregate("", (c, n) => c + (c == "" ? "" : "\n") + n.ToString());
         }
 
+        public string ToString(string format)
+        {
+            if (format.ToLower() == "f")
+            {
+                throw new NotImplementedException();
+            }
+            else
+                return rows.Aggregate("", (c, n) => c + (c == "" ? "" : "\n") + n.ToString());
+        }
 
         public IEnumerator GetEnumerator()
         {
-            return ((IEnumerable)data).GetEnumerator();
+            return ((IEnumerable)rows).GetEnumerator();
         }
+
+        public SparseMatrix Square
+        {
+            get
+            {
+                List<Tuple<int, int, double>> result = new List<Tuple<int, int, double>>();
+                SparseMatrix transposed = new SparseMatrix(this);
+                foreach (MatrixRow r in rows)
+                    foreach (MatrixRow c in transposed.rows)
+                    {
+                        SparseVector xc = r.V.Centered;
+                        SparseVector yc = c.V.Centered;
+                        if (xc.Count > 0 && yc.Count > 0)
+                        {
+                            double kxy = xc * yc / (xc.NormL2 * yc.NormL2);
+                            result.Add(Tuple.Create(r.Index, c.Index, kxy));
+                        }
+                    }
+                return new SparseMatrix(result);
+            }
+        }
+
+        public static double operator *(SparseMatrix a, SparseMatrix b)
+        {
+            throw new NotImplementedException();
+
+        }
+
+
     }
 }
