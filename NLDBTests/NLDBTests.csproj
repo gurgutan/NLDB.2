@@ -73,10 +73,8 @@
   </Choose>
   <ItemGroup>
     <Compile Include="ConfidenceTests.cs" />
-    <Compile Include="LanguageTests.cs" />
-    <Compile Include="LexiconTests.cs" />
+    <Compile Include="DAL\SparseVectorTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="WordTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NLDB\NLDB.csproj">

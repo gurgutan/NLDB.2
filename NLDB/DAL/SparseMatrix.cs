@@ -22,7 +22,7 @@ namespace NLDB.DAL
         }
     }
 
-    public class SparseMatrix : IEnumerable
+    public class SparseMatrix : IEnumerable<MatrixRow>
     {
         private double? normL1 = null;
         private double? normL2 = null;
@@ -45,8 +45,8 @@ namespace NLDB.DAL
                 .AsParallel()
                 .OrderBy(t => (ulong)t.Item1 << 32 | (uint)t.Item2)
                 .GroupBy(t => t.Item1)
-                .Select((group, i) => new MatrixRow(i,
-                        new SparseVector(group.Select(v => Tuple.Create(v.Item2, v.Item3)))))
+                .Select(group =>
+                    new MatrixRow(group.Key, new SparseVector(group.Select(v => Tuple.Create(v.Item2, v.Item3)))))
                 .ToList();
         }
 
@@ -54,8 +54,7 @@ namespace NLDB.DAL
 
         public IEnumerable<Tuple<int, int, double>> EnumerateIndexed()
         {
-            return rows
-                .SelectMany(row => row.V
+            return rows.SelectMany(row => row.V
                     .EnumerateIndexed()
                     .Select(v => Tuple.Create(row.Index, v.Item1, v.Item2)));
         }
@@ -107,30 +106,57 @@ namespace NLDB.DAL
                 return rows.Aggregate("", (c, n) => c + (c == "" ? "" : "\n") + n.ToString());
         }
 
-        public IEnumerator GetEnumerator()
-        {
-            return ((IEnumerable)rows).GetEnumerator();
-        }
+        public void NormalizeRows() => rows./*AsParallel().ForAll*/ForEach(r => r.V.Normalize());
 
-        public SparseMatrix Square
+        public void CenterRows() => rows./*AsParallel().ForAll*/ForEach(r => r.V.Center());
+
+        public SparseMatrix RowsCorrelationMatrix()
         {
-            get
+            List<Tuple<int, int, double>> result = new List<Tuple<int, int, double>>();
+            SparseMatrix transposed = new SparseMatrix(this);
+            using (ProgressInformer informer = new ProgressInformer(prompt: $"Матрица подобия:", max: rows.Count, measurment: $"слов", barSize: 64))
             {
-                List<Tuple<int, int, double>> result = new List<Tuple<int, int, double>>();
-                SparseMatrix transposed = new SparseMatrix(this);
+                int count = 0;
                 foreach (MatrixRow r in rows)
+                {
                     foreach (MatrixRow c in transposed.rows)
                     {
-                        SparseVector xc = r.V.Centered;
-                        SparseVector yc = c.V.Centered;
+                        SparseVector xc = r.V.BuildCentered;
+                        SparseVector yc = c.V.BuildCentered;
                         if (xc.Count > 0 && yc.Count > 0)
                         {
-                            double kxy = xc * yc / (xc.NormL2 * yc.NormL2);
+                            double kxy = (xc * yc) / (xc.NormL2 * yc.NormL2);
                             result.Add(Tuple.Create(r.Index, c.Index, kxy));
                         }
                     }
-                return new SparseMatrix(result);
+                    informer.Set(count++);
+                }
             }
+            return new SparseMatrix(result);
+        }
+
+        public SparseMatrix RowsCovariationMatrix()
+        {
+            List<Tuple<int, int, double>> result = new List<Tuple<int, int, double>>();
+            using (ProgressInformer informer = new ProgressInformer(prompt: $"Матрица подобия:", max: rows.Count, measurment: $"слов", barSize: 64))
+            {
+                int count = 0;
+                foreach (MatrixRow r in rows)
+                {
+                    foreach (MatrixRow c in rows)
+                    {
+                        var x = r.V;
+                        var y = c.V;
+                        if (x.Count > 0 && y.Count > 0)
+                        {
+                            double kxy = x * y;
+                            result.Add(Tuple.Create(r.Index, c.Index, kxy));
+                        }
+                    }
+                    if (count++ % 101 == 0) informer.Set(count);
+                }
+            }
+            return new SparseMatrix(result);
         }
 
         public static double operator *(SparseMatrix a, SparseMatrix b)
@@ -139,6 +165,14 @@ namespace NLDB.DAL
 
         }
 
+        IEnumerator<MatrixRow> IEnumerable<MatrixRow>.GetEnumerator()
+        {
+            return ((IEnumerable<MatrixRow>)rows).GetEnumerator();
+        }
 
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return rows.GetEnumerator();
+        }
     }
 }

@@ -4,8 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using MathNet.Numerics;
-using MathNet.Numerics.LinearAlgebra;
 using NLDB.DAL;
 
 namespace NLDB
@@ -27,7 +25,7 @@ namespace NLDB
         Silent, Verbose, Debug
     };
 
-    public class Engine 
+    public class Engine
     {
         public ExecuteMode ExecuteMode { get; set; }
 
@@ -101,7 +99,6 @@ namespace NLDB
         private CalculationResult CalculateSimilarity2(int rank)
         {
             Stopwatch stopwatch = new Stopwatch();
-
             //Функция вычисляет попарные сходства между векторами-строками матрицы расстояний MatrixA и сохраняет результат в БД
             DB.BeginTransaction();
             stopwatch.Restart();
@@ -109,7 +106,7 @@ namespace NLDB
             stopwatch.Stop();
             Debug.WriteLine($"Матрица {rank} считана {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
             stopwatch.Restart();
-            MatrixDotSquare(m, size, rank);
+            MatrixDotSquare(m, rank);
             stopwatch.Stop();
             Debug.WriteLine($"Результат получен {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
             stopwatch.Restart();
@@ -120,18 +117,23 @@ namespace NLDB
             return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Success);
         }
 
-        private long MatrixDotSquare(List<Tuple<int, int, double>> m, Tuple<int, int> size, int rank)
+        private long MatrixDotSquare(List<Tuple<int, int, double>> m, int rank)
         {
-
-            Control.UseNativeMKL();
-            Debug.WriteLine(Control.Describe());
+            //Control.UseNativeMKL();
+            //Debug.WriteLine(Control.Describe());
             Debug.WriteLine($"Создание матрицы [{rank}] из {m.Count} ...");
-            Matrix<double> M = Matrix<double>.Build.SparseOfIndexed(size.Item1 + 1, size.Item2 + 1, m);
-            Matrix<double> N = Matrix<double>.Build.SparseOfIndexed(size.Item1 + 1, size.Item2 + 1, m);
-            Debug.WriteLine($"Умножение...");
-            var result = M.TransposeAndMultiply(N);
+            SparseMatrix M = new SparseMatrix(m);
+            Debug.WriteLine($"Центрирование");
+            M.CenterRows();
+            Debug.WriteLine($"Нормализация");
+            M.NormalizeRows();
+            Debug.WriteLine($"Вычисление ковариации");
+            var result = M.RowsCovariationMatrix();
+            //Matrix<double> M = Matrix<double>.Build.SparseOfIndexed(size.Item1 + 1, size.Item2 + 1, m);
+            //Matrix<double> N = Matrix<double>.Build.SparseOfIndexed(size.Item1 + 1, size.Item2 + 1, m);
+            //var result = M.TransposeAndMultiply(N);
             Debug.WriteLine($"Вставка в БД...");
-            DB.InsertAll(result.EnumerateIndexed(Zeros.AllowSkip), rank);
+            DB.InsertAll(result.EnumerateIndexed(), rank);
             return 0;
         }
 
@@ -277,7 +279,9 @@ namespace NLDB
                     {
                         if (childs[i] == childs[j]) continue;
                         if (!row.TryGetValue(j, out AValue value))
+                        {
                             row[j] = new AValue(w.Rank - 1, childs[i], childs[j], j - i, 1);
+                        }
                         else
                         {
                             value.Count++;

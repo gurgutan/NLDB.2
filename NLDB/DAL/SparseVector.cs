@@ -5,10 +5,10 @@ using System.Linq;
 
 namespace NLDB.DAL
 {
-    public struct VectorValue
+    public class VectorValue
     {
         public readonly int Index;
-        public readonly double V;
+        public double V;
 
         public VectorValue(int index, double value)
         {
@@ -20,32 +20,30 @@ namespace NLDB.DAL
         {
             return $"({Index},{V})";
         }
+
     }
 
-    public class SparseVector : IEnumerable
+    public class SparseVector : IEnumerable, IEnumerable<VectorValue>
     {
         private double? normL1 = null;
         private double? normL2 = null;
         private double? mean = null;
         private List<VectorValue> data = new List<VectorValue>();
 
+        public SparseVector(IEnumerable<double> values)
+        {
+            data = values.Select((v, i) => new VectorValue(i, v)).ToList();
+        }
+
         public SparseVector(IEnumerable<Tuple<int, double>> tuples)
         {
-            data = tuples
-                .AsParallel()
-                .OrderBy(t => (ulong)t.Item1)
-                .Select(t => new VectorValue(t.Item1, t.Item2))
-                .ToList();
+            data = FromTuples(tuples);
         }
 
         public SparseVector(SparseVector v)
         {
-            data = v
-                .EnumerateIndexed()
-                .AsParallel()
-                .OrderBy(t => (ulong)t.Item1)
-                .Select(t => new VectorValue(t.Item1, t.Item2))
-                .ToList();
+            data = SparseVector.FromTuples(v.EnumerateIndexed());
+            //data.Sort(new Comparison<VectorValue>((v1, v2) => v2.Index - v1.Index));
         }
 
         public int Count => data.Count;
@@ -81,17 +79,17 @@ namespace NLDB.DAL
 
         public double Sum => data.AsParallel().Sum(e => e.V);
 
-        public double Multiply(SparseVector v)
+        public double Dot(SparseVector v)
         {
             return this * v;
         }
 
         public double CosDistance(SparseVector v)
         {
-            return this * v / (NormL2 * v.NormL2);
+            return (this * v) / (NormL2 * v.NormL2);
         }
 
-        public SparseVector Centered
+        public SparseVector BuildCentered
         {
             get
             {
@@ -100,12 +98,34 @@ namespace NLDB.DAL
             }
         }
 
+        public void Center()
+        {
+            double mx = Mean;
+            data.AsParallel().ForAll(x => x.V -= mx);
+        }
+
+        public void Normalize()
+        {
+            double d = NormL2;
+            data.ForEach(x => x.V = x.V / d);
+        }
+
         public double Dispersion
         {
             get
             {
-                SparseVector center = Centered;
+                SparseVector center = BuildCentered;
                 return center.SquareNormL2;
+            }
+        }
+
+        public double this[int i]
+        {
+            get
+            {
+                int index = data.Select(v => v.Index).ToList().BinarySearch(i);
+                if (index >= 0) return data[i].V;
+                else throw new IndexOutOfRangeException();
             }
         }
 
@@ -144,9 +164,29 @@ namespace NLDB.DAL
             return ((IEnumerable)data).GetEnumerator();
         }
 
+        IEnumerator<VectorValue> IEnumerable<VectorValue>.GetEnumerator()
+        {
+            return ((IEnumerable<VectorValue>)data).GetEnumerator();
+        }
+
         public override string ToString()
         {
             return "[" + string.Join(",", data.Select(v => v.ToString())) + "]";
         }
+
+        //-------------------------------------------------------------------------------------------------
+        //Закрытые методы
+        //-------------------------------------------------------------------------------------------------
+        private static List<VectorValue> FromTuples(IEnumerable<Tuple<int, double>> tuples)
+        {
+            var result = tuples
+                .AsParallel()
+                .OrderBy(t => t.Item1)
+                .Select(t => new VectorValue(t.Item1, t.Item2))
+                .ToList();
+            //result.Sort(new Comparison<VectorValue>((v1, v2) => v2.Index - v1.Index));
+            return result;
+        }
+
     }
 }

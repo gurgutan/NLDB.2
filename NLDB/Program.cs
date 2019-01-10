@@ -10,41 +10,17 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\884mb.txt";
-            string dbpath = @"D:\Data\Result\884mb.db";
+            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
+            string dbpath = @"D:\Data\Result\5mb.db";
             Engine engine = new Engine(dbpath)
             {
                 ExecuteMode = ExecuteMode.Verbose
             };
 
-            List<Tuple<int, int, double>> tuples = new List<Tuple<int, int, double>>
-            {
-                Tuple.Create(0,0,1.0),
-                Tuple.Create(1,1,2.0),
-                Tuple.Create(1,2,2.0),
-                Tuple.Create(1,3,2.0),
-                Tuple.Create(2,2,3.0),
-                Tuple.Create(3,3,4.0),
-                Tuple.Create(4,4,5.0),
-            };
-            SparseMatrix m = new SparseMatrix(tuples);
-            Console.WriteLine(m.ToString());
-
-            List<Tuple<int, double>> tuples2 = new List<Tuple<int, double>>
-            {
-                Tuple.Create(0,1.0),
-                Tuple.Create(1,1.0),
-                Tuple.Create(2,1.0),
-            };
-            SparseVector v1 = new SparseVector(tuples2);
-
-            Console.WriteLine(v1.NormL1.ToString() + "  " + v1.NormL2);
-            Console.ReadKey();
-
             //engine.Create();
             //engine.Insert(new Splitter(0, ""));
             //engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
-            //engine.Insert(new Splitter(2, @"[\n\r\:\;]+"));
+            //engine.Insert(new Splitter(2, @"[\n\r\?\!\:\;]+"));
             //engine.Insert(new Splitter(3, @"\[\[{число}\]\]"));
             //engine
             //    .Execute(OperationType.FileReading, trainfile)
@@ -56,7 +32,7 @@ namespace NLDB
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
             //engine.Clear("MatrixB");
-            //engine.Execute(OperationType.SimilarityCalculation, 0);
+            engine.Execute(OperationType.SimilarityCalculation, 0);
             //engine.Execute(OperationType.SimilarityCalculation, 1);
             //engine.Execute(OperationType.SimilarityCalculation, 2);
             //engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath,"words"));
