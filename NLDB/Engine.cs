@@ -127,14 +127,17 @@ namespace NLDB
             M.CenterRows();
             Debug.WriteLine($"Нормализация");
             M.NormalizeRows();
+            //string a = "1,2,3";
+            //a.Split(',').Select(;
             Debug.WriteLine($"Вычисление ковариации");
-            var result = M.RowsCovariationMatrix();
+            var result = M.BuildRowsCovariation();
             //Matrix<double> M = Matrix<double>.Build.SparseOfIndexed(size.Item1 + 1, size.Item2 + 1, m);
             //Matrix<double> N = Matrix<double>.Build.SparseOfIndexed(size.Item1 + 1, size.Item2 + 1, m);
             //var result = M.TransposeAndMultiply(N);
-            Debug.WriteLine($"Вставка в БД...");
-            DB.InsertAll(result.EnumerateIndexed(), rank);
-            return 0;
+            var tuples = result.EnumerateIndexed().ToList();
+            Debug.WriteLine($"Вставка в БД {tuples.Count} записей ...");
+            DB.InsertAll(tuples, rank);
+            return tuples.Count;
         }
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -224,8 +227,6 @@ namespace NLDB
                 double valueA = a[key_a];
                 if (b.TryGetValue(key_a, out double valueB))
                 {
-                    //asize += valueA * valueA;
-                    //bsize += valueB * valueB;
                     m += valueA * valueB;
                 }
             }

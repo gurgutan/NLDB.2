@@ -1,16 +1,17 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace NLDB.DAL
 {
-    public struct MatrixRow
+    public class IndexedVector
     {
         public readonly int Index;
         public readonly SparseVector V;
 
-        public MatrixRow(int index, SparseVector v)
+        public IndexedVector(int index, SparseVector v)
         {
             Index = index;
             V = v;
@@ -22,31 +23,42 @@ namespace NLDB.DAL
         }
     }
 
-    public class SparseMatrix : IEnumerable<MatrixRow>
+    public class SparseMatrix : IEnumerable<IndexedVector>
     {
+        private double? mean = null;
+        private double? sum = null;
         private double? normL1 = null;
         private double? normL2 = null;
-        private List<MatrixRow> rows = new List<MatrixRow>();
-        public IEnumerable<MatrixRow> Rows => rows.AsEnumerable();
+        private List<IndexedVector> rows = new List<IndexedVector>();
+        public IList<IndexedVector> Rows => rows;
 
         public SparseMatrix(IEnumerable<Tuple<int, int, double>> tuples)
         {
-            rows = FromTuples(tuples);
+            rows = FromIndexed(tuples);
         }
+
+        public SparseMatrix(IEnumerable<Tuple<int, SparseVector>> tuples)
+        {
+            rows = tuples.OrderBy(t => t.Item1).Select(t => new IndexedVector(t.Item1, t.Item2)).ToList();
+        }
+        public SparseMatrix(IDictionary<int, SparseVector> pairs)
+        {
+            rows = pairs.OrderBy(t => t.Key).Select(t => new IndexedVector(t.Key, t.Value)).ToList();
+        }
+
 
         public SparseMatrix(SparseMatrix m)
         {
-            rows = FromTuples(m.EnumerateIndexed());
+            rows = FromIndexed(m.EnumerateIndexed());
         }
 
-        private List<MatrixRow> FromTuples(IEnumerable<Tuple<int, int, double>> tuples)
+        private List<IndexedVector> FromIndexed(IEnumerable<Tuple<int, int, double>> tuples)
         {
             return tuples
                 .AsParallel()
                 .OrderBy(t => (ulong)t.Item1 << 32 | (uint)t.Item2)
                 .GroupBy(t => t.Item1)
-                .Select(group =>
-                    new MatrixRow(group.Key, new SparseVector(group.Select(v => Tuple.Create(v.Item2, v.Item3)))))
+                .Select(group => new IndexedVector(group.Key, new SparseVector(group.Select(v => Tuple.Create(v.Item2, v.Item3)))))
                 .ToList();
         }
 
@@ -61,35 +73,86 @@ namespace NLDB.DAL
 
         public void Transpose()
         {
-            rows = FromTuples(EnumerateIndexed().Select(t => Tuple.Create(t.Item2, t.Item1, t.Item3)));
+            rows = FromIndexed(EnumerateIndexed().Select(t => Tuple.Create(t.Item2, t.Item1, t.Item3)));
         }
 
-        public static SparseMatrix Transpose(SparseMatrix a)
+        public static SparseMatrix BuildTransposed(SparseMatrix a)
         {
             SparseMatrix result = new SparseMatrix(a);
             result.Transpose();
             return result;
         }
 
-        public double NormL1
+        public double NormL1()
         {
-            get
-            {
-                if (normL1 == null) normL1 = rows.AsParallel().Sum(e => Math.Abs(e.V.NormL1));
-                return (double)normL1;
-            }
+            if (normL1 == null) normL1 = rows.AsParallel().Sum(e => Math.Abs(e.V.NormL1()));
+            return (double)normL1;
         }
 
-        public double NormL2
+        public double NormL2()
         {
-            get
-            {
-                if (normL2 == null) normL2 = Math.Sqrt(rows.AsParallel().Sum(e => e.V.NormL2));
-                return (double)normL2;
-            }
+            if (normL2 == null) normL2 = Math.Sqrt(rows.AsParallel().Sum(e => e.V.NormL2()));
+            return (double)normL2;
         }
 
-        public double Mean => throw new NotImplementedException();
+        public double Sum()
+        {
+            if (sum == null) sum = rows.AsParallel().Sum(r => r.V.Sum());
+            return (double)sum;
+        }
+
+        public double Mean()
+        {
+            //Учитываются только ненулевые строки
+            if (mean == null) mean = Sum() / rows.Count;
+            return (double)mean;
+        }
+
+        public void NormalizeRows() => rows.AsParallel().ForAll(r => r.V.Normalize());
+
+
+        public void CenterRows() => rows.AsParallel().ForAll(r => r.V.Center());
+
+        public SparseMatrix BuildRowsCovariation()
+        {
+            ConcurrentDictionary<int, SparseVector> indexedVectors = new ConcurrentDictionary<int, SparseVector>();
+            using (ProgressInformer informer = new ProgressInformer(prompt: $"Матрица подобия:", max: rows.Count, measurment: $"слов", barSize: 64))
+            {
+                //Parallel.ForEach(rows, (r) =>
+                foreach (var r in rows)
+                {
+                    List<Tuple<int, double>> tuples = new List<Tuple<int, double>>();
+                    foreach (IndexedVector c in rows)
+                    {
+                        var x = r.V;
+                        var y = c.V;
+                        if (x.Count > 0 && y.Count > 0)
+                        {
+                            var cxy = x * y;
+                            tuples.Add(Tuple.Create(c.Index, cxy));
+                        }
+                    }
+                    if (tuples.Count > 0) indexedVectors[r.Index] = new SparseVector(tuples);
+                }//);
+            }
+            return new SparseMatrix(indexedVectors);
+        }
+
+        public static double operator *(SparseMatrix a, SparseMatrix b)
+        {
+            throw new NotImplementedException();
+
+        }
+
+        IEnumerator<IndexedVector> IEnumerable<IndexedVector>.GetEnumerator()
+        {
+            return ((IEnumerable<IndexedVector>)rows).GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return rows.GetEnumerator();
+        }
 
         public override string ToString()
         {
@@ -104,75 +167,6 @@ namespace NLDB.DAL
             }
             else
                 return rows.Aggregate("", (c, n) => c + (c == "" ? "" : "\n") + n.ToString());
-        }
-
-        public void NormalizeRows() => rows./*AsParallel().ForAll*/ForEach(r => r.V.Normalize());
-
-        public void CenterRows() => rows./*AsParallel().ForAll*/ForEach(r => r.V.Center());
-
-        public SparseMatrix RowsCorrelationMatrix()
-        {
-            List<Tuple<int, int, double>> result = new List<Tuple<int, int, double>>();
-            SparseMatrix transposed = new SparseMatrix(this);
-            using (ProgressInformer informer = new ProgressInformer(prompt: $"Матрица подобия:", max: rows.Count, measurment: $"слов", barSize: 64))
-            {
-                int count = 0;
-                foreach (MatrixRow r in rows)
-                {
-                    foreach (MatrixRow c in transposed.rows)
-                    {
-                        SparseVector xc = r.V.BuildCentered;
-                        SparseVector yc = c.V.BuildCentered;
-                        if (xc.Count > 0 && yc.Count > 0)
-                        {
-                            double kxy = (xc * yc) / (xc.NormL2 * yc.NormL2);
-                            result.Add(Tuple.Create(r.Index, c.Index, kxy));
-                        }
-                    }
-                    informer.Set(count++);
-                }
-            }
-            return new SparseMatrix(result);
-        }
-
-        public SparseMatrix RowsCovariationMatrix()
-        {
-            List<Tuple<int, int, double>> result = new List<Tuple<int, int, double>>();
-            using (ProgressInformer informer = new ProgressInformer(prompt: $"Матрица подобия:", max: rows.Count, measurment: $"слов", barSize: 64))
-            {
-                int count = 0;
-                foreach (MatrixRow r in rows)
-                {
-                    foreach (MatrixRow c in rows)
-                    {
-                        var x = r.V;
-                        var y = c.V;
-                        if (x.Count > 0 && y.Count > 0)
-                        {
-                            double kxy = x * y;
-                            result.Add(Tuple.Create(r.Index, c.Index, kxy));
-                        }
-                    }
-                    if (count++ % 101 == 0) informer.Set(count);
-                }
-            }
-            return new SparseMatrix(result);
-        }
-
-        public static double operator *(SparseMatrix a, SparseMatrix b)
-        {
-            throw new NotImplementedException();
-
-        }
-
-        IEnumerator<MatrixRow> IEnumerable<MatrixRow>.GetEnumerator()
-        {
-            return ((IEnumerable<MatrixRow>)rows).GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return rows.GetEnumerator();
         }
     }
 }

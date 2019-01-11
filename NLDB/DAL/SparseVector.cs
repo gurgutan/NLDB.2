@@ -5,12 +5,12 @@ using System.Linq;
 
 namespace NLDB.DAL
 {
-    public class VectorValue
+    public class IndexedValue
     {
         public readonly int Index;
         public double V;
 
-        public VectorValue(int index, double value)
+        public IndexedValue(int index, double value)
         {
             Index = index;
             V = value;
@@ -18,21 +18,25 @@ namespace NLDB.DAL
 
         public override string ToString()
         {
-            return $"({Index},{V})";
+            return $"{Index}:{V}";
         }
-
     }
 
-    public class SparseVector : IEnumerable, IEnumerable<VectorValue>
+    public class ValueIndexComparer : IComparer<IndexedValue>
+    {
+        public int Compare(IndexedValue x, IndexedValue y) => x.Index.CompareTo(y.Index);
+    }
+
+    public class SparseVector : IEnumerable, IEnumerable<IndexedValue>
     {
         private double? normL1 = null;
         private double? normL2 = null;
         private double? mean = null;
-        private List<VectorValue> data = new List<VectorValue>();
+        private List<IndexedValue> data = new List<IndexedValue>();
 
         public SparseVector(IEnumerable<double> values)
         {
-            data = values.Select((v, i) => new VectorValue(i, v)).ToList();
+            data = values.Select((v, i) => new IndexedValue(i, v)).ToList();
         }
 
         public SparseVector(IEnumerable<Tuple<int, double>> tuples)
@@ -42,42 +46,33 @@ namespace NLDB.DAL
 
         public SparseVector(SparseVector v)
         {
-            data = SparseVector.FromTuples(v.EnumerateIndexed());
-            //data.Sort(new Comparison<VectorValue>((v1, v2) => v2.Index - v1.Index));
+            data = FromTuples(v.EnumerateIndexed());
         }
 
         public int Count => data.Count;
 
-        public double NormL1
+        public double NormL1()
         {
-            get
-            {
-                if (normL1 == null) normL1 = data.AsParallel().Sum(e => Math.Abs(e.V));
-                return (double)normL1;
-            }
+            if (normL1 == null) normL1 = data.AsParallel().Sum(e => Math.Abs(e.V));
+            return (double)normL1;
         }
 
-        public double NormL2
+        public double NormL2()
         {
-            get
-            {
-                if (normL2 == null) normL2 = Math.Sqrt(data.AsParallel().Sum(e => e.V * e.V));
-                return (double)normL2;
-            }
+            if (normL2 == null) normL2 = Math.Sqrt(data.AsParallel().Sum(e => e.V * e.V));
+            return (double)normL2;
         }
 
-        public double SquareNormL2 => data.AsParallel().Sum(e => e.V * e.V);
+        public double SquareNormL2() => data.AsParallel().Sum(e => e.V * e.V);
 
-        public double Mean
+        public double Mean()
         {
-            get
-            {
-                if (mean == null) mean = Sum / data.Count;
-                return (double)mean;
-            }
+            //Здесь учитываются только не нулевые элементы вектора
+            if (mean == null) mean = Sum() / data.Count;
+            return (double)mean;
         }
 
-        public double Sum => data.AsParallel().Sum(e => e.V);
+        public double Sum() => data.AsParallel().Sum(e => e.V);
 
         public double Dot(SparseVector v)
         {
@@ -86,46 +81,49 @@ namespace NLDB.DAL
 
         public double CosDistance(SparseVector v)
         {
-            return (this * v) / (NormL2 * v.NormL2);
+            var divisor = NormL2() * v.NormL2();
+            if (divisor == 0) return 0; //при нулевой длине одного из векеторов считаем, что ковариация=0
+            return (this * v) / divisor;
         }
 
-        public SparseVector BuildCentered
+        public SparseVector BuildCentered()
         {
-            get
-            {
-                double mx = Mean;
-                return new SparseVector(data.Select(v => Tuple.Create(v.Index, v.V - mx)));
-            }
+            double mx = Mean();
+            return new SparseVector(data.AsParallel().Select(v => Tuple.Create(v.Index, v.V - mx)));
         }
 
         public void Center()
         {
-            double mx = Mean;
+            double mx = Mean();
             data.AsParallel().ForAll(x => x.V -= mx);
         }
 
         public void Normalize()
         {
-            double d = NormL2;
-            data.ForEach(x => x.V = x.V / d);
+            double d = NormL2();
+            if (d == 0)
+                data.ForEach(x => x.V = 0);
+            else
+                data.AsParallel().ForAll(x => x.V /= d);
         }
 
-        public double Dispersion
+        public double Dispersion()
         {
-            get
-            {
-                SparseVector center = BuildCentered;
-                return center.SquareNormL2;
-            }
+            return BuildCentered().SquareNormL2();  //Затратно, т.к. строится центрированный вектор
         }
 
+        /// <summary>
+        /// Доступ к i-му элементу вектора. Время доступа O(log n)
+        /// </summary>
+        /// <param name="i"></param>
+        /// <returns></returns>
         public double this[int i]
         {
             get
             {
-                int index = data.Select(v => v.Index).ToList().BinarySearch(i);
+                int index = data.BinarySearch(new IndexedValue(i, 0), new ValueIndexComparer());
                 if (index >= 0) return data[i].V;
-                else throw new IndexOutOfRangeException();
+                throw new IndexOutOfRangeException();
             }
         }
 
@@ -137,8 +135,8 @@ namespace NLDB.DAL
             double result = 0;
             while (!end)
             {
-                VectorValue a = (VectorValue)a_enumerator.Current;
-                VectorValue b = (VectorValue)b_enumerator.Current;
+                IndexedValue a = (IndexedValue)a_enumerator.Current;
+                IndexedValue b = (IndexedValue)b_enumerator.Current;
                 if (a.Index == b.Index)
                 {
                     result += a.V * b.V;
@@ -164,28 +162,26 @@ namespace NLDB.DAL
             return ((IEnumerable)data).GetEnumerator();
         }
 
-        IEnumerator<VectorValue> IEnumerable<VectorValue>.GetEnumerator()
+        IEnumerator<IndexedValue> IEnumerable<IndexedValue>.GetEnumerator()
         {
-            return ((IEnumerable<VectorValue>)data).GetEnumerator();
+            return ((IEnumerable<IndexedValue>)data).GetEnumerator();
         }
 
         public override string ToString()
         {
-            return "[" + string.Join(",", data.Select(v => v.ToString())) + "]";
+            return "[" + string.Join(",", data.AsParallel().Select(v => v.ToString())) + "]";
         }
 
         //-------------------------------------------------------------------------------------------------
         //Закрытые методы
         //-------------------------------------------------------------------------------------------------
-        private static List<VectorValue> FromTuples(IEnumerable<Tuple<int, double>> tuples)
+        private static List<IndexedValue> FromTuples(IEnumerable<Tuple<int, double>> tuples)
         {
-            var result = tuples
+            return tuples
                 .AsParallel()
                 .OrderBy(t => t.Item1)
-                .Select(t => new VectorValue(t.Item1, t.Item2))
+                .Select(t => new IndexedValue(t.Item1, t.Item2))
                 .ToList();
-            //result.Sort(new Comparison<VectorValue>((v1, v2) => v2.Index - v1.Index));
-            return result;
         }
 
     }
