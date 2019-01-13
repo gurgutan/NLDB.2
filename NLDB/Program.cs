@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using NLDB.DAL;
 
@@ -10,12 +10,10 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
-            string trainfile = @"D:\Data\Wiki\ru\5mb.txt";
-            string dbpath = @"D:\Data\Result\5mb.db";
-            Engine engine = new Engine(dbpath)
-            {
-                ExecuteMode = ExecuteMode.Verbose
-            };
+            string filename = "884mb.txt";
+            string trainfile = @"D:\Data\Wiki\ru\" + filename;
+            string dbpath = @"D:\Data\Result\" + Path.ChangeExtension(filename, "db");
+            Engine engine = new Engine(dbpath, ExecuteMode.Verbose);
 
             //engine.Create();
             //engine.Insert(new Splitter(0, ""));
@@ -31,9 +29,9 @@ namespace NLDB
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
-            engine.Clear("MatrixB");
-            engine.Execute(OperationType.SimilarityCalculation, 0);
-            engine.Execute(OperationType.SimilarityCalculation, 1);
+            //engine.Clear("MatrixB");
+            //engine.Execute(OperationType.SimilarityCalculation, 0);
+            //engine.Execute(OperationType.SimilarityCalculation, 1);
             //engine.Execute(OperationType.SimilarityCalculation, 2);
             //engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath,"words"));
 
@@ -45,11 +43,15 @@ namespace NLDB
                 if (line == "") continue;
                 Console.Write($"\n\nФраза: ");
                 line = Console.ReadLine();
-                //Console.WriteLine(engine.ToTerm(engine.DB.GetWord(int.Parse(line))).ToString());
-                List<Term> similars = engine.Similars(text: line, rank: 2, count: 8);
+                Term term = engine.Similars(line, 1, 1).First();
+                Console.WriteLine(term.ToString());
+                System.Collections.Generic.IEnumerable<Term> nearest = engine.Nearest(term, 8);
+                Console.WriteLine("\nСовместные:\n" + nearest.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+
+                //List<Term> similars = engine.Similars(text: line, rank: 2, count: 8);
                 //Найдем 8 лучших совпадений с текстом line. rank=2 означает, что нас интересуют совпадения предложений
                 //List<Term> similars = engine.Similars(text: line, rank: 2, count: 8);
-                Console.WriteLine("\n\nПохожие предложения:\n" + similars.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+                //Console.WriteLine("\n\nПохожие предложения:\n" + similars.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
                 //Получим предположение о предложении, следующем за line
                 //List<Term> next = l.Next(text: line, rank: 2);
                 //Console.WriteLine("\n\nОтветные предложения:\n" + next.Aggregate("", (c, n) => c + $"\n" + n.ToString()));

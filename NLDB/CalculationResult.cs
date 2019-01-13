@@ -2,10 +2,25 @@
 
 namespace NLDB
 {
-    /// <summary>
-    /// Тип результата обработки данных
-    /// </summary>
     public enum ResultType { Success, Error };
+
+    public enum OperationType
+    {
+        None,
+        FileReading,
+        FileWriting,
+        TextNormalization,
+        TextSplitting,
+        WordsExtraction,
+        DistancesCalculation,
+        SimilarityCalculation
+    };
+
+    public enum ExecuteMode
+    {
+        Silent, Verbose, Debug
+    };
+
 
     public class CalculationResult
     {
@@ -33,6 +48,11 @@ namespace NLDB
             }
             else
                 return Engine.Execute(ptype, Engine.Data);
+        }
+
+        public override string ToString()
+        {
+            return $"{ProcessingType.ToString()} - {ResultType.ToString()}";
         }
     }
 }

@@ -76,9 +76,9 @@ namespace NLDB.DAL.Tests
         public void TestNorm()
         {
             var v = new SparseVector(new double[] { 1.0, 1.0, 1.0 });
-            Assert.AreEqual(v.NormL1, 3);
-            Assert.AreEqual(v.NormL2, Math.Sqrt(3));
-            Assert.AreEqual(v.SquareNormL2, 3);
+            Assert.AreEqual(v.NormL1(), 3);
+            Assert.AreEqual(v.NormL2(), Math.Sqrt(3));
+            Assert.AreEqual(v.SquareNormL2(), 3);
         }
 
     }

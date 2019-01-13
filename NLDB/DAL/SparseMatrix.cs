@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using NLDB.Utils;
 
 namespace NLDB.DAL
 {
@@ -46,7 +48,6 @@ namespace NLDB.DAL
             rows = pairs.OrderBy(t => t.Key).Select(t => new IndexedVector(t.Key, t.Value)).ToList();
         }
 
-
         public SparseMatrix(SparseMatrix m)
         {
             rows = FromIndexed(m.EnumerateIndexed());
@@ -69,18 +70,6 @@ namespace NLDB.DAL
             return rows.SelectMany(row => row.V
                     .EnumerateIndexed()
                     .Select(v => Tuple.Create(row.Index, v.Item1, v.Item2)));
-        }
-
-        public void Transpose()
-        {
-            rows = FromIndexed(EnumerateIndexed().Select(t => Tuple.Create(t.Item2, t.Item1, t.Item3)));
-        }
-
-        public static SparseMatrix BuildTransposed(SparseMatrix a)
-        {
-            SparseMatrix result = new SparseMatrix(a);
-            result.Transpose();
-            return result;
         }
 
         public double NormL1()
@@ -108,33 +97,107 @@ namespace NLDB.DAL
             return (double)mean;
         }
 
-        public void NormalizeRows() => rows.AsParallel().ForAll(r => r.V.Normalize());
+        public void NormalizeRows()
+        {
+            rows.AsParallel().ForAll(r => r.V.Normalize());
+        }
 
-
-        public void CenterRows() => rows.AsParallel().ForAll(r => r.V.Center());
+        public void CenterRows()
+        {
+            rows.AsParallel().ForAll(r => r.V.Center());
+        }
 
         public SparseMatrix BuildRowsCovariation()
         {
             ConcurrentDictionary<int, SparseVector> indexedVectors = new ConcurrentDictionary<int, SparseVector>();
             using (ProgressInformer informer = new ProgressInformer(prompt: $"Матрица подобия:", max: rows.Count, measurment: $"слов", barSize: 64))
             {
-                //Parallel.ForEach(rows, (r) =>
-                foreach (var r in rows)
+                long rowcount = 0;
+                Parallel.ForEach(rows, (r) =>
+                //foreach (var r in rows)
                 {
                     List<Tuple<int, double>> tuples = new List<Tuple<int, double>>();
                     foreach (IndexedVector c in rows)
                     {
-                        var x = r.V;
-                        var y = c.V;
+                        SparseVector x = r.V;
+                        SparseVector y = c.V;
                         if (x.Count > 0 && y.Count > 0)
                         {
-                            var cxy = x * y;
+                            double cxy = x * y;
                             tuples.Add(Tuple.Create(c.Index, cxy));
                         }
                     }
                     if (tuples.Count > 0) indexedVectors[r.Index] = new SparseVector(tuples);
-                }//);
+                    rowcount++;
+                    if (rowcount % 37 == 0) informer.Set(rowcount);
+                });
+                informer.Set(rows.Count);
             }
+            return new SparseMatrix(indexedVectors);
+        }
+
+        //-------------------------------------------------------------------------------------------------
+        // Методы преобразования
+        //-------------------------------------------------------------------------------------------------
+        public void Transpose()
+        {
+            rows = FromIndexed(EnumerateIndexed().Select(t => Tuple.Create(t.Item2, t.Item1, t.Item3)));
+        }
+
+        /// <summary>
+        /// Удаляет элементы матрицы, значения которых находятся в диапазоне [left, right] включительно.
+        /// </summary>
+        /// <param name="left"></param>
+        /// <param name="right"></param>
+        /// <returns></returns>
+        public int RemoveValuesFromRange(double left, double right)
+        {
+            int count = 0;
+            //Для каждого вектора выполняем операцию удаления элементов из интервала
+            rows.ForEach(v => count += v.V.RemoveValuesFromRange(left, right));
+            //Теперь удаляем "пустые" векторы
+            rows.RemoveAll(v => v.V.Count == 0);
+            return count;
+        }
+
+        //-------------------------------------------------------------------------------------------------
+        // Статические методы
+        //-------------------------------------------------------------------------------------------------
+        public static SparseMatrix BuildTransposed(SparseMatrix a)
+        {
+            SparseMatrix result = new SparseMatrix(a);
+            result.Transpose();
+            return result;
+        }
+        /// <summary>
+        /// Вычисление ковариации двух матриц. Каждая строка матрицы a скалярно умножается на строку матрицы b. Векторы-строки должны быть предварительно центрированы.
+        /// </summary>
+        /// <param name="a">левая матрица</param>
+        /// <param name="b">правая матрица (предполагается что она уже транспонирована)</param>
+        /// <param name="zeroingRadius">элементы, не из интервала [-zeroingRadius, zeroingRadius] в результат не записываются</param>
+        /// <returns></returns>
+        public static SparseMatrix Covariation(SparseMatrix a, SparseMatrix b, double zeroingRadius = 0)
+        {
+            if (zeroingRadius < 0) zeroingRadius = -zeroingRadius;
+            ConcurrentDictionary<int, SparseVector> indexedVectors = new ConcurrentDictionary<int, SparseVector>();
+            Parallel.ForEach(a.Rows, (r) =>
+            {
+                List<Tuple<int, double>> tuples = new List<Tuple<int, double>>();
+                foreach (IndexedVector c in b.Rows)
+                {
+                    if (c == r)
+                        tuples.Add(Tuple.Create(c.Index, 1.0));
+                    else if (r.V.Count > 0 && c.V.Count > 0)
+                    {
+                        //Скалярное произведение
+                        double cxy = r.V * c.V;
+                        //Нулевые элементы в результат не добавляем
+                        if (cxy > zeroingRadius || cxy < -zeroingRadius)
+                            tuples.Add(Tuple.Create(c.Index, cxy));
+                    }
+                }
+                if (tuples.Count > 0) indexedVectors[r.Index] = new SparseVector(tuples);
+            });
             return new SparseMatrix(indexedVectors);
         }
 
@@ -147,11 +210,6 @@ namespace NLDB.DAL
         IEnumerator<IndexedVector> IEnumerable<IndexedVector>.GetEnumerator()
         {
             return ((IEnumerable<IndexedVector>)rows).GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return rows.GetEnumerator();
         }
 
         public override string ToString()
@@ -167,6 +225,11 @@ namespace NLDB.DAL
             }
             else
                 return rows.Aggregate("", (c, n) => c + (c == "" ? "" : "\n") + n.ToString());
+        }
+
+        public IEnumerator GetEnumerator()
+        {
+            return ((IEnumerable<IndexedVector>)rows).GetEnumerator();
         }
     }
 }

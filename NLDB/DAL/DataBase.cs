@@ -16,12 +16,12 @@ namespace NLDB.DAL
         private SQLiteTransaction transaction;
         private Parser[] parsers = null;
 
-        private readonly Dictionary<string, MatrixDictionary> sparseMatrixCash = new Dictionary<string, MatrixDictionary>(SPARSEMATRIX_CASH_SIZE);
-        private readonly ConcurrentDictionary<long, AValue> matrixACash = new ConcurrentDictionary<long, AValue>(PARALLELIZM, MATRIXA_CASH_SIZE);
-        private readonly ConcurrentDictionary<long, BValue> matrixBCash = new ConcurrentDictionary<long, BValue>(PARALLELIZM, MATRIXB_CASH_SIZE);
-        private readonly Dictionary<int, Term> termsCash = new Dictionary<int, Term>(TERMS_CASH_SIZE);
-        private readonly Dictionary<int, Word> wordsCash = new Dictionary<int, Word>(WORDS_CASH_SIZE);
-        private readonly Dictionary<string, Word> symbolsCash = new Dictionary<string, Word>(SYMBOLS_CASH_SIZE);
+        private Dictionary<string, MatrixDictionary> sparseMatrixCash = new Dictionary<string, MatrixDictionary>(SPARSEMATRIX_CASH_SIZE);
+        private ConcurrentDictionary<long, AValue> matrixACash = new ConcurrentDictionary<long, AValue>(PARALLELIZM, MATRIXA_CASH_SIZE);
+        private ConcurrentDictionary<long, BValue> matrixBCash = new ConcurrentDictionary<long, BValue>(PARALLELIZM, MATRIXB_CASH_SIZE);
+        private Dictionary<int, Term> termsCash = new Dictionary<int, Term>(TERMS_CASH_SIZE);
+        private Dictionary<int, Word> wordsCash = new Dictionary<int, Word>(WORDS_CASH_SIZE);
+        private Dictionary<string, Word> symbolsCash = new Dictionary<string, Word>(SYMBOLS_CASH_SIZE);
 
         private const int SPARSEMATRIX_CASH_SIZE = 1 << 10;
         private const int MATRIXA_CASH_SIZE = 1 << 20;
@@ -50,10 +50,6 @@ namespace NLDB.DAL
             //Create();
         }
 
-        public void Dispose()
-        {
-            db.Dispose();
-        }
 
         //---------------------------------------------------------------------------------------------------------
         //Создание, инициализация, удаление таблиц
@@ -484,10 +480,10 @@ namespace NLDB.DAL
         /// <param name="rank">Ранг слов</param>
         /// <param name="m"></param>
         /// <returns></returns>
-        public Tuple<int, int> GetAMatrixAsTuples(int rank, out List<Tuple<int, int, double>> m)
+        public Tuple<int, int> GetAMatrixAsTuples(int rank, int from, int to, out List<Tuple<int, int, double>> m)
         {
             string text = $"SELECT Row, Column, Sum, Count AS Value FROM MatrixA " +
-                          $"WHERE Rank={rank} ";
+                          $"WHERE Rank={rank} AND Row>={from} AND Row<{to}";
             m = new List<Tuple<int, int, double>>();
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
             {
@@ -560,8 +556,9 @@ namespace NLDB.DAL
             }
         }
 
-        public async void InsertAll(IEnumerable<Tuple<int, int, double>> values, int rank)
+        public int InsertAll(IEnumerable<Tuple<int, int, double>> values, int rank)
         {
+            int count = 0;
             //Не предполагается изменение значений MatrixB, поэтому только замена: "INSERT OR REPLACE"
             string text = $"INSERT OR REPLACE INTO MatrixB(Row, Column, Similarity, Rank) VALUES (@r, @c, @s, @rnk);";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
@@ -576,8 +573,32 @@ namespace NLDB.DAL
                     cmd.Parameters["@r"].Value = v.Item1;
                     cmd.Parameters["@c"].Value = v.Item2;
                     cmd.Parameters["@s"].Value = v.Item3;
-                    await cmd.ExecuteNonQueryAsync();
+                    count += cmd.ExecuteNonQuery();
+                };
+            }
+            return count;
+        }
+
+        public Tuple<int, int> GetBMatrixAsTuples(int rank, int from, int to, out List<Tuple<int, int, double>> m)
+        {
+            string text = $"SELECT Row, Column, Similarity FROM MatrixB " +
+                          $"WHERE Rank={rank} AND Row>={from} AND Row<{to}";
+            m = new List<Tuple<int, int, double>>();
+            using (SQLiteCommand cmd = new SQLiteCommand(text, db))
+            {
+                SQLiteDataReader reader = cmd.ExecuteReader();
+                int rowsCount = 0;
+                int columnsCount = 0;
+                while (reader.Read())
+                {
+                    int r = reader.GetInt32(0);
+                    int c = reader.GetInt32(1);
+                    double similarity = reader.GetDouble(2);
+                    m.Add(Tuple.Create(r, c, similarity));
+                    if (r > rowsCount) rowsCount = r;
+                    if (c > columnsCount) columnsCount = c;
                 }
+                return Tuple.Create(rowsCount, columnsCount);
             }
         }
 
@@ -753,5 +774,34 @@ namespace NLDB.DAL
             while (current < count && cash.Count > 0)
                 current += cash.TryRemove(cash.First().Key, out BValue value) ? 1 : 0;
         }
+
+        #region IDisposable Support
+        private bool disposedValue = false; // Для определения избыточных вызовов
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    db.Dispose();
+                }
+                sparseMatrixCash = null;
+                matrixACash = null;
+                matrixBCash = null;
+                termsCash = null;
+                wordsCash = null;
+                symbolsCash = null;
+                parsers = null;
+
+                disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+        #endregion
     }
 }

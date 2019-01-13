@@ -27,7 +27,7 @@ namespace NLDB
         private readonly Dictionary<string, int> alphabet = new Dictionary<string, int>(1 << 10);
 
         //Кэш id слов для поиска по childs
-        private readonly Dictionary<Sequence, int> words_id = new Dictionary<Sequence, int>(1 << 10);
+        private readonly Dictionary<DAL.Sequence, int> words_id = new Dictionary<DAL.Sequence, int>(1 << 10);
 
         private int current_id = 0;
 
@@ -563,7 +563,7 @@ namespace NLDB
         /// <returns></returns>
         public int GetWordIdByChilds(int[] _childs)
         {
-            Sequence childs = new Sequence(_childs);
+            DAL.Sequence childs = new DAL.Sequence(_childs);
             if (words_id.TryGetValue(childs, out int id)) return id;
             string childs_str = _childs.Aggregate("", (c, n) => c + (c == "" ? "" : ",") + n.ToString());
             SQLiteCommand cmd = db.CreateCommand();

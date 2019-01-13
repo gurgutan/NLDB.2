@@ -125,9 +125,10 @@
     <Compile Include="Deprecated\Grammar.cs" />
     <Compile Include="Deprecated\Lexicon.cs" />
     <Compile Include="Deprecated\MeanValue.cs" />
+    <Compile Include="Utils\Logger.cs" />
     <Compile Include="Pointer.cs" />
-    <Compile Include="ProgressInformer.cs" />
-    <Compile Include="Sequence.cs" />
+    <Compile Include="Utils\ProgressInformer.cs" />
+    <Compile Include="DAL\Sequence.cs" />
     <Compile Include="Deprecated\Primes.cs" />
     <Compile Include="Deprecated\Language.cs" />
     <Compile Include="Parser.cs" />

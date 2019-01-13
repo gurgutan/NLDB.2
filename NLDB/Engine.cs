@@ -5,28 +5,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using NLDB.DAL;
+using NLDB.Utils;
 
 namespace NLDB
 {
-    public enum OperationType
+    public class Engine : IDisposable
     {
-        None,
-        FileReading,
-        FileWriting,
-        TextNormalization,
-        TextSplitting,
-        WordsExtraction,
-        DistancesCalculation,
-        SimilarityCalculation
-    };
+        public readonly Logger Logger;
 
-    public enum ExecuteMode
-    {
-        Silent, Verbose, Debug
-    };
-
-    public class Engine
-    {
         public ExecuteMode ExecuteMode { get; set; }
 
         public CalculationResult CalculationResult { get; private set; }
@@ -41,15 +27,19 @@ namespace NLDB
             return DB.Words($"Rank={rank} {limit}");
         }
 
-        public Engine(string dbpath)
+        public Engine(string dbpath, ExecuteMode mode = ExecuteMode.Verbose)
         {
             this.dbpath = dbpath;
+            ExecuteMode = mode;
             DB = new DataBase(dbpath);
+            Logger = new Logger(Path.ChangeExtension(dbpath, "log"));
+            Logger.WriteLine($"Подключено: '{dbpath}'");
         }
 
         public void Create()
         {
             DB.Create();
+            Logger.WriteLine($"Создана БД '{dbpath}'");
         }
 
         public void Clear(string tableName = "")
@@ -60,25 +50,23 @@ namespace NLDB
                 try
                 {
                     DB.Clear(tableName);
+                    Logger.WriteLine($"Очищена таблица БД '{tableName}'");
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"Ошибка очистки таблицы {tableName}:{e.Message}");
+                    Logger.WriteLine($"Ошибка очистки таблицы {tableName}:{e.Message}");
                 }
         }
 
         public CalculationResult Execute(OperationType ptype, object parameter = null)
         {
-            if (ExecuteMode == ExecuteMode.Verbose)
-            {
-                Console.WriteLine($"Начало операции {ptype}");
-            }
+            Logger.WriteLine($"Операция {ptype}");
             switch (ptype)
             {
                 case OperationType.FileReading:
                     CalculationResult = ReadFile((string)parameter); break;
                 case OperationType.FileWriting:
-                    CalculationResult = WriteFile((string)parameter); break;
+                    CalculationResult = WriteDataToFile((string)parameter); break;
                 case OperationType.TextNormalization:
                     CalculationResult = NormilizeText((string)parameter); break;
                 case OperationType.TextSplitting:
@@ -88,155 +76,80 @@ namespace NLDB
                 case OperationType.DistancesCalculation:
                     CalculationResult = CalculateDistances((IEnumerable<Word>)parameter); break;
                 case OperationType.SimilarityCalculation:
-                    //CalculationResult = CalculateSimilarity((IList<Word>)parameter); break;
-                    CalculationResult = CalculateSimilarity2((int)parameter); break;
+                    CalculationResult = CalculateSimilarity((int)parameter); break;
                 default:
                     throw new NotImplementedException();
             }
+            Logger.WriteLine($"Завешена {CalculationResult.ToString()}");
             return CalculationResult;
         }
 
-        private CalculationResult CalculateSimilarity2(int rank)
+        //-------------------------------------------------------------------------------------------------------------------------------------------------------
+        private CalculationResult CalculateSimilarity(int rank)
         {
             Stopwatch stopwatch = new Stopwatch();
             //Функция вычисляет попарные сходства между векторами-строками матрицы расстояний MatrixA и сохраняет результат в БД
-            DB.BeginTransaction();
-            stopwatch.Restart();
-            Tuple<int, int> size = DB.GetAMatrixAsTuples(rank, out List<Tuple<int, int, double>> m);
-            stopwatch.Stop();
-            Debug.WriteLine($"Матрица {rank} считана {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
-            stopwatch.Restart();
-            MatrixDotSquare(m, rank);
-            stopwatch.Stop();
-            Debug.WriteLine($"Результат получен {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
-            stopwatch.Restart();
-            DB.Commit();
-            stopwatch.Stop();
-            Debug.WriteLine($"Записан в БД {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
-            Data = null;
-            return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Success);
-        }
-
-        private long MatrixDotSquare(List<Tuple<int, int, double>> m, int rank)
-        {
-            //Control.UseNativeMKL();
-            //Debug.WriteLine(Control.Describe());
-            Debug.WriteLine($"Создание матрицы [{rank}] из {m.Count} ...");
-            SparseMatrix M = new SparseMatrix(m);
-            Debug.WriteLine($"Центрирование");
-            M.CenterRows();
-            Debug.WriteLine($"Нормализация");
-            M.NormalizeRows();
-            //string a = "1,2,3";
-            //a.Split(',').Select(;
-            Debug.WriteLine($"Вычисление ковариации");
-            var result = M.BuildRowsCovariation();
-            //Matrix<double> M = Matrix<double>.Build.SparseOfIndexed(size.Item1 + 1, size.Item2 + 1, m);
-            //Matrix<double> N = Matrix<double>.Build.SparseOfIndexed(size.Item1 + 1, size.Item2 + 1, m);
-            //var result = M.TransposeAndMultiply(N);
-            var tuples = result.EnumerateIndexed().ToList();
-            Debug.WriteLine($"Вставка в БД {tuples.Count} записей ...");
-            DB.InsertAll(tuples, rank);
-            return tuples.Count;
-        }
-
-        //-------------------------------------------------------------------------------------------------------------------------------------------------------
-        /// <summary>
-        /// Вычисление матрицы подобия
-        /// </summary>
-        /// <param name="words"></param>
-        /// <returns></returns>
-        private CalculationResult CalculateSimilarity(IList<Word> words)
-        {
-            Stopwatch stopwatch = new Stopwatch();  //!!! отладочный таймер
-            //Функция вычисляет попарные сходства между векторами-строками матрицы расстояний MatrixA и сохраняет результат в БД
-            //Матрица симметричная, с нулевой главной диагональю
+            List<Word> words = Words(rank).ToList();
+            Logger.WriteLine($"Вычисление матрицы корреляции для {words.Count} слов ранга {rank}");
             int maxCount = words.Count();
             long elementsCount = 0;
-            int rank = words.First().Rank;
-            if (maxCount == 0) return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Error);
-            int iterationsCount = maxCount * maxCount;
-            using (ProgressInformer informer = new ProgressInformer(prompt: $"Матрица подобия:", max: maxCount, measurment: $"слов р{rank}", barSize: 64))
+            if (maxCount == 0)
+            {
+                Logger.WriteLine($"Отстутсвуют слова для расчета корреляции");
+                return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Error);
+            }
+            int step = Math.Max(1, STEPS_COUNT);
+            int max_number = maxCount / step;
+            long barmax = max_number * (max_number + 1);
+            using (ProgressInformer informer = new ProgressInformer(prompt: $"Корреляция:", max: barmax, measurment: $"слов {rank}", barSize: 64))
             {
                 //Вычисления производятся порциями по step строк. Выбирается диапазон величиной step индексов
-                int step = Math.Max(1, maxCount / STEPS_COUNT);
-                for (int i = 0; i <= maxCount / step; i++)
+                Logger.WriteLine($"Параметры цикла: шаг={step}, количество={max_number}");
+                for (int i = 0; i <= max_number; i++)
                 {
                     DB.BeginTransaction();
-                    stopwatch.Restart();    //!!!
-                    int rowsLeft = i * step;
-                    informer.Set(rowsLeft);
-                    MatrixDictionary rows = DB.GetARows(words.Skip(rowsLeft).Take(step).ToList(), rank);
-                    for (int j = i; j <= maxCount / step; j++)
+                    int startRowNumber = i * step;
+                    int endRowNumber = Math.Min(startRowNumber + step, words.Count - 1);
+                    Logger.WriteLine($"Чтение матрицы из БД для {words[startRowNumber].Id}-{words[endRowNumber].Id}");
+                    DB.GetAMatrixAsTuples(rank, words[startRowNumber].Id, words[endRowNumber].Id, out List<Tuple<int, int, double>> rows);
+                    SparseMatrix A = new SparseMatrix(rows);
+                    for (int j = i; j <= max_number; j++)
                     {
-                        int columnsLeft = j * step;
-                        MatrixDictionary columns = DB.GetARows(words.Skip(columnsLeft).Take(step).ToList(), rank);
-                        elementsCount += CalculateSubmatrixB(rows, columns, rank);
-                        Debug.WriteLine($"i={i}, j={j} [max={maxCount / step}], элементов = {elementsCount}");
+                        informer.Set(i * max_number + j);
+                        stopwatch.Restart();
+                        int startColumnNumber = j * step;
+                        int endColumnNumber = Math.Min(startColumnNumber + step, words.Count - 1);
+                        Logger.WriteLine($"Чтение подматрицы из БД для интервала Id {words[startColumnNumber].Id}-{words[endColumnNumber].Id}");
+                        DB.GetAMatrixAsTuples(rank, words[startColumnNumber].Id, words[endColumnNumber].Id, out List<Tuple<int, int, double>> columns);
+                        Logger.WriteLine($"Построение разреженной подматрицы B");
+                        SparseMatrix B = new SparseMatrix(columns);
+                        Logger.WriteLine($"Начало вычислений B*B^T:");
+                        elementsCount += MatrixDotSquare(A, B, rank);
+                        stopwatch.Stop();
+                        Logger.WriteLine($"[{i}/{max_number},{j}/{max_number}], всего эл-в:{elementsCount}, {stopwatch.Elapsed.TotalSeconds} сек");
                     }
                     DB.Commit();
-                    stopwatch.Stop();   //!!!
-                    Debug.WriteLine($"Подматрица подобия ({maxCount}x{maxCount}): {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
+                    Logger.WriteLine($"Подматрица подобия ({maxCount}x{maxCount}): {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
                 }
-                informer.Set(maxCount);
+                informer.Set(barmax);
             }
             Data = null;
             return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Success);
         }
 
-        //Функция вычисления произведения векторов
-        private long CalculateSubmatrixB(MatrixDictionary rows, MatrixDictionary columns, int rank)
+        private int MatrixDotSquare(SparseMatrix A, SparseMatrix B, int rank)
         {
-            int count = 0;
-            if (rows.Count == 0 || columns.Count == 0) return 0;
-            List<List<BValue>> result = new List<List<BValue>>(rows.Count * columns.Count);
-            //Сначала вычисления с сохранением в несколько списков параллельно
-            rows.AsParallel().ForAll(row =>
-            //foreach (KeyValuePair<int, SparseVector> row in rows)
-            {
-                List<BValue> result_row = new List<BValue>();
-                foreach (KeyValuePair<int, VectorDictionary> column in columns)
-                {
-                    double d;
-                    if (row.Key == column.Key)
-                        d = 1;  //Cos(0)=1
-                    else
-                        d = CosDistance(row.Value, column.Value);
-                    //TODO: вероятно не имеет смысла записывать в БД значения подобия из интервала [-e;e], 0<e<0.9. Т.к. d в этом интервале означает несовместимость слов.
-                    if (d != 0)
-                    {
-                        //Матрица симметричная
-                        result_row.Add(new BValue(rank, row.Key, column.Key, d));
-                        result_row.Add(new BValue(rank, column.Key, row.Key, d));
-                        count += 2;
-                    }
-                }
-                if (result_row.Count > 0) result.Add(result_row);
-            });
-            if (result.Count == 0) return 0;
-            //Запись в данных БД каждого из списков значений
-            result.AsParallel().ForAll(row => DB.InsertAll(row));
-            return count;
-        }
-
-        private double CosDistance(VectorDictionary a, VectorDictionary b)
-        {
-            double m = 0, asize = 0, bsize = 0;
-            foreach (int key_a in a.Keys)
-            {
-                double valueA = a[key_a];
-                if (b.TryGetValue(key_a, out double valueB))
-                {
-                    m += valueA * valueB;
-                }
-            }
-            asize = a.Size;
-            bsize = b.Size;
-            double divisor = Math.Sqrt(asize) * Math.Sqrt(bsize);
-            if (divisor > 0 && m > 0)
-                return m / divisor;
-            else
-                return 0;
+            Logger.WriteLine($"  1. Центрирование и нормализация");
+            A.CenterRows();
+            A.NormalizeRows();
+            B.CenterRows();
+            B.NormalizeRows();
+            Logger.WriteLine($"  2. Вычисление ковариации");
+            SparseMatrix result = SparseMatrix.Covariation(A, B, 0.5);
+            Logger.WriteLine($"  3. Формирование списка значений");
+            IEnumerable<Tuple<int, int, double>> tuples = result.EnumerateIndexed();
+            Logger.WriteLine($"  4. Запись в БД");
+            return DB.InsertAll(tuples, rank);
         }
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -372,16 +285,13 @@ namespace NLDB
                     .Where(c => c.id != 0)
                     .Select(c => c.id)
                     .ToArray();
-                sw.Stop();  //!!!
-                Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
+                sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
-                List<DAL.Word> parents = DB.GetParents(childs).ToList();
-                sw.Stop();  //!!!
-                Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
+                List<Word> parents = DB.GetParents(childs).ToList();
+                sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
                 List<Term> context = parents.Select(p => DB.ToTerm(p)).ToList();
-                sw.Stop();  //!!!
-                Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
+                sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
                 //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
                 Pointer max = context.AsParallel().Aggregate(
                     new Pointer(),
@@ -444,6 +354,18 @@ namespace NLDB
             return context.Take(count).ToList();
         }
 
+        public IEnumerable<Term> Nearest(Term term, int count = 1)
+        {
+            var result = new List<Term>();
+            if (term.id == 0) return null;
+            var size = DB.GetBMatrixAsTuples(term.rank, term.id, term.id + 1, out List<Tuple<int, int, double>> m);
+            if (m.Count == 0) return result;
+            var M = new SparseMatrix(m);
+            var vector = M.First().V;
+            if (vector.Count == 0) return result;
+            return vector.OrderByDescending(iv => iv.V).Take(count).Select(iv=>ToTerm(iv.Index));
+        }
+
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult ReadFile(string filename)
         {
@@ -457,7 +379,7 @@ namespace NLDB
         }
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
-        private CalculationResult WriteFile(string filename)
+        private CalculationResult WriteDataToFile(string filename)
         {
             //TODO: продумать сохранение в файл разнух типов данных, хранимых по ссылке Data
             using (StreamWriter writer = File.CreateText(filename))
@@ -498,11 +420,25 @@ namespace NLDB
             return DB.ToTerm(word);
         }
 
+        public Term ToTerm(int id)
+        {
+            var word = DB.GetWord(id);
+            if (word == null) return null;
+            return DB.ToTerm(word);
+        }
+
+        public void Dispose()
+        {
+            Logger.WriteLine($"Закрытие подключения к '{dbpath}'");
+            ((IDisposable)DB).Dispose();
+            Logger.Dispose();
+        }
+
         //--------------------------------------------------------------------------------------------
         //Закрытые свойства
         //--------------------------------------------------------------------------------------------
         private DataBase DB { get; }
         private readonly string dbpath;
-        private const int STEPS_COUNT = 1 << 8;
+        private const int STEPS_COUNT = 1 << 18;
     }
 }
