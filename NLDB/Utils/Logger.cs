@@ -30,7 +30,7 @@ namespace NLDB.Utils
         {
             try
             {
-                stream = new StreamWriter(Filename, append: true, encoding: Encoding.UTF8)
+                stream = new StreamWriter(Filename, append: AppendFile, encoding: Encoding.UTF8)
                 {
                     AutoFlush = true
                 };
@@ -60,6 +60,8 @@ namespace NLDB.Utils
 
         public void Dispose()
         {
+            WriteLine("Завершение протокола.");
+            stopwatch.Stop();
             ((IDisposable)stream).Dispose();
         }
     }

@@ -33,7 +33,7 @@ namespace NLDB
             engine.Execute(OperationType.SimilarityCalculation, 0);
             engine.Execute(OperationType.SimilarityCalculation, 1);
             engine.Execute(OperationType.SimilarityCalculation, 2);
-            //engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath, "words"));
+            engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath, "words"));
 
             //Теперь будем использовать полученные данные
             Console.WriteLine("\n\nДля окончания диалога нажмите Enter");

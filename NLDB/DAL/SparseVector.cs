@@ -255,9 +255,9 @@ namespace NLDB.DAL
                     end = !(a_enumerator.MoveNext() && b_enumerator.MoveNext());
                 }
                 else if (a.Index < b.Index)
-                    end = !a_enumerator.SkipTo(b);//a_enumerator.MoveNext();
+                    end = !a_enumerator./*SkipTo(b);//*/MoveNext();
                 else if (a.Index > b.Index)
-                    end = !b_enumerator.SkipTo(a);//b_enumerator.MoveNext();
+                    end = !b_enumerator./*SkipTo(a);//*/MoveNext();
             }
             return result;
         }

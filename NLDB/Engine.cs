@@ -110,7 +110,7 @@ namespace NLDB
                     int endRowNumber = Math.Min(startRowNumber + step, words.Count - 1);
                     informer.Set(startRowNumber);
                     Logger.WriteLine($"Чтение матрицы из БД для {words[startRowNumber].Id}-{words[endRowNumber].Id}");
-                    DB.GetAMatrixAsTuples(rank, words[startRowNumber].Id, words[endRowNumber].Id, out List<Tuple<int, int, double>> rows);
+                    Tuple<int, int> size_a = DB.GetAMatrixAsTuples(rank, words[startRowNumber].Id, words[endRowNumber].Id, out List<Tuple<int, int, double>> rows);
                     SparseMatrix A = new SparseMatrix(rows);
                     for (int j = i; j <= max_number; j++)
                     {
@@ -119,11 +119,11 @@ namespace NLDB
                         int startColumnNumber = j * step;
                         int endColumnNumber = Math.Min(startColumnNumber + step, words.Count - 1);
                         Logger.WriteLine($"Чтение подматрицы из БД для интервала Id {words[startColumnNumber].Id}-{words[endColumnNumber].Id}");
-                        DB.GetAMatrixAsTuples(rank, words[startColumnNumber].Id, words[endColumnNumber].Id, out List<Tuple<int, int, double>> columns);
+                        Tuple<int, int> size_b = DB.GetAMatrixAsTuples(rank, words[startColumnNumber].Id, words[endColumnNumber].Id, out List<Tuple<int, int, double>> columns);
                         Logger.WriteLine($"Построение разреженной подматрицы B");
                         SparseMatrix B = new SparseMatrix(columns);
                         Logger.WriteLine($"Начало вычислений B*B^T:");
-                        elementsCount += MatrixDotSquare(A, B, rank);
+                        elementsCount += Correlation(A, B, rank);
                         stopwatch.Stop();
                         Logger.WriteLine($"[{i}/{max_number},{j}/{max_number}], всего эл-в:{elementsCount}, {stopwatch.Elapsed.TotalSeconds} сек");
                         DB.Commit();
@@ -136,7 +136,7 @@ namespace NLDB
             return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Success);
         }
 
-        private int MatrixDotSquare(SparseMatrix A, SparseMatrix B, int rank)
+        private int Correlation(SparseMatrix A, SparseMatrix B, int rank)
         {
             Logger.WriteLine($"  1. Центрирование");
             A.CenterRows();
@@ -154,11 +154,11 @@ namespace NLDB
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult CalculateDistances(IEnumerable<Word> words)
         {
-            //Stopwatch sw = new Stopwatch();   //!!!
-            //sw.Start(); //!!!
             int maxCount = words.Count();
+            int rank = words.First().Rank - 1;
+            Logger.WriteLine($"Расчет матрицы позиционных расстояний для коллекции {maxCount} слов ранга {rank}");
             if (maxCount == 0) return new CalculationResult(this, OperationType.DistancesCalculation, ResultType.Error);
-            using (ProgressInformer informer = new ProgressInformer($"Матрица расстояний:", maxCount, measurment: $"слов р{words.First().Rank - 1}", barSize: 64))
+            using (ProgressInformer informer = new ProgressInformer($"Матрица расстояний:", maxCount, measurment: $"слов р{rank}", barSize: 64))
             {
                 int step = Math.Max(1, maxCount / DISTANCES_CALC_STEP);
                 for (int j = 0; j <= maxCount / step; j++)
@@ -214,6 +214,7 @@ namespace NLDB
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult ExtractWords(IEnumerable<string> strings, int rank)
         {
+            Logger.WriteLine($"Преобразование в слова");
             DB.BeginTransaction();
             using (ProgressInformer informer = new ProgressInformer($"Слова ранга {rank}:", strings.Count(), "", 64))
             {
@@ -224,6 +225,7 @@ namespace NLDB
                 }).ToList();
             }
             DB.Commit();
+            Logger.WriteLine($"Получено {((List<int>)Data).Count} слов ранга {rank}");
             return new CalculationResult(this, OperationType.WordsExtraction, ResultType.Success, Data);
         }
 
@@ -355,12 +357,12 @@ namespace NLDB
 
         public IEnumerable<Term> Nearest(Term term, int count = 1)
         {
-            var result = new List<Term>();
+            List<Term> result = new List<Term>();
             if (term.id == 0) return null;
-            var size = DB.GetBMatrixAsTuples(term.rank, term.id, term.id + 1, out List<Tuple<int, int, double>> m);
+            Tuple<int, int> size = DB.GetBMatrixAsTuples(term.rank, term.id, term.id + 1, out List<Tuple<int, int, double>> m);
             if (m.Count == 0) return result;
-            var M = new SparseMatrix(m);
-            var vector = M.First().V;
+            SparseMatrix M = new SparseMatrix(m);
+            SparseVector vector = M.First().V;
             if (vector.Count == 0) return result;
             return vector.OrderByDescending(iv => iv.V).Take(count).Select(iv => ToTerm(iv.Index));
         }
@@ -368,8 +370,12 @@ namespace NLDB
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult ReadFile(string filename)
         {
+            Logger.WriteLine($"Открытие и чтение файла '{filename}'");
             if (!File.Exists(filename))
+            {
+                Logger.WriteLine($"Операция завершена с ошибкой: файл не найден");
                 return new CalculationResult(this, OperationType.FileReading, ResultType.Error);
+            }
             using (StreamReader reader = File.OpenText(filename))
             {
                 Data = reader.ReadToEnd();
@@ -380,6 +386,7 @@ namespace NLDB
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult WriteDataToFile(string filename)
         {
+            if (Data is null) return new CalculationResult(this, OperationType.FileWriting, ResultType.Error);
             //TODO: продумать сохранение в файл разнух типов данных, хранимых по ссылке Data
             using (StreamWriter writer = File.CreateText(filename))
             {
@@ -399,13 +406,16 @@ namespace NLDB
 
         private CalculationResult NormilizeText(string text)
         {
+            Logger.WriteLine($"Нормализация текста. Размер текста: {text.Length}");
             Data = Parser.Normilize(text);
             return new CalculationResult(this, OperationType.TextNormalization, ResultType.Success);
         }
 
         private CalculationResult SplitText(string text)
         {
+            Logger.WriteLine($"Сегментация текста");
             Data = DB.Split(text);
+            Logger.WriteLine($"Количество сегментов: {((string[])Data).Length}");
             return new CalculationResult(this, OperationType.TextSplitting, ResultType.Success);
         }
 
@@ -421,7 +431,7 @@ namespace NLDB
 
         public Term ToTerm(int id)
         {
-            var word = DB.GetWord(id);
+            Word word = DB.GetWord(id);
             if (word == null) return null;
             return DB.ToTerm(word);
         }
