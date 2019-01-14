@@ -98,24 +98,23 @@ namespace NLDB
                 Logger.WriteLine($"Отстутсвуют слова для расчета корреляции");
                 return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Error);
             }
-            int step = Math.Max(1, STEPS_COUNT);
+            int step = Math.Max(1, SIMILARITY_CALC_STEP);
             int max_number = maxCount / step;
-            long barmax = max_number * (max_number + 1);
-            using (ProgressInformer informer = new ProgressInformer(prompt: $"Корреляция:", max: barmax, measurment: $"слов {rank}", barSize: 64))
+            using (ProgressInformer informer = new ProgressInformer(prompt: $"Корреляция:", max: maxCount, measurment: $"слов {rank}", barSize: 64))
             {
                 //Вычисления производятся порциями по step строк. Выбирается диапазон величиной step индексов
                 Logger.WriteLine($"Параметры цикла: шаг={step}, количество={max_number}");
                 for (int i = 0; i <= max_number; i++)
                 {
-                    DB.BeginTransaction();
                     int startRowNumber = i * step;
                     int endRowNumber = Math.Min(startRowNumber + step, words.Count - 1);
+                    informer.Set(startRowNumber);
                     Logger.WriteLine($"Чтение матрицы из БД для {words[startRowNumber].Id}-{words[endRowNumber].Id}");
                     DB.GetAMatrixAsTuples(rank, words[startRowNumber].Id, words[endRowNumber].Id, out List<Tuple<int, int, double>> rows);
                     SparseMatrix A = new SparseMatrix(rows);
                     for (int j = i; j <= max_number; j++)
                     {
-                        informer.Set(i * max_number + j);
+                        DB.BeginTransaction();
                         stopwatch.Restart();
                         int startColumnNumber = j * step;
                         int endColumnNumber = Math.Min(startColumnNumber + step, words.Count - 1);
@@ -127,11 +126,11 @@ namespace NLDB
                         elementsCount += MatrixDotSquare(A, B, rank);
                         stopwatch.Stop();
                         Logger.WriteLine($"[{i}/{max_number},{j}/{max_number}], всего эл-в:{elementsCount}, {stopwatch.Elapsed.TotalSeconds} сек");
+                        DB.Commit();
                     }
-                    DB.Commit();
                     Logger.WriteLine($"Подматрица подобия ({maxCount}x{maxCount}): {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
                 }
-                informer.Set(barmax);
+                informer.Set(maxCount);
             }
             Data = null;
             return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Success);
@@ -139,13 +138,13 @@ namespace NLDB
 
         private int MatrixDotSquare(SparseMatrix A, SparseMatrix B, int rank)
         {
-            Logger.WriteLine($"  1. Центрирование и нормализация");
+            Logger.WriteLine($"  1. Центрирование");
             A.CenterRows();
             A.NormalizeRows();
             B.CenterRows();
             B.NormalizeRows();
             Logger.WriteLine($"  2. Вычисление ковариации");
-            SparseMatrix result = SparseMatrix.Covariation(A, B, 0.5);
+            SparseMatrix result = SparseMatrix.Covariation(A, B, 0.2);
             Logger.WriteLine($"  3. Формирование списка значений");
             IEnumerable<Tuple<int, int, double>> tuples = result.EnumerateIndexed();
             Logger.WriteLine($"  4. Запись в БД");
@@ -159,9 +158,9 @@ namespace NLDB
             //sw.Start(); //!!!
             int maxCount = words.Count();
             if (maxCount == 0) return new CalculationResult(this, OperationType.DistancesCalculation, ResultType.Error);
-            using (ProgressInformer informer = new ProgressInformer($"Матрица расстояний:", maxCount, measurment: $"слов р{words.First().Rank}", barSize: 64))
+            using (ProgressInformer informer = new ProgressInformer($"Матрица расстояний:", maxCount, measurment: $"слов р{words.First().Rank - 1}", barSize: 64))
             {
-                int step = Math.Max(1, maxCount / STEPS_COUNT);
+                int step = Math.Max(1, maxCount / DISTANCES_CALC_STEP);
                 for (int j = 0; j <= maxCount / step; j++)
                 {
                     DB.BeginTransaction();
@@ -326,8 +325,8 @@ namespace NLDB
             Debug.WriteLine($"Similars->Identify: {sw.Elapsed.TotalSeconds}");
             //Для терма нулевого ранга возвращаем результат по наличию соответствующей буквы в алфавите
             if (term.rank == 0) return new List<Term> { term };
-            //Определение контекста по дочерним словам
             sw.Restart(); //!!!
+            //Определение контекста по дочерним словам
             int[] childs = term
                 .Childs
                 .Where(c => c.id != 0)
@@ -363,7 +362,7 @@ namespace NLDB
             var M = new SparseMatrix(m);
             var vector = M.First().V;
             if (vector.Count == 0) return result;
-            return vector.OrderByDescending(iv => iv.V).Take(count).Select(iv=>ToTerm(iv.Index));
+            return vector.OrderByDescending(iv => iv.V).Take(count).Select(iv => ToTerm(iv.Index));
         }
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -439,6 +438,7 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         private DataBase DB { get; }
         private readonly string dbpath;
-        private const int STEPS_COUNT = 1 << 18;
+        private const int SIMILARITY_CALC_STEP = 1 << 12;   //Оптимальный шаг для отношения Производительность/Память примерно 262 144
+        private const int DISTANCES_CALC_STEP = 1 << 8;     //Оптимальный шаг для вычисления матрицы расстояний примерно 1024
     }
 }

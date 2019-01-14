@@ -192,7 +192,7 @@ namespace NLDB.DAL
                         //Скалярное произведение
                         double cxy = r.V * c.V;
                         //Нулевые элементы в результат не добавляем
-                        if (cxy > zeroingRadius || cxy < -zeroingRadius)
+                        if (cxy < -zeroingRadius || cxy > zeroingRadius)
                             tuples.Add(Tuple.Create(c.Index, cxy));
                     }
                 }

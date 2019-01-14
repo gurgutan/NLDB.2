@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace NLDB.DAL
 {
-    public class IndexedValue
+    public class IndexedValue : IEquatable<IndexedValue>
     {
         public readonly int Index;
         public double V;
@@ -16,6 +16,29 @@ namespace NLDB.DAL
             V = value;
         }
 
+        public override bool Equals(object obj)
+        {
+            var value = obj as IndexedValue;
+            return value != null &&
+                   Index == value.Index &&
+                   V == value.V;
+        }
+
+        public bool Equals(IndexedValue other)
+        {
+            return other != null &&
+                   Index == other.Index &&
+                   V == other.V;
+        }
+
+        public override int GetHashCode()
+        {
+            var hashCode = 1405935468;
+            hashCode = hashCode * -1521134295 + Index.GetHashCode();
+            hashCode = hashCode * -1521134295 + V.GetHashCode();
+            return hashCode;
+        }
+
         public override string ToString()
         {
             return $"{Index}:{V}";
@@ -23,11 +46,11 @@ namespace NLDB.DAL
 
     }
 
-    public class ElementIndexComparer : IComparer<IndexedValue>, IEqualityComparer<IndexedValue>
+    public class ItemIndexComparer : IComparer<IndexedValue>, IEqualityComparer<IndexedValue>
     {
         public int Compare(IndexedValue x, IndexedValue y)
         {
-            return x.Index.CompareTo(y.Index);
+            return x.Index - y.Index;
         }
 
         public bool Equals(IndexedValue x, IndexedValue y)
@@ -46,8 +69,8 @@ namespace NLDB.DAL
         private double? normL1 = null;
         private double? normL2 = null;
         private double? mean = null;
-        private List<IndexedValue> values = new List<IndexedValue>();
 
+        private List<IndexedValue> values;
         public List<IndexedValue> Values => values;
 
         public SparseVector(IEnumerable<double> values)
@@ -62,7 +85,10 @@ namespace NLDB.DAL
 
         public SparseVector(SparseVector v)
         {
-            values = FromTuples(v.EnumerateIndexed());
+            values = new List<IndexedValue>(v.values);
+            normL1 = v.normL1;
+            normL2 = v.normL2;
+            mean = v.mean;
         }
 
         public int Count => values.Count;
@@ -106,10 +132,10 @@ namespace NLDB.DAL
             return this * v;
         }
 
-        public double CosDistance(SparseVector v)
+        public double Correlation(SparseVector v)
         {
             double divisor = NormL2() * v.NormL2();
-            if (divisor == 0) return 0; //при нулевой длине одного из векеторов считаем, что ковариация=0
+            if (divisor == 0) return 0; //при нулевой длине одного из векеторов считаем, что корреляция=0
             return (this * v) / divisor;
         }
 
@@ -119,10 +145,15 @@ namespace NLDB.DAL
             return new SparseVector(values.AsParallel().Select(v => Tuple.Create(v.Index, v.V - mx)));
         }
 
+        //-------------------------------------------------------------------------------------------------
+        // Методы, которые меняют данные вектора
+        //-------------------------------------------------------------------------------------------------
         public void Center()
         {
             double mx = Mean();
             values.AsParallel().ForAll(x => x.V -= mx);
+            ResetProperties();
+            //mean = 0;
         }
 
         public void Normalize()
@@ -132,6 +163,7 @@ namespace NLDB.DAL
                 values.ForEach(x => x.V = 0);
             else
                 values.AsParallel().ForAll(x => x.V /= d);
+            ResetProperties();
         }
 
         /// <summary>
@@ -141,7 +173,9 @@ namespace NLDB.DAL
         /// <param name="right">правая граница диапазона</param>
         public int RemoveValuesFromRange(double left, double right)
         {
-            return values.RemoveAll(e => e.V >= left && e.V <= right);
+            int count = values.RemoveAll(e => e.V >= left && e.V <= right);
+            ResetProperties();
+            return count;
         }
 
         /// <summary>
@@ -153,13 +187,13 @@ namespace NLDB.DAL
         {
             get
             {
-                int index = values.BinarySearch(new IndexedValue(i, 0), new ElementIndexComparer());
+                int index = values.BinarySearch(new IndexedValue(i, 0), new ItemIndexComparer());
                 if (index >= 0) return values[i].V;
                 else
                     return 0;
             }
         }
-              
+
         public IEnumerable<Tuple<int, double>> EnumerateIndexed()
         {
             return values.Select(t => Tuple.Create(t.Index, t.V));
@@ -183,6 +217,15 @@ namespace NLDB.DAL
         //-------------------------------------------------------------------------------------------------
         // Закрытые методы
         //-------------------------------------------------------------------------------------------------
+        private void ResetProperties()
+        {
+            mean = null;
+            normL1 = null;
+            normL2 = null;
+        }
+        //-------------------------------------------------------------------------------------------------
+        // Статические методы
+        //-------------------------------------------------------------------------------------------------
         private static List<IndexedValue> FromTuples(IEnumerable<Tuple<int, double>> tuples)
         {
             return tuples
@@ -193,15 +236,13 @@ namespace NLDB.DAL
         }
 
         //-------------------------------------------------------------------------------------------------
-        // Статические методы
-        //-------------------------------------------------------------------------------------------------
         // Операторы
         //-------------------------------------------------------------------------------------------------
         public static double operator *(SparseVector vector_a, SparseVector vector_b)
         {
             //vector_a.AsQueryable().Intersect(vector_b, new ElementIndexComparer());
-            IEnumerator<IndexedValue> a_enumerator = (IEnumerator<IndexedValue>)vector_a.GetEnumerator();
-            IEnumerator<IndexedValue> b_enumerator = (IEnumerator<IndexedValue>)vector_b.GetEnumerator();
+            SparseVectorEnumerator a_enumerator = (SparseVectorEnumerator)vector_a.GetEnumerator();
+            SparseVectorEnumerator b_enumerator = (SparseVectorEnumerator)vector_b.GetEnumerator();
             bool end = !(a_enumerator.MoveNext() && b_enumerator.MoveNext());
             double result = 0;
             while (!end)
@@ -213,8 +254,10 @@ namespace NLDB.DAL
                     result += a.V * b.V;
                     end = !(a_enumerator.MoveNext() && b_enumerator.MoveNext());
                 }
-                else if (a.Index < b.Index) end = !a_enumerator.MoveNext();
-                else if (a.Index > b.Index) end = !b_enumerator.MoveNext();
+                else if (a.Index < b.Index)
+                    end = !a_enumerator.SkipTo(b);//a_enumerator.MoveNext();
+                else if (a.Index > b.Index)
+                    end = !b_enumerator.SkipTo(a);//b_enumerator.MoveNext();
             }
             return result;
         }
@@ -245,6 +288,26 @@ namespace NLDB.DAL
                 return false;
             else
                 current = vector.Values[currentIndex];
+            return true;
+        }
+
+        /// <summary>
+        /// Метод переводит перечислитель к следующему индексу вектора, совпадающему с индексом item. Если такого нет, переводит 
+        /// </summary>
+        /// <param name="item">Значение, индекс которого должен совпасть со следующим в случае успеха</param>
+        /// <returns></returns>
+        public bool SkipTo(IndexedValue item)
+        {
+            if (currentIndex + 1 >= vector.Values.Count)
+                return false;
+            int index = vector.Values.BinarySearch(currentIndex + 1, vector.Values.Count - currentIndex - 1, item, new ItemIndexComparer());
+            if (index < 0)
+                if ((~index) == vector.Count)
+                    return false;
+                else
+                    index = ~index;
+            currentIndex = index;
+            current = vector.Values[currentIndex];
             return true;
         }
 
