@@ -19,6 +19,9 @@ namespace NLDB
 
         public int Rank => DB.MaxRank;
 
+        //TODO: Потом можно сделать настраиваемый размер буфера для чтения текста
+        public int TextBufferSize => TEXT_BUFFER_SIZE;
+
         public object Data;
 
         public IEnumerable<Word> Words(int rank = 0, int count = 0)
@@ -32,7 +35,8 @@ namespace NLDB
             this.dbpath = dbpath;
             ExecuteMode = mode;
             DB = new DataBase(dbpath);
-            Logger = new Logger(Path.ChangeExtension(dbpath, "log"));
+            DateTime date = DateTime.Now;
+            Logger = new Logger(Path.ChangeExtension(dbpath, "." + date.Day + date.Month + date.Year + "_" + date.Hour + date.Millisecond + date.Second + ".log"));
             Logger.WriteLine($"Подключено: '{dbpath}'");
         }
 
@@ -64,13 +68,13 @@ namespace NLDB
             switch (ptype)
             {
                 case OperationType.FileReading:
-                    CalculationResult = ReadFile((string)parameter); break;
+                    CalculationResult = ReadFile((string)parameter, TEXT_BUFFER_SIZE); break;
                 case OperationType.FileWriting:
                     CalculationResult = WriteDataToFile((string)parameter); break;
                 case OperationType.TextNormalization:
-                    CalculationResult = NormilizeText((string)parameter); break;
+                    CalculationResult = NormilizeText((IEnumerable<string>)parameter); break;
                 case OperationType.TextSplitting:
-                    CalculationResult = SplitText((string)parameter); break;
+                    CalculationResult = SplitText((IEnumerable<string>)parameter); break;
                 case OperationType.WordsExtraction:
                     CalculationResult = ExtractWords((IEnumerable<string>)parameter, Rank); break;
                 case OperationType.DistancesCalculation:
@@ -214,16 +218,17 @@ namespace NLDB
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult ExtractWords(IEnumerable<string> strings, int rank)
         {
-            DB.BeginTransaction();
             using (ProgressInformer informer = new ProgressInformer($"Слова ранга {rank}:", strings.Count(), "", 64))
             {
                 Data = strings.SelectMany((s, i) =>
                 {
+                    DB.BeginTransaction();
                     informer.Set(i + 1);
-                    return ExtractWordsFromString(s, rank);
+                    var result = ExtractWordsFromString(s, rank);
+                    DB.Commit();
+                    return result;
                 }).ToList();
             }
-            DB.Commit();
             return new CalculationResult(this, OperationType.WordsExtraction, ResultType.Success, Data);
         }
 
@@ -355,25 +360,43 @@ namespace NLDB
 
         public IEnumerable<Term> Nearest(Term term, int count = 1)
         {
-            var result = new List<Term>();
+            List<Term> result = new List<Term>();
             if (term.id == 0) return null;
-            var size = DB.GetBMatrixAsTuples(term.rank, term.id, term.id + 1, out List<Tuple<int, int, double>> m);
+            Tuple<int, int> size = DB.GetBMatrixAsTuples(term.rank, term.id, term.id + 1, out List<Tuple<int, int, double>> m);
             if (m.Count == 0) return result;
-            var M = new SparseMatrix(m);
-            var vector = M.First().V;
+            SparseMatrix M = new SparseMatrix(m);
+            SparseVector vector = M.First().V;
             if (vector.Count == 0) return result;
             return vector.OrderByDescending(iv => iv.V).Take(count).Select(iv => ToTerm(iv.Index));
         }
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
-        private CalculationResult ReadFile(string filename)
+        /// <summary>
+        /// Записывает в Data массив строк, считанных из файла filename. Каждая строка содержит не более blockSize символов
+        /// </summary>
+        /// <param name="filename">имя входного файла для чтения</param>
+        /// <param name="blockSize">размер буфера для чтения - 1 Гбайт по умолчанию</param>
+        /// <returns>Результат операции</returns>
+        private CalculationResult ReadFile(string filename, int blockSize = 1 << 30)
         {
             if (!File.Exists(filename))
                 return new CalculationResult(this, OperationType.FileReading, ResultType.Error);
+            List<string> result = new List<string>();
             using (StreamReader reader = File.OpenText(filename))
+            using (ProgressInformer informer = new ProgressInformer("Чтение файла:", reader.BaseStream.Length, "байт"))
             {
-                Data = reader.ReadToEnd();
+                //Считаем, что входной поток - UTF-8
+                int tail = reader.BaseStream.Length % blockSize == 0 ? 0 : 1;
+                char[] buffer = new char[blockSize];
+                while (reader.Read(buffer, 0, blockSize) > 0)
+                {
+                    informer.Set(reader.BaseStream.Position);
+                    result.Add(new string(buffer));
+                }
+                informer.Set(reader.BaseStream.Length);
             }
+            Data = result;
+            GC.Collect();
             return new CalculationResult(this, OperationType.FileReading, ResultType.Success);
         }
 
@@ -383,13 +406,13 @@ namespace NLDB
             //TODO: продумать сохранение в файл разнух типов данных, хранимых по ссылке Data
             using (StreamWriter writer = File.CreateText(filename))
             {
-                if (Data is List<int>)
+                if (Data is IList<int>)
                 {
-                    (Data as List<int>).ForEach(i => writer.Write(i + ";"));
+                    (Data as IList<int>).ToList().ForEach(i => writer.Write(i + ";"));
                 }
-                else if (Data is string[])
+                else if (Data is IList<string>)
                 {
-                    (Data as string[]).ToList().ForEach(i => writer.Write(i + ";"));
+                    (Data as IList<string>).ToList().ForEach(i => writer.Write(i + ";"));
                 }
                 else
                     writer.Write(Data.ToString());
@@ -397,15 +420,37 @@ namespace NLDB
             return new CalculationResult(this, OperationType.FileWriting, ResultType.Success);
         }
 
-        private CalculationResult NormilizeText(string text)
+        private CalculationResult NormilizeText(IEnumerable<string> text)
         {
-            Data = Parser.Normilize(text);
+            List<string> result = new List<string>();
+            using (ProgressInformer informer = new ProgressInformer("Нормализация:", text.Count() - 1, "блоков"))
+            {
+                text.Select((s, i) =>
+                {
+                    informer.Set(i);
+                    result.Add(Parser.Normilize(s));
+                    return 0;
+                }).ToList();
+            }
+            Data = result;
+            GC.Collect();
             return new CalculationResult(this, OperationType.TextNormalization, ResultType.Success);
         }
 
-        private CalculationResult SplitText(string text)
+        private CalculationResult SplitText(IEnumerable<string> text)
         {
-            Data = DB.Split(text);
+            List<string> result = new List<string>();
+            using (ProgressInformer informer = new ProgressInformer("Разбиение на строки:", text.Count() - 1, "блоков"))
+            {
+                text.Select((s, i) =>
+                {
+                    informer.Set(i);
+                    result.AddRange(DB.Split(s));
+                    return 0;
+                }).ToList();
+            }
+            Data = result;
+            GC.Collect();
             return new CalculationResult(this, OperationType.TextSplitting, ResultType.Success);
         }
 
@@ -421,7 +466,7 @@ namespace NLDB
 
         public Term ToTerm(int id)
         {
-            var word = DB.GetWord(id);
+            Word word = DB.GetWord(id);
             if (word == null) return null;
             return DB.ToTerm(word);
         }
@@ -440,5 +485,6 @@ namespace NLDB
         private readonly string dbpath;
         private const int SIMILARITY_CALC_STEP = 1 << 12;   //Оптимальный шаг для отношения Производительность/Память примерно 262 144
         private const int DISTANCES_CALC_STEP = 1 << 8;     //Оптимальный шаг для вычисления матрицы расстояний примерно 1024
+        private const int TEXT_BUFFER_SIZE = 1 << 28;
     }
 }
