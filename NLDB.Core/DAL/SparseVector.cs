@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace NLDB.DAL
 {
-    public class IndexedValue : IEquatable<IndexedValue>
+    public class IndexedValue : IEquatable<IndexedValue>,IComparable<IndexedValue>
     {
         public readonly int Index;
         public double V;
@@ -44,6 +44,10 @@ namespace NLDB.DAL
             return $"{Index}:{V}";
         }
 
+        int IComparable<IndexedValue>.CompareTo(IndexedValue other)
+        {
+            return Math.Sign(this.V - other.V);
+        }
     }
 
     public class ItemIndexComparer : IComparer<IndexedValue>, IEqualityComparer<IndexedValue>

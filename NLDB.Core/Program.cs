@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using NLDB.DAL;
 
 namespace NLDB
 {
@@ -10,30 +9,30 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
-            string filename = "1200kb.txt";
+            string filename = "5mb.txt";
             string trainfile = @"D:\Data\Wiki\ru\" + filename;
             string dbpath = @"D:\Data\Result\" + Path.ChangeExtension(filename, "db");
             Engine engine = new Engine(dbpath, ExecuteMode.Verbose);
 
-            engine.Create();
-            engine.Insert(new Splitter(0, ""));
-            engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
-            engine.Insert(new Splitter(2, @"[\n\r\?\!\:\;]+"));
-            engine.Insert(new Splitter(3, @"\[\[{число}\]\]"));
-            engine
-               .Execute(OperationType.FileReading, trainfile)
-               .Then(OperationType.TextNormalization, engine.Data)
-               .Then(OperationType.FileWriting, Path.ChangeExtension(dbpath, "norm"))
-               .Then(OperationType.TextSplitting, engine.Data)
-               .Then(OperationType.WordsExtraction, engine.Data);
-            engine.Clear("MatrixA");
-            engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
-            engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
-            engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
-            engine.Clear("MatrixB");
-            engine.Execute(OperationType.SimilarityCalculation, 0);
-            engine.Execute(OperationType.SimilarityCalculation, 1);
-            engine.Execute(OperationType.SimilarityCalculation, 2);
+            //engine.Create();
+            //engine.Insert(new Splitter(0, ""));
+            //engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
+            //engine.Insert(new Splitter(2, @"[\n\r\?\!\:\;]+"));
+            //engine.Insert(new Splitter(3, @"\[\[{число}\]\]"));
+            //engine
+            //   .Execute(OperationType.FileReading, trainfile)
+            //   .Then(OperationType.TextNormalization, engine.Data)
+            //   .Then(OperationType.FileWriting, Path.ChangeExtension(dbpath, "norm"))
+            //   .Then(OperationType.TextSplitting, engine.Data)
+            //   .Then(OperationType.WordsExtraction, engine.Data);
+            //engine.Clear("MatrixA");
+            //engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
+            //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
+            //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
+            //engine.Clear("MatrixB");
+            //engine.Execute(OperationType.SimilarityCalculation, 0);
+            //engine.Execute(OperationType.SimilarityCalculation, 1);
+            //engine.Execute(OperationType.SimilarityCalculation, 2);
             //engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath, "words"));
 
             //Теперь будем использовать полученные данные
@@ -44,10 +43,10 @@ namespace NLDB
                 Console.Write($"\n\nФраза: ");
                 line = Console.ReadLine();
                 if (line == "") continue;
-                Term term = engine.Similars(line, 1, 1).First();
-                Console.WriteLine(term.ToString());
-                System.Collections.Generic.IEnumerable<Term> nearest = engine.Nearest(term, 8);
-                Console.WriteLine("\nСовместные:\n" + nearest.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
+                var terms = engine.Similars(line, 2, 8);
+                Console.WriteLine(string.Join("\n", terms.Select(t => t.ToString())));
+                //System.Collections.Generic.IEnumerable<Term> nearest = engine.Nearest(term, 8);
+                //Console.WriteLine("\nСовместные:\n" + nearest.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
 
             }
             Console.WriteLine("\n\nНажмите любую клавишу для продолжения");

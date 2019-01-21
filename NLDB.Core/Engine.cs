@@ -22,7 +22,7 @@ namespace NLDB
         //TODO: Потом можно сделать настраиваемый размер буфера для чтения текста
         public int TextBufferSize => TEXT_BUFFER_SIZE;
 
-        public object Data;
+        public object Data { get; private set; }
 
         public IEnumerable<Word> Words(int rank = 0, int count = 0)
         {
@@ -297,19 +297,25 @@ namespace NLDB
                 List<Term> context = parents.Select(p => DB.ToTerm(p)).ToList();
                 sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
                 //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
-                Pointer max = context.AsParallel().Aggregate(
-                    new Pointer(),
-                    (subtotal, thread_term) =>
-                    {
-                        float confidence = Confidence.Compare(term, thread_term);
-                        if (subtotal.value < confidence) return new Pointer(thread_term.id, 0, confidence);
-                        return subtotal;
-                    },
-                    (total, subtotal) => total.value < subtotal.value ? subtotal : total,
-                    (final) => final);
-                term.id = max.id;
-                term.confidence = max.value;
+                sw.Restart(); //!!!
+                var m = context.AsParallel().Max(t => new IndexedValue(t.id, Confidence.Compare(term, t)));
+                term.id = m.Index;
+                term.confidence = ToTerm(m.Index).confidence;
                 term.Identified = true;
+                //Pointer max = context.AsParallel().Aggregate(
+                //    new Pointer(),
+                //    (subtotal, thread_term) =>
+                //    {
+                //        float confidence = Confidence.Compare(term, thread_term);
+                //        if (subtotal.value < confidence) return new Pointer(thread_term.id, 0, confidence);
+                //        return subtotal;
+                //    },
+                //    (total, subtotal) => total.value < subtotal.value ? subtotal : total,
+                //    (final) => final);
+                //term.id = max.id;
+                //term.confidence = max.value;
+                //term.Identified = true;
+                sw.Stop(); Debug.WriteLine($"Максимум: {sw.Elapsed.TotalSeconds}");
                 return term;
             }
         }

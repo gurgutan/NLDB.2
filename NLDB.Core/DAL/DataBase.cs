@@ -305,8 +305,8 @@ namespace NLDB.DAL
 
         internal List<Word> GetParents(IEnumerable<int> wordsId)
         {
-            string ids = string.Join(",", wordsId);
             List<Word> result = new List<Word>();
+            string ids = string.Join(",", wordsId);
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words INNER JOIN Parents ON Words.Id=Parents.ParentId WHERE Parents.WordId IN ({ids});", db))
             {
                 SQLiteDataReader reader = cmd.ExecuteReader();
