@@ -42,7 +42,14 @@ namespace NLDB.Utils
         /// </summary>
         public long Max { get; set; }
 
+        /// <summary>
+        /// Желаемое максимальное число кадров в секунду для анимации прогресса.
+        /// </summary>
+        public int FPS { get; set; }
+
         private long current;
+        private DateTime prevTime;
+        private TimeSpan currentTimeSpan;
         /// <summary>
         /// Текущее значение величины в реалбных единицах
         /// </summary>
@@ -60,8 +67,10 @@ namespace NLDB.Utils
         private readonly int PosY;
         private readonly int PosX;
 
-        public ProgressInformer(string prompt = "", long max = 100, string measurment = "", int barSize = 64)
+        public ProgressInformer(string prompt = "", long max = 100, string measurment = "", int barSize = 64, int fps = 0)
         {
+            if (fps < 0 || fps > 1000)
+                throw new ArgumentOutOfRangeException("FPS должен быть в интервале [0,1000]");
             Prompt = prompt;
             UnitsOfMeasurment = measurment;
             Max = max;
@@ -69,9 +78,11 @@ namespace NLDB.Utils
             ShowPercents = true;
             ShowCurrent = true;
             BarSize = Math.Min(Console.BufferWidth - Prompt.Length - 5 - max.ToString().Length * 2 - 1, barSize);
+            FPS = fps;
             Current = 0;
             PosX = Console.CursorLeft;
             PosY = Console.CursorTop;
+            prevTime = DateTime.Now;
         }
 
         /// <summary>
@@ -90,6 +101,7 @@ namespace NLDB.Utils
         /// </summary>
         public void Show()
         {
+            if (IsTimeToShow()) return;
             lock (ConsoleWriterLock)
             {
                 double percents = Math.Truncate(100.0 / Max * Current);
@@ -112,6 +124,19 @@ namespace NLDB.Utils
                 if (ShowProgressBar) Console.Write($"{leftBorder}{progress}{rightBorder}");
                 if (ShowCurrent) Console.Write($"{Current}\\{Max} {UnitsOfMeasurment}");
             }
+        }
+
+        private bool IsTimeToShow()
+        {
+            if (FPS == 0) return true;
+            currentTimeSpan = DateTime.Now - prevTime;
+            long intervalForFPS = 1000 / FPS;
+            if (currentTimeSpan.TotalMilliseconds / intervalForFPS > 0)
+            {
+                prevTime = DateTime.Now.AddMilliseconds(1000 - (long)(currentTimeSpan.TotalMilliseconds) % intervalForFPS);
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
