@@ -10,25 +10,25 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
-            string filename = "5mb.txt";
+            string filename = "884mb.txt";
             string trainfile = @"D:\Data\Wiki\ru\" + filename;
             string dbpath = @"D:\Data\Result\" + Path.ChangeExtension(filename, "db");
             Engine engine = new Engine(dbpath, ExecuteMode.Verbose);
 
-            //engine.Create();
-            //engine.Insert(new Splitter(0, ""));
-            //engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
-            //engine.Insert(new Splitter(2, @"[\n\r\?\!\:\;]+"));
-            //engine.Insert(new Splitter(3, @"\[\[{число}\]\]"));
-            //engine
-            //    .Execute(OperationType.FileReading, trainfile)
-            //    .Then(OperationType.TextNormalization)
-            //    .Then(OperationType.TextSplitting)
-            //    .Then(OperationType.WordsExtraction);
-            //engine.Clear("MatrixA");
-            //engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
-            //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
-            //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
+            engine.Create();
+            engine.Insert(new Splitter(0, ""));
+            engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
+            engine.Insert(new Splitter(2, @"[\n\r\?\!\:\;\.]+"));
+            engine.Insert(new Splitter(3, @"\[\[{число}\]\]"));
+            engine
+                .Execute(OperationType.FileReading, trainfile)
+                .Then(OperationType.TextNormalization)
+                .Then(OperationType.TextSplitting)
+                .Then(OperationType.WordsExtraction);
+            engine.Clear("MatrixA");
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
             engine.Clear("MatrixB");
             engine.Execute(OperationType.SimilarityCalculation, 0);
             engine.Execute(OperationType.SimilarityCalculation, 1);
