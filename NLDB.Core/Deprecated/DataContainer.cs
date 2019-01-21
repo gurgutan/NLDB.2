@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using NLDB.DAL;
 
 namespace NLDB
 {
@@ -197,9 +198,9 @@ namespace NLDB
             Term_old t = new Term_old(
                 w.rank,
                 w.id,
-                _confidence : confidence,
-                _text : w.symbol,
-                _childs : w.rank == 0 ? null : w.childs.Select(c => ToTerm(c)));
+                _confidence: confidence,
+                _text: w.symbol,
+                _childs: w.rank == 0 ? null : w.childs.Select(c => ToTerm(c)));
             //Сохраняем в кэш
             terms[w.id] = t;
             return t;
@@ -369,7 +370,7 @@ namespace NLDB
             SQLiteCommand cmd = db.CreateCommand();
             cmd.CommandText = $"SELECT similarity FROM smatrix WHERE row={r} and column={c} LIMIT 1;";
             object result = cmd.ExecuteScalar();
-            return (float) result;
+            return (float)result;
         }
 
         public float SMatrixSetValue(int r, int c, float s, int rank)
@@ -384,7 +385,7 @@ namespace NLDB
 
         internal async void SMatrixSetValue(List<Tuple<int, int, int, float>> row)
         {
-            using(SQLiteCommand cmd = db.CreateCommand())
+            using (SQLiteCommand cmd = db.CreateCommand())
             {
                 cmd.CommandText = $"INSERT INTO smatrix(row, column, similarity, rank) VALUES(@r, @c, @s, @rnk);";
                 cmd.Parameters.AddWithValue("@r", 0);
@@ -849,7 +850,7 @@ namespace NLDB
 
         private int[] StringToIntArray(string s)
         {
-            return s.Split(separator: new char[] { ',' }, options : StringSplitOptions.RemoveEmptyEntries).Select(e => int.Parse(e)).ToArray();
+            return s.Split(separator: new char[] { ',' }, options: StringSplitOptions.RemoveEmptyEntries).Select(e => int.Parse(e)).ToArray();
         }
 
         /// <summary>

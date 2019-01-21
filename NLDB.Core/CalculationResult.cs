@@ -37,7 +37,7 @@ namespace NLDB
             Data = data;
         }
 
-        public CalculationResult Then(OperationType ptype)
+        public CalculationResult Then(OperationType ptype, params object[] parameters)
         {
             if (Engine.ExecuteMode == ExecuteMode.Verbose)
                 Console.WriteLine($"Операция {ProcessingType} завершилась с результатом {ResultType}");
@@ -47,7 +47,7 @@ namespace NLDB
                 return this;
             }
             else
-                return Engine.Execute(ptype, Engine.Data);
+                return Engine.Execute(ptype, parameters);
         }
 
         public override string ToString()

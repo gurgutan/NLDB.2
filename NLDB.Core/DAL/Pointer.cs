@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace NLDB
+namespace NLDB.DAL
 {
     public struct Pointer : IComparable<Pointer>
     {
@@ -23,7 +23,7 @@ namespace NLDB
 
         public override bool Equals(object obj)
         {
-            return ((Pointer) obj).id == id;
+            return ((Pointer)obj).id == id;
         }
 
         public int GetHashCode(object obj)
@@ -56,7 +56,7 @@ namespace NLDB
 
         public new bool Equals(object x, object y)
         {
-            return ((Pointer) x).id == ((Pointer) y).id;
+            return ((Pointer)x).id == ((Pointer)y).id;
         }
 
         public int GetHashCode(Pointer obj)

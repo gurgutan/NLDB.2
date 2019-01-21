@@ -19,7 +19,7 @@ namespace NLDB
 
         public int Rank => DB.MaxRank;
 
-        public object Data;
+        public object Data { get; private set; }
 
         public IEnumerable<Word> Words(int rank = 0, int count = 0)
         {
@@ -58,25 +58,29 @@ namespace NLDB
                 }
         }
 
-        public CalculationResult Execute(OperationType ptype, object parameter = null)
+        public CalculationResult Execute(OperationType ptype, params object[] parameters)
         {
             Logger.WriteLine($"Операция {ptype}");
             switch (ptype)
             {
                 case OperationType.FileReading:
-                    CalculationResult = ReadFile((string)parameter); break;
+                    {
+                        int count = 0;
+                        if (parameters.Length == 2) count = (int)parameters[1];
+                        CalculationResult = ReadFile((string)parameters[0], count); break;
+                    }
                 case OperationType.FileWriting:
-                    CalculationResult = WriteDataToFile((string)parameter); break;
+                    CalculationResult = WriteDataToFile((string)parameters[0]); break;
                 case OperationType.TextNormalization:
-                    CalculationResult = NormilizeText((string)parameter); break;
+                    CalculationResult = NormilizeText((string)parameters[0]); break;
                 case OperationType.TextSplitting:
-                    CalculationResult = SplitText((string)parameter); break;
+                    CalculationResult = SplitText((string)parameters[0]); break;
                 case OperationType.WordsExtraction:
-                    CalculationResult = ExtractWords((IEnumerable<string>)parameter, Rank); break;
+                    CalculationResult = ExtractWords((IEnumerable<string>)parameters[0], Rank); break;
                 case OperationType.DistancesCalculation:
-                    CalculationResult = CalculateDistances((IEnumerable<Word>)parameter); break;
+                    CalculationResult = CalculateDistances((IEnumerable<Word>)parameters[0]); break;
                 case OperationType.SimilarityCalculation:
-                    CalculationResult = CalculateSimilarity((int)parameter); break;
+                    CalculationResult = CalculateSimilarity((int)parameters[0]); break;
                 default:
                     throw new NotImplementedException();
             }
@@ -84,7 +88,7 @@ namespace NLDB
             return CalculationResult;
         }
 
-        //-------------------------------------------------------------------------------------------------------------------------------------------------------
+        //---------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult CalculateSimilarity(int rank)
         {
             Stopwatch stopwatch = new Stopwatch();
@@ -99,33 +103,34 @@ namespace NLDB
                 return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Error);
             }
             int step = Math.Max(1, SIMILARITY_CALC_STEP);
-            int max_number = maxCount / step;
+            int maxNumber = maxCount / step;
             using (ProgressInformer informer = new ProgressInformer(prompt: $"Корреляция:", max: maxCount, measurment: $"слов {rank}", barSize: 64))
             {
                 //Вычисления производятся порциями по step строк. Выбирается диапазон величиной step индексов
-                Logger.WriteLine($"Параметры цикла: шаг={step}, количество={max_number}");
-                for (int i = 0; i <= max_number; i++)
+                Logger.WriteLine($"Параметры цикла: шаг={step}, количество={maxNumber}");
+                for (int i = 0; i <= maxNumber; i++)
                 {
                     int startRowNumber = i * step;
                     int endRowNumber = Math.Min(startRowNumber + step, words.Count - 1);
                     informer.Set(startRowNumber);
                     Logger.WriteLine($"Чтение матрицы из БД для {words[startRowNumber].Id}-{words[endRowNumber].Id}");
-                    DB.GetAMatrixAsTuples(rank, words[startRowNumber].Id, words[endRowNumber].Id, out List<Tuple<int, int, double>> rows);
+                    var aSize = DB.GetAMatrixAsTuples(rank, words[startRowNumber].Id, words[endRowNumber].Id, out List<Tuple<int, int, double>> rows);
                     SparseMatrix A = new SparseMatrix(rows);
-                    for (int j = i; j <= max_number; j++)
+                    for (int j = i; j <= maxNumber; j++)
                     {
                         DB.BeginTransaction();
                         stopwatch.Restart();
                         int startColumnNumber = j * step;
                         int endColumnNumber = Math.Min(startColumnNumber + step, words.Count - 1);
                         Logger.WriteLine($"Чтение подматрицы из БД для интервала Id {words[startColumnNumber].Id}-{words[endColumnNumber].Id}");
-                        DB.GetAMatrixAsTuples(rank, words[startColumnNumber].Id, words[endColumnNumber].Id, out List<Tuple<int, int, double>> columns);
+                        var bSize = DB.GetAMatrixAsTuples(rank, words[startColumnNumber].Id, words[endColumnNumber].Id, out List<Tuple<int, int, double>> columns);
                         Logger.WriteLine($"Построение разреженной подматрицы B");
                         SparseMatrix B = new SparseMatrix(columns);
-                        Logger.WriteLine($"Начало вычислений B*B^T:");
-                        elementsCount += MatrixDotSquare(A, B, rank);
+                        Logger.WriteLine($"Начало вычислений A[{aSize.Item1}x{aSize.Item2}]*B[{bSize.Item1}x{bSize.Item2}]");
+                        var count = MatrixDotSquare(A, B, rank);
+                        elementsCount += count;
                         stopwatch.Stop();
-                        Logger.WriteLine($"[{i}/{max_number},{j}/{max_number}], всего эл-в:{elementsCount}, {stopwatch.Elapsed.TotalSeconds} сек");
+                        Logger.WriteLine($"Шаг: [{i},{j}]/[{maxNumber}, {maxNumber}], эл-в:{count}, {stopwatch.Elapsed.TotalSeconds} сек");
                         DB.Commit();
                     }
                     Logger.WriteLine($"Подматрица подобия ({maxCount}x{maxCount}): {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
@@ -144,14 +149,14 @@ namespace NLDB
             B.CenterRows();
             B.NormalizeRows();
             Logger.WriteLine($"  2. Вычисление ковариации");
-            SparseMatrix result = SparseMatrix.Covariation(A, B, 0.2);
+            SparseMatrix result = SparseMatrix.Covariation(A, B, zeroingRadius: 0.5);
             Logger.WriteLine($"  3. Формирование списка значений");
             IEnumerable<Tuple<int, int, double>> tuples = result.EnumerateIndexed();
             Logger.WriteLine($"  4. Запись в БД");
             return DB.InsertAll(tuples, rank);
         }
 
-        //-------------------------------------------------------------------------------------------------------------------------------------------------------
+        //---------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult CalculateDistances(IEnumerable<Word> words)
         {
             //Stopwatch sw = new Stopwatch();   //!!!
@@ -211,7 +216,7 @@ namespace NLDB
             result.Values.ToList().ForEach(r => DB.InsertAll(r.Values));
         }
 
-        //-------------------------------------------------------------------------------------------------------------------------------------------------------
+        //---------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult ExtractWords(IEnumerable<string> strings, int rank)
         {
             DB.BeginTransaction();
@@ -261,7 +266,7 @@ namespace NLDB
             .ToArray();          //получим результат сразу
         }
 
-        //-------------------------------------------------------------------------------------------------------------------------------------------------------
+        //---------------------------------------------------------------------------------------------------------------------------------------------------
         internal Term Recognize(Term term, int rank)
         {
             if (term.rank == 0)
@@ -309,7 +314,7 @@ namespace NLDB
             }
         }
 
-        //-------------------------------------------------------------------------------------------------------------------------------------------------------
+        //---------------------------------------------------------------------------------------------------------------------------------------------------
         internal List<Term> Similars(string text, int rank, int count)
         {
             if (count <= 0) throw new ArgumentException("Количество возращаемых значений должно быть положительным");
@@ -365,19 +370,22 @@ namespace NLDB
             return vector.OrderByDescending(iv => iv.V).Take(count).Select(iv => ToTerm(iv.Index));
         }
 
-        //-------------------------------------------------------------------------------------------------------------------------------------------------------
-        private CalculationResult ReadFile(string filename)
+        //---------------------------------------------------------------------------------------------------------------------------------------------------
+        private CalculationResult ReadFile(string filename, int length = 0)
         {
             if (!File.Exists(filename))
                 return new CalculationResult(this, OperationType.FileReading, ResultType.Error);
             using (StreamReader reader = File.OpenText(filename))
             {
-                Data = reader.ReadToEnd();
+                if (length == 0) length = (int)reader.BaseStream.Length;
+                char[] buffer = new char[length];
+                int charCount = reader.Read(buffer, 0, length);
+                Data = new String(buffer);
             }
             return new CalculationResult(this, OperationType.FileReading, ResultType.Success);
         }
 
-        //-------------------------------------------------------------------------------------------------------------------------------------------------------
+        //---------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult WriteDataToFile(string filename)
         {
             //TODO: продумать сохранение в файл разнух типов данных, хранимых по ссылке Data
