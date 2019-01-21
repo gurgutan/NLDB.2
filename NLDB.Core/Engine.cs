@@ -224,7 +224,7 @@ namespace NLDB
                 {
                     DB.BeginTransaction();
                     informer.Set(i + 1);
-                    var result = ExtractWordsFromString(s, rank);
+                    int[] result = ExtractWordsFromString(s, rank);
                     DB.Commit();
                     return result;
                 }).ToList();
@@ -263,7 +263,7 @@ namespace NLDB
                 return id;
             })
             .Where(i => i != 0) //нули - не идентифицированные слова - пропускаем
-            .ToArray();          //получим результат сразу
+            .ToArray();         //получим результат сразу
         }
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -298,7 +298,7 @@ namespace NLDB
                 sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
                 //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
                 sw.Restart(); //!!!
-                var m = context.AsParallel().Max(t => new IndexedValue(t.id, Confidence.Compare(term, t)));
+                IndexedValue m = context.AsParallel().Max(t => new IndexedValue(t.id, Confidence.Compare(term, t)));
                 term.id = m.Index;
                 term.confidence = ToTerm(m.Index).confidence;
                 term.Identified = true;
@@ -320,49 +320,91 @@ namespace NLDB
             }
         }
 
-        //-------------------------------------------------------------------------------------------------------------------------------------------------------
-        internal List<Term> Similars(string text, int rank, int count)
+        internal List<Term> Similars(string text, int rank, int count = 1)
         {
             if (count <= 0) throw new ArgumentException("Количество возращаемых значений должно быть положительным");
+            List<Term> result = new List<Term>();
             text = Parser.Normilize(text);
-            Stopwatch sw = new Stopwatch(); //!!!
-            sw.Start(); //!!!
             Term term = DB.ToTerm(text, rank);
-            sw.Stop();  //!!!
-            Debug.WriteLine($"Similars->ToTerm: {sw.Elapsed.TotalSeconds}");
-            sw.Restart(); //!!!
-            Recognize(term, rank);
-            sw.Stop();  //!!!
-            Debug.WriteLine($"Similars->Identify: {sw.Elapsed.TotalSeconds}");
-            //Для терма нулевого ранга возвращаем результат по наличию соответствующей буквы в алфавите
-            if (term.rank == 0) return new List<Term> { term };
-            sw.Restart(); //!!!
-            //Определение контекста по дочерним словам
-            int[] childs = term
-                .Childs
-                .Where(c => c.id != 0)
-                .Select(c => c.id)
-                .Distinct()
-                .ToArray();
-            sw.Stop();  //!!!
-            Debug.WriteLine($"Similars->childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
-            sw.Restart(); //!!!
-            List<Term> context = DB
-                .GetParents(childs)
-                .Distinct()
-                .Select(p => DB.ToTerm(p)).
-                ToList();
-            sw.Stop();  //!!!
-            Debug.WriteLine($"Similars->context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
-            //Расчет оценок Confidence для каждого из соседей
-            sw.Restart(); //!!!
-            context.AsParallel().ForAll(p => p.confidence = Confidence.Compare(term, p));
-            sw.Stop();  //!!!
-            Debug.WriteLine($"Similars->Compare [{context.Count}]: {sw.Elapsed.TotalSeconds}");
-            //Сортировка по убыванию оценки
-            context.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
-            return context.Take(count).ToList();
+            if (term.rank == 0)
+            {
+                //При нулевом ранге терма (т.е. терм - это буква), confidence считаем исходя из наличия соответствующей буквы в алфавите
+                term.id = DB.GetWordBySymbol(term.text).Id;
+                term.confidence = (term.id == 0 ? 0 : 1);
+                term.Identified = true;
+                result.Add(term);
+            }
+            else
+            {
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+                //Если ранг терма больше нуля, то confidence считаем по набору дочерних элементов
+                int[] childs = term
+                    .Childs
+                    .Distinct(new DAL.TermComparer())
+                    .Select(c => Recognize(c, rank - 1))
+                    .Where(c => c.id != 0)
+                    .Select(c => c.id)
+                    .ToArray();
+                sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
+                sw.Restart(); //!!!
+                List<Word> parents = DB.GetParents(childs).ToList();
+                sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
+                sw.Restart(); //!!!
+                List<Term> context = parents.Select(p => DB.ToTerm(p)).ToList();
+                sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
+                //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
+                sw.Restart(); //!!!
+                context.AsParallel().ForAll(p => p.confidence = Confidence.Compare(term, p));
+                context.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
+                result = context.Take(count).ToList();
+            }
+            return result;
         }
+
+        //-------------------------------------------------------------------------------------------------------------------------------------------------------
+        //internal List<Term> Similars(string text, int rank, int count)
+        //{
+        //    if (count <= 0) throw new ArgumentException("Количество возращаемых значений должно быть положительным");
+        //    text = Parser.Normilize(text);
+        //    Stopwatch sw = new Stopwatch(); //!!!
+        //    sw.Start(); //!!!
+        //    Term term = DB.ToTerm(text, rank);
+        //    sw.Stop();  //!!!
+        //    Debug.WriteLine($"Similars->ToTerm: {sw.Elapsed.TotalSeconds}");
+        //    sw.Restart(); //!!!
+        //    Recognize(term, rank);
+        //    sw.Stop();  //!!!
+        //    Debug.WriteLine($"Similars->Identify: {sw.Elapsed.TotalSeconds}");
+        //    //Для терма нулевого ранга возвращаем результат по наличию соответствующей буквы в алфавите
+        //    if (term.rank == 0) return new List<Term> { term };
+        //    sw.Restart(); //!!!
+        //    //Определение контекста по дочерним словам
+        //    int[] childs = term
+        //        .Childs
+        //        .Where(c => c.id != 0)
+        //        .Select(c => c.id)
+        //        .Distinct()
+        //        .ToArray();
+        //    sw.Stop();  //!!!
+        //    Debug.WriteLine($"Similars->childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
+        //    sw.Restart(); //!!!
+        //    List<Term> context = DB
+        //        .GetParents(childs)
+        //        .Distinct()
+        //        .Select(p => DB.ToTerm(p)).
+        //        ToList();
+        //    sw.Stop();  //!!!
+        //    Debug.WriteLine($"Similars->context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
+        //    //Расчет оценок Confidence для каждого из соседей
+        //    sw.Restart(); //!!!
+        //    context.AsParallel().ForAll(p => p.confidence = Confidence.Compare(term, p));
+        //    sw.Stop();  //!!!
+        //    Debug.WriteLine($"Similars->Compare [{context.Count}]: {sw.Elapsed.TotalSeconds}");
+        //    //Сортировка по убыванию оценки
+        //    context.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
+        //    return context.Take(count).ToList();
+        //}
 
         public IEnumerable<Term> Nearest(Term term, int count = 1)
         {
