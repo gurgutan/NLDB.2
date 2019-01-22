@@ -294,7 +294,9 @@ namespace NLDB.DAL
         internal List<Word> GetParents(int wordId)
         {
             List<Word> result = new List<Word>();
-            using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words INNER JOIN Parents ON Words.Id=Parents.ParentId WHERE Parents.WordId={wordId};", db))
+            using (SQLiteCommand cmd = new SQLiteCommand(
+                $"SELECT DISTINCT  Words.Id, Words.Rank, Words.Symbol, Words.Childs FROM Words " +
+                $"INNER JOIN Parents ON Words.Id=Parents.ParentId WHERE Parents.WordId={wordId};", db))
             {
                 SQLiteDataReader reader = cmd.ExecuteReader();
                 while (reader.Read())
@@ -307,7 +309,9 @@ namespace NLDB.DAL
         {
             List<Word> result = new List<Word>();
             string ids = string.Join(",", wordsId);
-            using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words INNER JOIN Parents ON Words.Id=Parents.ParentId WHERE Parents.WordId IN ({ids});", db))
+            using (SQLiteCommand cmd = new SQLiteCommand(
+                $"SELECT DISTINCT Words.Id, Words.Rank, Words.Symbol, Words.Childs FROM Words " +
+                $"INNER JOIN Parents ON Words.Id=Parents.ParentId WHERE Parents.WordId IN ({ids});", db))
             {
                 SQLiteDataReader reader = cmd.ExecuteReader();
                 while (reader.Read())

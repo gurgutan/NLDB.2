@@ -44,10 +44,9 @@ namespace NLDB
                 line = Console.ReadLine();
                 if (line == "") continue;
                 var terms = engine.Similars(line, 2, 8);
-                Console.WriteLine(string.Join("\n", terms.Select(t => t.ToString())));
-                //System.Collections.Generic.IEnumerable<Term> nearest = engine.Nearest(term, 8);
-                //Console.WriteLine("\nСовместные:\n" + nearest.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
-
+                Console.WriteLine(string.Join("\n", terms.Select(t => "[" + t.confidence.ToString("F4") + "] " + t.ToString())));
+                var nearest = engine.Nearest(terms.First(), 8);
+                Console.WriteLine("\nСовместные:\n" + nearest.Aggregate("", (c, n) => c + $"\n" + "[" + n.confidence.ToString("F4") + "] " + n.ToString()));
             }
             Console.WriteLine("\n\nНажмите любую клавишу для продолжения");
             Console.ReadKey();

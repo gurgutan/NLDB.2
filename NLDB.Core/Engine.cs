@@ -266,66 +266,51 @@ namespace NLDB
             .ToArray();         //получим результат сразу
         }
 
-        //-------------------------------------------------------------------------------------------------------------------------------------------------------
-        internal Term Recognize(Term term, int rank)
-        {
-            if (term.rank == 0)
-            {
-                //При нулевом ранге терма (т.е. терм - это буква), confidence считаем исходя из наличия соответствующей буквы в алфавите
-                term.id = DB.GetWordBySymbol(term.text).Id;
-                term.confidence = (term.id == 0 ? 0 : 1);
-                term.Identified = true;
-                return term;
-            }
-            else
-            {
-                Stopwatch sw = new Stopwatch();
-                sw.Start();
-                //Если ранг терма больше нуля, то confidence считаем по набору дочерних элементов
-                int[] childs = term
-                    .Childs
-                    .Distinct(new DAL.TermComparer())
-                    .Select(c => Recognize(c, rank - 1))
-                    .Where(c => c.id != 0)
-                    .Select(c => c.id)
-                    .ToArray();
-                sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
-                sw.Restart(); //!!!
-                List<Word> parents = DB.GetParents(childs).ToList();
-                sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
-                sw.Restart(); //!!!
-                List<Term> context = parents.Select(p => DB.ToTerm(p)).ToList();
-                sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
-                //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
-                sw.Restart(); //!!!
-                IndexedValue m = context.AsParallel().Max(t => new IndexedValue(t.id, Confidence.Compare(term, t)));
-                term.id = m.Index;
-                term.confidence = ToTerm(m.Index).confidence;
-                term.Identified = true;
-                //Pointer max = context.AsParallel().Aggregate(
-                //    new Pointer(),
-                //    (subtotal, thread_term) =>
-                //    {
-                //        float confidence = Confidence.Compare(term, thread_term);
-                //        if (subtotal.value < confidence) return new Pointer(thread_term.id, 0, confidence);
-                //        return subtotal;
-                //    },
-                //    (total, subtotal) => total.value < subtotal.value ? subtotal : total,
-                //    (final) => final);
-                //term.id = max.id;
-                //term.confidence = max.value;
-                //term.Identified = true;
-                sw.Stop(); Debug.WriteLine($"Максимум: {sw.Elapsed.TotalSeconds}");
-                return term;
-            }
-        }
+        ////-------------------------------------------------------------------------------------------------------------------------------------------------------
+        //internal Term Recognize(Term term, int rank)
+        //{
+        //    if (term.rank == 0)
+        //    {
+        //        //При нулевом ранге терма (т.е. терм - это буква), confidence считаем исходя из наличия соответствующей буквы в алфавите
+        //        term.id = DB.GetWordBySymbol(term.text).Id;
+        //        term.confidence = (term.id == 0 ? 0 : 1);
+        //        term.Identified = true;
+        //        return term;
+        //    }
+        //    else
+        //    {
+        //        Stopwatch sw = new Stopwatch();
+        //        sw.Start();
+        //        //Если ранг терма больше нуля, то confidence считаем по набору дочерних элементов
+        //        int[] childs = term
+        //            .Childs
+        //            .Distinct(new DAL.TermComparer())
+        //            .Select(c => Recognize(c, rank - 1))
+        //            .Where(c => c.id != 0)
+        //            .Select(c => c.id)
+        //            .ToArray();
+        //        sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
+        //        sw.Restart(); //!!!
+        //        List<Word> parents = DB.GetParents(childs).ToList();
+        //        sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
+        //        sw.Restart(); //!!!
+        //        List<Term> context = parents.Select(p => DB.ToTerm(p)).ToList();
+        //        sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
+        //        //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
+        //        sw.Restart(); //!!!
+        //        IndexedValue m = context.AsParallel().Max(t => new IndexedValue(t.id, Confidence.Compare(term, t)));
+        //        term.id = m.Index;
+        //        term.confidence = ToTerm(m.Index).confidence;
+        //        term.Identified = true;
+        //        sw.Stop(); Debug.WriteLine($"Максимум: {sw.Elapsed.TotalSeconds}");
+        //        return term;
+        //    }
+        //}
 
-        internal List<Term> Similars(string text, int rank, int count = 1)
+        internal List<Term> Similars(Term term, int count = 1)
         {
             if (count <= 0) throw new ArgumentException("Количество возращаемых значений должно быть положительным");
             List<Term> result = new List<Term>();
-            text = Parser.Normilize(text);
-            Term term = DB.ToTerm(text, rank);
             if (term.rank == 0)
             {
                 //При нулевом ранге терма (т.е. терм - это буква), confidence считаем исходя из наличия соответствующей буквы в алфавите
@@ -342,17 +327,17 @@ namespace NLDB
                 int[] childs = term
                     .Childs
                     .Distinct(new DAL.TermComparer())
-                    .Select(c => Recognize(c, rank - 1))
+                    .SelectMany(c => Similars(term: c, count: 1))
                     .Where(c => c.id != 0)
                     .Select(c => c.id)
                     .ToArray();
-                sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
+                sw.Stop(); Debug.WriteLine($"Similars->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
                 List<Word> parents = DB.GetParents(childs).ToList();
-                sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
+                sw.Stop(); Debug.WriteLine($"Similars->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
                 List<Term> context = parents.Select(p => DB.ToTerm(p)).ToList();
-                sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
+                sw.Stop(); Debug.WriteLine($"Similars->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
                 //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
                 sw.Restart(); //!!!
                 context.AsParallel().ForAll(p => p.confidence = Confidence.Compare(term, p));
@@ -360,6 +345,14 @@ namespace NLDB
                 result = context.Take(count).ToList();
             }
             return result;
+        }
+
+        internal List<Term> Similars(string text, int rank = 1, int count = 1)
+        {
+            if (count <= 0) throw new ArgumentException("Количество возращаемых значений должно быть положительным");
+            List<Term> result = new List<Term>();
+            Term term = DB.ToTerm(text, rank);
+            return Similars(term, count);
         }
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -413,7 +406,7 @@ namespace NLDB
             Tuple<int, int> size = DB.GetBMatrixAsTuples(term.rank, term.id, term.id + 1, out List<Tuple<int, int, double>> m);
             if (m.Count == 0) return result;
             SparseMatrix M = new SparseMatrix(m);
-            SparseVector vector = M.First().V;
+            SparseVector vector = M.First().V;  //первая и единственная строка матрицы - вектор расстояний
             if (vector.Count == 0) return result;
             return vector.OrderByDescending(iv => iv.V).Take(count).Select(iv => ToTerm(iv.Index));
         }
