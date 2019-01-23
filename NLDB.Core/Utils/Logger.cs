@@ -52,7 +52,7 @@ namespace NLDB.Utils
                     timespan = " ("+stopwatch.Elapsed.TotalSeconds.ToString()+")";
                     stopwatch.Reset();
                 }
-                string t = DateTime.Now.ToString("dd.mm.yy hh:mm:ss.ffff") + $"{timespan}" + "> " + text;
+                string t = DateTime.Now.ToString("dd.mm.yy HH:mm:ss.ffff") + $"{timespan}" + "> " + text;
                 stream.WriteLine(t);
                 if (consoleOn) Console.WriteLine(t);
             }
