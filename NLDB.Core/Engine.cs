@@ -62,25 +62,25 @@ namespace NLDB
                 }
         }
 
-        public CalculationResult Execute(OperationType ptype, object parameter = null)
+        public CalculationResult Execute(OperationType ptype, params object[] parameters)
         {
             Logger.WriteLine($"Операция {ptype}");
             switch (ptype)
             {
                 case OperationType.FileReading:
-                    CalculationResult = ReadFile((string)parameter, TEXT_BUFFER_SIZE); break;
+                    CalculationResult = ReadFile((string)parameters[0], TEXT_BUFFER_SIZE); break;
                 case OperationType.FileWriting:
-                    CalculationResult = WriteDataToFile((string)parameter); break;
+                    CalculationResult = WriteDataToFile((string)parameters[0]); break;
                 case OperationType.TextNormalization:
-                    CalculationResult = NormilizeText((IEnumerable<string>)parameter); break;
+                    CalculationResult = NormilizeText((IEnumerable<string>)parameters); break;
                 case OperationType.TextSplitting:
-                    CalculationResult = SplitText((IEnumerable<string>)parameter); break;
+                    CalculationResult = SplitText((IEnumerable<string>)parameters[0]); break;
                 case OperationType.WordsExtraction:
-                    CalculationResult = ExtractWords((IEnumerable<string>)parameter, Rank); break;
+                    CalculationResult = ExtractWords((IEnumerable<string>)parameters[0], Rank); break;
                 case OperationType.DistancesCalculation:
-                    CalculationResult = CalculateDistances((IEnumerable<Word>)parameter); break;
+                    CalculationResult = CalculateDistances((IEnumerable<Word>)parameters[0]); break;
                 case OperationType.SimilarityCalculation:
-                    CalculationResult = CalculateSimilarity((int)parameter); break;
+                    CalculationResult = CalculateSimilarity((int)parameters[0], (int)parameters[1]); break;
                 default:
                     throw new NotImplementedException();
             }
@@ -89,7 +89,7 @@ namespace NLDB
         }
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
-        private CalculationResult CalculateSimilarity(int rank)
+        private CalculationResult CalculateSimilarity(int rank, int continueFrom = 0)
         {
             Stopwatch stopwatch = new Stopwatch();
             //Функция вычисляет попарные сходства между векторами-строками матрицы расстояний MatrixA и сохраняет результат в БД
@@ -103,12 +103,13 @@ namespace NLDB
                 return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Error);
             }
             int step = Math.Max(1, SIMILARITY_CALC_STEP);
+            Logger.WriteLine($"Параметры: step={step}");
             int max_number = maxCount / step;
             using (ProgressInformer informer = new ProgressInformer(prompt: $"Корреляция:", max: maxCount, measurment: $"слов {rank}", barSize: 64))
             {
                 //Вычисления производятся порциями по step строк. Выбирается диапазон величиной step индексов
                 Logger.WriteLine($"Параметры цикла: шаг={step}, количество={max_number}");
-                for (int i = 0; i <= max_number; i++)
+                for (int i = continueFrom; i <= max_number; i++)
                 {
                     int startRowNumber = i * step;
                     int endRowNumber = Math.Min(startRowNumber + step, words.Count - 1);
