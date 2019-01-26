@@ -36,7 +36,7 @@ namespace NLDB
             ExecuteMode = mode;
             DB = new DataBase(dbpath);
             DateTime date = DateTime.Now;
-            Logger = new Logger(Path.ChangeExtension(dbpath, "." + date.Day + date.Month + date.Year + "_" + date.Hour + date.Millisecond + date.Second + ".log"));
+            Logger = new Logger(Path.ChangeExtension(dbpath, "." + string.Join("_", date.Day, date.Month, date.Year, date.Hour, date.Minute, date.Second + ".log")));
             Logger.WriteLine($"Подключено: '{dbpath}'");
         }
 
@@ -105,7 +105,7 @@ namespace NLDB
             int step = Math.Max(1, SIMILARITY_CALC_STEP);
             Logger.WriteLine($"Параметры: step={step}");
             int max_number = maxCount / step;
-            using (ProgressInformer informer = new ProgressInformer(prompt: $"Корреляция:", max: maxCount, measurment: $"слов {rank}", barSize: 64))
+            using (ProgressInformer informer = new ProgressInformer(prompt: $"Корреляция:", max: maxCount, measurment: $"слов {rank}", barSize: 64, fps: 10))
             {
                 //Вычисления производятся порциями по step строк. Выбирается диапазон величиной step индексов
                 Logger.WriteLine($"Параметры цикла: шаг={step}, количество={max_number}");
@@ -135,7 +135,7 @@ namespace NLDB
                     }
                     Logger.WriteLine($"Подматрица подобия ({maxCount}x{maxCount}): {stopwatch.Elapsed.TotalSeconds} сек.");  //!!!
                 }
-                informer.Set(maxCount);
+                informer.Set(maxCount, true);
             }
             Data = null;
             return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Success);
@@ -190,7 +190,6 @@ namespace NLDB
             {
                 int[] childs = w.ChildsId;
                 Enumerable.Range(0, childs.Length - 1).AsParallel().ForAll((i) =>
-                //for (int i = 0; i < childs.Length; i++)
                 {
                     Dictionary<int, AValue> row = new Dictionary<int, AValue>(childs.Length - 1);
                     for (int j = 0; j < childs.Length; j++)
@@ -267,47 +266,6 @@ namespace NLDB
             .ToArray();         //получим результат сразу
         }
 
-        ////-------------------------------------------------------------------------------------------------------------------------------------------------------
-        //internal Term Recognize(Term term, int rank)
-        //{
-        //    if (term.rank == 0)
-        //    {
-        //        //При нулевом ранге терма (т.е. терм - это буква), confidence считаем исходя из наличия соответствующей буквы в алфавите
-        //        term.id = DB.GetWordBySymbol(term.text).Id;
-        //        term.confidence = (term.id == 0 ? 0 : 1);
-        //        term.Identified = true;
-        //        return term;
-        //    }
-        //    else
-        //    {
-        //        Stopwatch sw = new Stopwatch();
-        //        sw.Start();
-        //        //Если ранг терма больше нуля, то confidence считаем по набору дочерних элементов
-        //        int[] childs = term
-        //            .Childs
-        //            .Distinct(new DAL.TermComparer())
-        //            .Select(c => Recognize(c, rank - 1))
-        //            .Where(c => c.id != 0)
-        //            .Select(c => c.id)
-        //            .ToArray();
-        //        sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
-        //        sw.Restart(); //!!!
-        //        List<Word> parents = DB.GetParents(childs).ToList();
-        //        sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
-        //        sw.Restart(); //!!!
-        //        List<Term> context = parents.Select(p => DB.ToTerm(p)).ToList();
-        //        sw.Stop(); Debug.WriteLine($"Identify->{term.ToString()}.context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
-        //        //Поиск ближайшего родителя, т.е. родителя с максимумом сonfidence
-        //        sw.Restart(); //!!!
-        //        IndexedValue m = context.AsParallel().Max(t => new IndexedValue(t.id, Confidence.Compare(term, t)));
-        //        term.id = m.Index;
-        //        term.confidence = ToTerm(m.Index).confidence;
-        //        term.Identified = true;
-        //        sw.Stop(); Debug.WriteLine($"Максимум: {sw.Elapsed.TotalSeconds}");
-        //        return term;
-        //    }
-        //}
-
         internal List<Term> Similars(Term term, int count = 1)
         {
             if (count <= 0) throw new ArgumentException("Количество возращаемых значений должно быть положительным");
@@ -356,50 +314,6 @@ namespace NLDB
             return Similars(term, count);
         }
 
-        //-------------------------------------------------------------------------------------------------------------------------------------------------------
-        //internal List<Term> Similars(string text, int rank, int count)
-        //{
-        //    if (count <= 0) throw new ArgumentException("Количество возращаемых значений должно быть положительным");
-        //    text = Parser.Normilize(text);
-        //    Stopwatch sw = new Stopwatch(); //!!!
-        //    sw.Start(); //!!!
-        //    Term term = DB.ToTerm(text, rank);
-        //    sw.Stop();  //!!!
-        //    Debug.WriteLine($"Similars->ToTerm: {sw.Elapsed.TotalSeconds}");
-        //    sw.Restart(); //!!!
-        //    Recognize(term, rank);
-        //    sw.Stop();  //!!!
-        //    Debug.WriteLine($"Similars->Identify: {sw.Elapsed.TotalSeconds}");
-        //    //Для терма нулевого ранга возвращаем результат по наличию соответствующей буквы в алфавите
-        //    if (term.rank == 0) return new List<Term> { term };
-        //    sw.Restart(); //!!!
-        //    //Определение контекста по дочерним словам
-        //    int[] childs = term
-        //        .Childs
-        //        .Where(c => c.id != 0)
-        //        .Select(c => c.id)
-        //        .Distinct()
-        //        .ToArray();
-        //    sw.Stop();  //!!!
-        //    Debug.WriteLine($"Similars->childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
-        //    sw.Restart(); //!!!
-        //    List<Term> context = DB
-        //        .GetParents(childs)
-        //        .Distinct()
-        //        .Select(p => DB.ToTerm(p)).
-        //        ToList();
-        //    sw.Stop();  //!!!
-        //    Debug.WriteLine($"Similars->context [{context.Count}]: {sw.Elapsed.TotalSeconds}");
-        //    //Расчет оценок Confidence для каждого из соседей
-        //    sw.Restart(); //!!!
-        //    context.AsParallel().ForAll(p => p.confidence = Confidence.Compare(term, p));
-        //    sw.Stop();  //!!!
-        //    Debug.WriteLine($"Similars->Compare [{context.Count}]: {sw.Elapsed.TotalSeconds}");
-        //    //Сортировка по убыванию оценки
-        //    context.Sort(new Comparison<Term>((t1, t2) => Math.Sign(t2.confidence - t1.confidence)));
-        //    return context.Take(count).ToList();
-        //}
-
         public IEnumerable<Term> Nearest(Term term, int count = 1)
         {
             List<Term> result = new List<Term>();
@@ -445,17 +359,14 @@ namespace NLDB
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
         private CalculationResult WriteDataToFile(string filename)
         {
+            if (Data == null) return new CalculationResult(this, OperationType.FileWriting, ResultType.Error);
             //TODO: продумать сохранение в файл разнух типов данных, хранимых по ссылке Data
             using (StreamWriter writer = File.CreateText(filename))
             {
                 if (Data is IList<int>)
-                {
                     (Data as IList<int>).ToList().ForEach(i => writer.Write(i + ";"));
-                }
                 else if (Data is IList<string>)
-                {
                     (Data as IList<string>).ToList().ForEach(i => writer.Write(i + ";"));
-                }
                 else
                     writer.Write(Data.ToString());
             }

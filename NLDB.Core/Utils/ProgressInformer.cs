@@ -99,9 +99,9 @@ namespace NLDB.Utils
         /// <summary>
         /// Выводит на экран полосу прогресса
         /// </summary>
-        public void Show()
+        public void Show(bool alwaysShow = false)
         {
-            if (IsTimeToShow()) return;
+            if (!IsTimeToShow(alwaysShow)) return;
             lock (ConsoleWriterLock)
             {
                 double percents = Math.Truncate(100.0 / Max * Current);
@@ -126,9 +126,9 @@ namespace NLDB.Utils
             }
         }
 
-        private bool IsTimeToShow()
+        private bool IsTimeToShow(bool alwaysShow = false)
         {
-            if (FPS == 0) return true;
+            if (FPS == 0 || alwaysShow) return true;
             currentTimeSpan = DateTime.Now - prevTime;
             long intervalForFPS = 1000 / FPS;
             if (currentTimeSpan.TotalMilliseconds / intervalForFPS > 0)
@@ -143,10 +143,10 @@ namespace NLDB.Utils
         /// Устанавливает текущую позицию величины в n и выводит на экран
         /// </summary>
         /// <param name="n"></param>
-        public void Set(long n)
+        public void Set(long n, bool alwaysShow = false)
         {
             current = n;
-            Show();
+            Show(alwaysShow);
         }
 
         public void Dispose()
