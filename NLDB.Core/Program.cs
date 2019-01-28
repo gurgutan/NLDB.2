@@ -31,7 +31,7 @@ namespace NLDB
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
             //engine.Clear("MatrixB");
             //engine.Execute(OperationType.SimilarityCalculation, 0);
-            engine.Execute(OperationType.SimilarityCalculation, 1, 205);
+            engine.Execute(OperationType.SimilarityCalculation, 1, 0);
             engine.Execute(OperationType.SimilarityCalculation, 2, 0);
             //engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath, "words"));
 

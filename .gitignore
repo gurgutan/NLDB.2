@@ -260,3 +260,4 @@ paket-files/
 __pycache__/
 *.pyc
 /NLDB.Core/D:/Data/Result/5mb.db
+/NLDB.Core/D:/Data/Result

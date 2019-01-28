@@ -36,7 +36,8 @@ namespace NLDB
             ExecuteMode = mode;
             DB = new DataBase(dbpath);
             DateTime date = DateTime.Now;
-            Logger = new Logger(Path.ChangeExtension(dbpath, "." + string.Join("_", date.Day, date.Month, date.Year, date.Hour, date.Minute, date.Second + ".log")));
+            var logFileName = Path.ChangeExtension(dbpath, "." + string.Join("_", date.Day, date.Month, date.Year, date.Hour, date.Minute, date.Second + ".log"));
+            Logger = new Logger(logFileName, false, true);
             Logger.WriteLine($"Подключено: '{dbpath}'");
         }
 
@@ -103,18 +104,17 @@ namespace NLDB
                 return new CalculationResult(this, OperationType.SimilarityCalculation, ResultType.Error);
             }
             int step = Math.Max(1, SIMILARITY_CALC_STEP);
-            Logger.WriteLine($"Параметры: step={step}");
             int max_number = maxCount / step;
+            Logger.WriteLine($"Параметры: шаг={step}, количество={max_number}");
             using (ProgressInformer informer = new ProgressInformer(prompt: $"Корреляция:", max: maxCount, measurment: $"слов {rank}", barSize: 64, fps: 10))
             {
                 //Вычисления производятся порциями по step строк. Выбирается диапазон величиной step индексов
-                Logger.WriteLine($"Параметры цикла: шаг={step}, количество={max_number}");
                 for (int i = continueFrom; i <= max_number; i++)
                 {
                     int startRowNumber = i * step;
                     int endRowNumber = Math.Min(startRowNumber + step, words.Count - 1);
-                    informer.Set(startRowNumber);
-                    Logger.WriteLine($"Чтение матрицы из БД для {words[startRowNumber].Id}-{words[endRowNumber].Id}");
+                    informer.Set(startRowNumber, true);
+                    Logger.WriteLine($"Чтение матрицы для строк {words[startRowNumber].Id}-{words[endRowNumber].Id}");
                     DB.GetAMatrixAsTuples(rank, words[startRowNumber].Id, words[endRowNumber].Id, out List<Tuple<int, int, double>> rows);
                     SparseMatrix A = new SparseMatrix(rows);
                     for (int j = i; j <= max_number; j++)
@@ -123,7 +123,7 @@ namespace NLDB
                         stopwatch.Restart();
                         int startColumnNumber = j * step;
                         int endColumnNumber = Math.Min(startColumnNumber + step, words.Count - 1);
-                        Logger.WriteLine($"Чтение подматрицы из БД для интервала Id {words[startColumnNumber].Id}-{words[endColumnNumber].Id}");
+                        Logger.WriteLine($"Чтение матрицы для строк {words[startColumnNumber].Id}-{words[endColumnNumber].Id}");
                         DB.GetAMatrixAsTuples(rank, words[startColumnNumber].Id, words[endColumnNumber].Id, out List<Tuple<int, int, double>> columns);
                         Logger.WriteLine($"Построение разреженной подматрицы B");
                         SparseMatrix B = new SparseMatrix(columns);
@@ -436,7 +436,7 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         private DataBase DB { get; }
         private readonly string dbpath;
-        private const int SIMILARITY_CALC_STEP = 1 << 12;   //Оптимальный шаг для отношения Производительность/Память примерно 262 144
+        private const int SIMILARITY_CALC_STEP = 1 << 19;   //Оптимальный шаг для отношения Производительность/Память примерно 262 144
         private const int DISTANCES_CALC_STEP = 1 << 8;     //Оптимальный шаг для вычисления матрицы расстояний примерно 1024
         private const int TEXT_BUFFER_SIZE = 1 << 28;
     }

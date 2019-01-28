@@ -21,6 +21,7 @@ namespace NLDB.Utils
         {
             Filename = filename;
             AppendFile = append;
+            ShowTimeSpan = showTimeSpan;
             if (ShowTimeSpan)
                 stopwatch.Start();
             Open();
@@ -49,10 +50,10 @@ namespace NLDB.Utils
                 if (ShowTimeSpan)
                 {
                     stopwatch.Stop();
-                    timespan = " ("+stopwatch.Elapsed.TotalSeconds.ToString()+")";
-                    stopwatch.Reset();
+                    timespan = $" ({stopwatch.Elapsed.TotalSeconds.ToString("F3")})";
+                    stopwatch.Restart();
                 }
-                string t = DateTime.Now.ToString("dd.mm.yy HH:mm:ss.ffff") + $"{timespan}" + "> " + text;
+                string t = DateTime.Now.ToString("dd.MM.yy HH:mm:ss.ffff") + $"{timespan}" + "> " + text;
                 stream.WriteLine(t);
                 if (consoleOn) Console.WriteLine(t);
             }
