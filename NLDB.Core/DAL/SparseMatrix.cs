@@ -39,6 +39,16 @@ namespace NLDB.DAL
             rows = FromIndexed(tuples);
         }
 
+        public SparseMatrix(IEnumerable<(int, int, double)> tuples)
+        {
+            rows = tuples
+                .AsParallel()
+                .OrderBy(t => (ulong)t.Item1 << 32 | (uint)t.Item2)
+                .GroupBy(t => t.Item1)
+                .Select(group => new IndexedVector(group.Key, new SparseVector(group.Select(v => Tuple.Create(v.Item2, v.Item3)))))
+                .ToList();
+        }
+
         public SparseMatrix(IEnumerable<Tuple<int, SparseVector>> tuples)
         {
             rows = tuples.OrderBy(t => t.Item1).Select(t => new IndexedVector(t.Item1, t.Item2)).ToList();
@@ -176,29 +186,45 @@ namespace NLDB.DAL
         /// <param name="b">правая матрица (предполагается что она уже транспонирована)</param>
         /// <param name="zeroingRadius">элементы, не из интервала [-zeroingRadius, zeroingRadius] в результат не записываются</param>
         /// <returns></returns>
+        //public static SparseMatrix Covariation(SparseMatrix a, SparseMatrix b, double zeroingRadius = 0)
+        //{
+        //    if (zeroingRadius < 0) zeroingRadius = -zeroingRadius;
+        //    ConcurrentDictionary<int, SparseVector> indexedVectors = new ConcurrentDictionary<int, SparseVector>();
+        //    Parallel.ForEach(a.Rows, (r) =>
+        //    {
+        //        List<Tuple<int, double>> tuples = new List<Tuple<int, double>>();
+        //        foreach (IndexedVector c in b.Rows)
+        //        {
+        //            if (c == r)
+        //                tuples.Add(Tuple.Create(c.Index, 1.0));
+        //            else if (r.V.Count > 0 && c.V.Count > 0)
+        //            {
+        //                //Скалярное произведение
+        //                double cxy = r.V * c.V;
+        //                //Нулевые элементы в результат не добавляем
+        //                if (cxy < -zeroingRadius || cxy > zeroingRadius)
+        //                    tuples.Add(Tuple.Create(c.Index, cxy));
+        //            }
+        //        }
+        //        if (tuples.Count > 0) indexedVectors[r.Index] = new SparseVector(tuples);
+        //    });
+        //    return new SparseMatrix(indexedVectors);
+        //}
+
         public static SparseMatrix Covariation(SparseMatrix a, SparseMatrix b, double zeroingRadius = 0)
         {
             if (zeroingRadius < 0) zeroingRadius = -zeroingRadius;
-            ConcurrentDictionary<int, SparseVector> indexedVectors = new ConcurrentDictionary<int, SparseVector>();
-            Parallel.ForEach(a.Rows, (r) =>
-            {
-                List<Tuple<int, double>> tuples = new List<Tuple<int, double>>();
-                foreach (IndexedVector c in b.Rows)
+            var tuples = a.SelectMany(r => b.Select(c => (r, c)))
+                .AsParallel()
+                .Select(t =>
                 {
-                    if (c == r)
-                        tuples.Add(Tuple.Create(c.Index, 1.0));
-                    else if (r.V.Count > 0 && c.V.Count > 0)
-                    {
-                        //Скалярное произведение
-                        double cxy = r.V * c.V;
-                        //Нулевые элементы в результат не добавляем
-                        if (cxy < -zeroingRadius || cxy > zeroingRadius)
-                            tuples.Add(Tuple.Create(c.Index, cxy));
-                    }
-                }
-                if (tuples.Count > 0) indexedVectors[r.Index] = new SparseVector(tuples);
-            });
-            return new SparseMatrix(indexedVectors);
+                    if (t.r.V.Count > 0 && t.c.V.Count > 0)
+                        return (t.r.Index, t.c.Index, t.r.V * t.c.V);
+                    else
+                        return (t.r.Index, t.c.Index, 0);
+                })
+                .Where(t => t.Item3 > zeroingRadius || t.Item3 < -zeroingRadius);
+            return new SparseMatrix(tuples);
         }
 
         public static double operator *(SparseMatrix a, SparseMatrix b)
