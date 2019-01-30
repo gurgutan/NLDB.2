@@ -292,7 +292,7 @@ namespace NLDB
                     .ToArray();
                 sw.Stop(); Debug.WriteLine($"Similars->{term.ToString()}.childs [{childs.Length}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
-                List<Word> parents = DB.GetParents(childs).ToList();
+                List<Word> parents = DB.GetParents(childs).Distinct().ToList();
                 sw.Stop(); Debug.WriteLine($"Similars->{term.ToString()}.parents [{parents.Count}]: {sw.Elapsed.TotalSeconds}");
                 sw.Restart(); //!!!
                 List<Term> context = parents.Select(p => DB.ToTerm(p)).ToList();

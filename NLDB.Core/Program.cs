@@ -10,22 +10,22 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
-            string filename = "1200kb.txt";
+            string filename = "5mb.txt";
             string trainfile = @"D:\Data\Wiki\ru\" + filename;
             string dbpath = @"D:\Data\Result\" + Path.ChangeExtension(filename, "db");
             Engine engine = new Engine(dbpath, ExecuteMode.Verbose);
 
-            engine.Create();
-            engine.Insert(new Splitter(0, ""));
-            engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
-            engine.Insert(new Splitter(2, @"[\n\r\?\!\:\;]+"));
-            engine.Insert(new Splitter(3, @"\[\[{число}\]\]"));
-            engine
-               .Execute(OperationType.FileReading, trainfile)
-               .Then(OperationType.TextNormalization, engine.Data)
-               .Then(OperationType.FileWriting, Path.ChangeExtension(dbpath, "norm"))
-               .Then(OperationType.TextSplitting, engine.Data)
-               .Then(OperationType.WordsExtraction, engine.Data);
+            //engine.Create();
+            //engine.Insert(new Splitter(0, ""));
+            //engine.Insert(new Splitter(1, @"[^а-яё\d\{\}\-]+"));
+            //engine.Insert(new Splitter(2, @"[\n\r\?\!\:\;]+"));
+            //engine.Insert(new Splitter(3, @"\[\[{число}\]\]"));
+            //engine
+            //   .Execute(OperationType.FileReading, trainfile)
+            //   .Then(OperationType.TextNormalization, engine.Data)
+            //   .Then(OperationType.FileWriting, Path.ChangeExtension(dbpath, "norm"))
+            //   .Then(OperationType.TextSplitting, engine.Data)
+            //   .Then(OperationType.WordsExtraction, engine.Data);
             //engine.Clear("MatrixA");
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));

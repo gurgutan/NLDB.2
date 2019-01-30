@@ -313,6 +313,7 @@ namespace NLDB.DAL
         internal List<Word> GetParents(IEnumerable<int> wordsId)
         {
             List<Word> result = new List<Word>();
+            //Фильтруем список id, оставляя только те, которых нет в кэше
             var ids = wordsId.Where(i =>
             {
                 if (GetFromCash(i, out List<Word> parents))
@@ -322,7 +323,9 @@ namespace NLDB.DAL
                 }
                 else
                     return true;
-            });
+            }).ToList();
+            if (ids.Count == 0) return result;
+            var cash = new Dictionary<int, List<Word>>();
             string id_string = string.Join(",", ids);
             using (SQLiteCommand cmd = new SQLiteCommand(
                 $"SELECT DISTINCT Words.Id, Words.Rank, Words.Symbol, Words.Childs, Parents.WordId FROM Words " +
@@ -331,9 +334,18 @@ namespace NLDB.DAL
                 SQLiteDataReader reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
-                    result.Add(new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3)));
+                    int id = reader.GetInt32(4);
+                    var w = new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3));
+                    result.Add(w);
+                    if (!cash.TryGetValue(id, out List<Word> plist))
+                    {
+                        plist = new List<Word>();
+                        cash[id] = plist;
+                    }
+                    plist.Add(w);
                 }
             }
+            cash.ToList().ForEach(pair => AddToCash(pair.Key, pair.Value));
             return result;
         }
 
