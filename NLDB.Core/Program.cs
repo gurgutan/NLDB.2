@@ -10,7 +10,7 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
-            string filename = "5mb.txt";
+            string filename = "full.txt";
             string trainfile = @"D:\Data\Wiki\ru\" + filename;
             string dbpath = @"D:\Data\Result\" + Path.ChangeExtension(filename, "db");
             Engine engine = new Engine(dbpath, ExecuteMode.Verbose);
@@ -44,9 +44,9 @@ namespace NLDB
                 Console.Write($"\n\nФраза: ");
                 line = Console.ReadLine();
                 if (line == "") continue;
-                var terms = engine.Similars(line, 2, 8);
+                var terms = engine.Similars(line, 1, 8);
                 Console.WriteLine(string.Join("\n", terms.Select(t => "[" + t.confidence.ToString("F4") + "] " + t.ToString())));
-                var nearest = engine.Nearest(terms.First(), 8);
+                var nearest = terms.SelectMany(t=>engine.Nearest(terms.First(), 4)).Distinct().ToList();
                 Console.WriteLine("\nСовместные:\n" + nearest.Aggregate("", (c, n) => c + $"\n" + "[" + n.confidence.ToString("F4") + "] " + n.ToString()));
             }
             Console.WriteLine("\n\nНажмите любую клавишу для продолжения");

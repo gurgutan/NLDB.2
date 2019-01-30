@@ -35,8 +35,8 @@ namespace NLDB
             this.dbpath = dbpath;
             ExecuteMode = mode;
             DB = new DataBase(dbpath);
-            DateTime date = DateTime.Now;
-            var logFileName = Path.ChangeExtension(dbpath, "." + string.Join("_", date.Day, date.Month, date.Year, date.Hour, date.Minute, date.Second + ".log"));
+            var date = DateTime.Now;
+            string logFileName = Path.ChangeExtension(dbpath, "." + string.Join("_", date.Day, date.Month, date.Year, date.Hour, date.Minute, date.Second + ".log"));
             Logger = new Logger(logFileName, false, true);
             Logger.WriteLine($"Подключено: '{dbpath}'");
         }
@@ -115,7 +115,7 @@ namespace NLDB
                     int endRowNumber = Math.Min(startRowNumber + step, words.Count - 1);
                     informer.Set(startRowNumber, true);
                     Logger.WriteLine($"Чтение матрицы для строк {words[startRowNumber].Id}-{words[endRowNumber].Id}");
-                    DB.GetAMatrixAsTuples(rank, words[startRowNumber].Id, words[endRowNumber].Id, out List<Tuple<int, int, double>> rows);
+                    DB.GetAMatrixAsTuples(rank, words[startRowNumber].Id, words[endRowNumber].Id, out var rows);
                     SparseMatrix A = new SparseMatrix(rows);
                     for (int j = i; j <= max_number; j++)
                     {
@@ -124,7 +124,7 @@ namespace NLDB
                         int startColumnNumber = j * step;
                         int endColumnNumber = Math.Min(startColumnNumber + step, words.Count - 1);
                         Logger.WriteLine($"Чтение матрицы для строк {words[startColumnNumber].Id}-{words[endColumnNumber].Id}");
-                        DB.GetAMatrixAsTuples(rank, words[startColumnNumber].Id, words[endColumnNumber].Id, out List<Tuple<int, int, double>> columns);
+                        DB.GetAMatrixAsTuples(rank, words[startColumnNumber].Id, words[endColumnNumber].Id, out var columns);
                         Logger.WriteLine($"Построение разреженной подматрицы B");
                         SparseMatrix B = new SparseMatrix(columns);
                         Logger.WriteLine($"Начало вычислений B*B^T:");
@@ -151,7 +151,7 @@ namespace NLDB
             Logger.WriteLine($"  2. Вычисление ковариации");
             SparseMatrix result = SparseMatrix.Covariation(A, B, 0.2);
             Logger.WriteLine($"  3. Формирование списка значений");
-            IEnumerable<Tuple<int, int, double>> tuples = result.EnumerateIndexed();
+            var tuples = result.EnumerateIndexed();
             Logger.WriteLine($"  4. Запись в БД");
             return DB.InsertAll(tuples, rank);
         }
@@ -186,7 +186,7 @@ namespace NLDB
         {
             int wordsCount = words.Count();
             ConcurrentDictionary<int, Dictionary<int, AValue>> result = new ConcurrentDictionary<int, Dictionary<int, AValue>>(4, wordsCount);
-            foreach (Word w in words)
+            foreach (var w in words)
             {
                 int[] childs = w.ChildsId;
                 Enumerable.Range(0, childs.Length - 1).AsParallel().ForAll((i) =>
@@ -195,7 +195,7 @@ namespace NLDB
                     for (int j = 0; j < childs.Length; j++)
                     {
                         if (childs[i] == childs[j]) continue;
-                        if (!row.TryGetValue(j, out AValue value))
+                        if (!row.TryGetValue(j, out var value))
                         {
                             row[j] = new AValue(w.Rank - 1, childs[i], childs[j], j - i, 1);
                         }
@@ -234,7 +234,7 @@ namespace NLDB
 
         private int[] ExtractWordsFromString(string text, int rank)
         {
-            IEnumerable<string> strings = DB.Split(text, rank).Where(s => !string.IsNullOrEmpty(s));
+            var strings = DB.Split(text, rank).Where(s => !string.IsNullOrEmpty(s));
             return strings.Select(s =>
             {
                 int id;
@@ -245,7 +245,7 @@ namespace NLDB
                     childsId = ExtractWordsFromString(s, rank - 1);
                     if (childsId.Length == 0) return 0;
                     string childsString = string.Join(",", childsId);//.Aggregate("", (c, n) => c + (c != "" ? "," : "") + n.ToString());
-                    Word word = DB.GetWordByChilds(childsString);
+                    var word = DB.GetWordByChilds(childsString);
                     if (word == null)
                         id = DB.Add(new Word() { Rank = rank, Symbol = "", Childs = childsString });
                     else
@@ -254,7 +254,7 @@ namespace NLDB
                 else
                 {
                     //Пробуем найти Слово по символу
-                    Word word = DB.GetWordBySymbol(s);
+                    var word = DB.GetWordBySymbol(s);
                     if (word == null)
                         id = DB.Add(new Word() { Rank = rank, Symbol = s });
                     else
@@ -318,12 +318,12 @@ namespace NLDB
         {
             List<Term> result = new List<Term>();
             if (term.id == 0) return null;
-            Tuple<int, int> size = DB.GetBMatrixAsTuples(term.rank, term.id, term.id + 1, out List<Tuple<int, int, double>> m);
+            var size = DB.GetBMatrixAsTuples(term.rank, term.id, term.id + 1, out var m);
             if (m.Count == 0) return result;
             SparseMatrix M = new SparseMatrix(m);
-            SparseVector vector = M.First().V;  //первая и единственная строка матрицы - вектор расстояний
+            var vector = M.First().V;  //первая и единственная строка матрицы - вектор расстояний
             if (vector.Count == 0) return result;
-            return vector.OrderByDescending(iv => iv.V).Take(count).Select(iv => ToTerm(iv.Index));
+            return vector.OrderByDescending(iv => iv.V).Take(count).Select(iv => { var t = ToTerm(iv.Index); t.confidence = (float)iv.V; return t; });
         }
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -338,7 +338,7 @@ namespace NLDB
             if (!File.Exists(filename))
                 return new CalculationResult(this, OperationType.FileReading, ResultType.Error);
             List<string> result = new List<string>();
-            using (StreamReader reader = File.OpenText(filename))
+            using (var reader = File.OpenText(filename))
             using (ProgressInformer informer = new ProgressInformer("Чтение файла:", reader.BaseStream.Length, "байт"))
             {
                 //Считаем, что входной поток - UTF-8
@@ -361,7 +361,7 @@ namespace NLDB
         {
             if (Data == null) return new CalculationResult(this, OperationType.FileWriting, ResultType.Error);
             //TODO: продумать сохранение в файл разнух типов данных, хранимых по ссылке Data
-            using (StreamWriter writer = File.CreateText(filename))
+            using (var writer = File.CreateText(filename))
             {
                 if (Data is IList<int>)
                     (Data as IList<int>).ToList().ForEach(i => writer.Write(i + ";"));
@@ -419,7 +419,7 @@ namespace NLDB
 
         public Term ToTerm(int id)
         {
-            Word word = DB.GetWord(id);
+            var word = DB.GetWord(id);
             if (word == null) return null;
             return DB.ToTerm(word);
         }
