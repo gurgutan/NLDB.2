@@ -19,10 +19,12 @@ namespace NLDB.DAL
         private Dictionary<string, MatrixDictionary> sparseMatrixCash = new Dictionary<string, MatrixDictionary>(SPARSEMATRIX_CASH_SIZE);
         private ConcurrentDictionary<long, AValue> matrixACash = new ConcurrentDictionary<long, AValue>(PARALLELIZM, MATRIXA_CASH_SIZE);
         private ConcurrentDictionary<long, BValue> matrixBCash = new ConcurrentDictionary<long, BValue>(PARALLELIZM, MATRIXB_CASH_SIZE);
+        private Dictionary<int, List<Word>> parentsCash = new Dictionary<int, List<Word>>(PARENTS_CASH_SIZE);
         private Dictionary<int, Term> termsCash = new Dictionary<int, Term>(TERMS_CASH_SIZE);
         private Dictionary<int, Word> wordsCash = new Dictionary<int, Word>(WORDS_CASH_SIZE);
         private Dictionary<string, Word> symbolsCash = new Dictionary<string, Word>(SYMBOLS_CASH_SIZE);
 
+        private const int PARENTS_CASH_SIZE = 1 << 20;
         private const int SPARSEMATRIX_CASH_SIZE = 1 << 10;
         private const int MATRIXA_CASH_SIZE = 1 << 20;
         private const int MATRIXB_CASH_SIZE = 1 << 20;
@@ -293,14 +295,17 @@ namespace NLDB.DAL
         //---------------------------------------------------------------------------------------------------------
         internal List<Word> GetParents(int wordId)
         {
-            List<Word> result = new List<Word>();
+            //List<Word> result = new List<Word>();
+            if (GetFromCash(wordId, out List<Word> result))
+                return result;
             using (SQLiteCommand cmd = new SQLiteCommand(
-                $"SELECT DISTINCT  Words.Id, Words.Rank, Words.Symbol, Words.Childs FROM Words " +
+                $"SELECT DISTINCT  Words.Id, Words.Rank, Words.Symbol, Words.Childs, Parents.WordId FROM Words " +
                 $"INNER JOIN Parents ON Words.Id=Parents.ParentId WHERE Parents.WordId={wordId};", db))
             {
                 SQLiteDataReader reader = cmd.ExecuteReader();
                 while (reader.Read())
                     result.Add(new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3)));
+                AddToCash(wordId, result);
             }
             return result;
         }
@@ -308,14 +313,26 @@ namespace NLDB.DAL
         internal List<Word> GetParents(IEnumerable<int> wordsId)
         {
             List<Word> result = new List<Word>();
-            string ids = string.Join(",", wordsId);
+            var ids = wordsId.Where(i =>
+            {
+                if (GetFromCash(i, out List<Word> parents))
+                {
+                    result.AddRange(parents);
+                    return false;
+                }
+                else
+                    return true;
+            });
+            string id_string = string.Join(",", ids);
             using (SQLiteCommand cmd = new SQLiteCommand(
-                $"SELECT DISTINCT Words.Id, Words.Rank, Words.Symbol, Words.Childs FROM Words " +
-                $"INNER JOIN Parents ON Words.Id=Parents.ParentId WHERE Parents.WordId IN ({ids});", db))
+                $"SELECT DISTINCT Words.Id, Words.Rank, Words.Symbol, Words.Childs, Parents.WordId FROM Words " +
+                $"INNER JOIN Parents ON Words.Id=Parents.ParentId WHERE Parents.WordId IN ({id_string});", db))
             {
                 SQLiteDataReader reader = cmd.ExecuteReader();
                 while (reader.Read())
+                {
                     result.Add(new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3)));
+                }
             }
             return result;
         }
@@ -745,6 +762,14 @@ namespace NLDB.DAL
             matrixBCash[key] = value;
         }
 
+        private void AddToCash(int id, List<Word> parents)
+        {
+            if (parents == null) return;
+            if (parentsCash.Count > PARENTS_CASH_SIZE)
+                RemoveFromCash(parentsCash, 2);
+            parentsCash[id] = parents;
+        }
+
         private void AddToCash(string key, MatrixDictionary m)
         {
             if (m == null) return;
@@ -758,7 +783,19 @@ namespace NLDB.DAL
             return (sparseMatrixCash.TryGetValue(key, out m));
         }
 
+        private bool GetFromCash(int key, out List<Word> parents)
+        {
+            return (parentsCash.TryGetValue(key, out parents));
+        }
+
         private void RemoveFromCash(Dictionary<string, MatrixDictionary> cash, int count)
+        {
+            int current = 0;
+            while (current < count && cash.Count > 0)
+                current += cash.Remove(cash.First().Key) ? 1 : 0;
+        }
+
+        private void RemoveFromCash(Dictionary<int, List<Word>> cash, int count)
         {
             int current = 0;
             while (current < count && cash.Count > 0)

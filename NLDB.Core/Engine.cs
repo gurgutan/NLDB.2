@@ -73,7 +73,7 @@ namespace NLDB
                 case OperationType.FileWriting:
                     CalculationResult = WriteDataToFile((string)parameters[0]); break;
                 case OperationType.TextNormalization:
-                    CalculationResult = NormilizeText((IEnumerable<string>)parameters); break;
+                    CalculationResult = NormilizeText((IEnumerable<string>)parameters[0]); break;
                 case OperationType.TextSplitting:
                     CalculationResult = SplitText((IEnumerable<string>)parameters[0]); break;
                 case OperationType.WordsExtraction:

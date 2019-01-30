@@ -48,7 +48,7 @@ namespace NLDB
             text = removeRegex.Replace(text.ToLower().Trim(), "");
             text = replaceNumbersRegex.Replace(text, specSymbolNumber);
             text = replaceEnglishRegex.Replace(text, specSymbolEnglish);
-            //text = removeShorthands.Replace(text, specSymbolShorthand);
+            text = removeShorthands.Replace(text, specSymbolShorthand);
             return text;
         }
 
