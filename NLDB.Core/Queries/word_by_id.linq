@@ -1,6 +1,6 @@
 <Query Kind="Program">
   <Connection>
-    <ID>9b86096c-950e-4cef-8ad0-a6ccc44eaccd</ID>
+    <ID>0889947e-f13f-490f-b1c1-63789e168985</ID>
     <Persist>true</Persist>
     <Driver Assembly="IQDriver" PublicKeyToken="5b59726538a49684">IQDriver.IQDriver</Driver>
     <Provider>System.Data.SQLite</Provider>
@@ -17,7 +17,7 @@ void Main()
 {
 	var s = MatrixBs
 	.Take(1000)
-	.Where(v=>v.Rank==1 && Math.Abs(v.Row-v.Column)>8000 && v.Similarity*5>4)
+	.Where(v=>v.Rank==0 /*&& Math.Abs(v.Row-v.Column)>8000*/ && v.Similarity*5>4)
 	.OrderByDescending(v=>v.Similarity)
 	.Take(100)
 	.Select(v=>new { v.Row, слово1=StringView(v.Row), v.Column, слово2=StringView(v.Column), совместность=v.Similarity })

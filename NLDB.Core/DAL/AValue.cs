@@ -1,6 +1,6 @@
 ﻿namespace NLDB.DAL
 {
-    public class AValue
+    public struct AValue
     {
         public int Rank { get; set; }
 
@@ -11,10 +11,18 @@
         public double Sum { get; set; }
         public int Count { get; set; }
 
-        public double Mean { get => Sum / Count; }
+        public double Mean => Sum / Count;
 
-        public AValue()
+        public ulong Key => ((ulong)R) << 32 | (uint)C;
+
+        public static int RowFromKey(ulong key)
         {
+            return (int)(key >> 32);
+        }
+
+        public static int ColumnFromKey(ulong key)
+        {
+            return (int)(key & 0xFFFFFFFF);
         }
 
         public AValue(int rank, int row, int column, double sum, int count)

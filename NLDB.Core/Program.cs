@@ -10,7 +10,7 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
-            string filename = "1200kb.txt";
+            string filename = "5mb.txt";
             string trainfile = @"D:\Data\Wiki\ru\" + filename;
             string dbpath = @"D:\Data\Result\" + Path.ChangeExtension(filename, "db");
             Engine engine = new Engine(dbpath, ExecuteMode.Verbose);

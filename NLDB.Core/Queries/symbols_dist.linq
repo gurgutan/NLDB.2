@@ -11,12 +11,15 @@
       <QuietenAllCaps>false</QuietenAllCaps>
     </DriverData>
   </Connection>
+  <Namespace>System</Namespace>
+  <Namespace>System.Collections.Concurrent</Namespace>
+  <Namespace>System.Collections.Generic</Namespace>
+  <Namespace>System.Data.Common</Namespace>
+  <Namespace>System.Data.SQLite</Namespace>
+  <Namespace>System.Linq</Namespace>
 </Query>
 
---select * from Words where Words.Rank=0;
-select W1.Id, W1.Symbol, W2.Id, W2.Symbol, B.Similarity, B.Rank from MatrixB AS B
-inner join Words W1 ON B.Row=W1.Id and W1.Rank=B.Rank
-inner join Words W2 ON B.Column==W2.Id and W2.Rank=B.Rank
-where B.Rank=0 and ABS(B.Row-B.Column)>0 and B.Similarity > 0
-order by B.Similarity desc
-limit 1000;
+select MatrixA.Row, Words1.Symbol, MatrixA.Column, Words2.Symbol, MatrixA.Sum/MatrixA.Count as avgsum from MatrixA 
+Left join Words Words1 ON MatrixA.Row=Words1.Id 
+left join Words Words2 ON MatrixA.Column=Words2.Id
+order by MatrixA.Row, avgsum desc;

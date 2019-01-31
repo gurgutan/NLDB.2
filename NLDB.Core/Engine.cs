@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -165,8 +164,7 @@ namespace NLDB
             if (maxCount == 0) return new CalculationResult(this, OperationType.DistancesCalculation, ResultType.Error);
             using (ProgressInformer informer = new ProgressInformer($"Матрица расстояний:", maxCount, measurment: $"слов р{words.First().Rank - 1}", barSize: 64))
             {
-                var sw = new Stopwatch();
-                sw.Start();
+                Stopwatch sw = new Stopwatch();
                 int step = Math.Max(1, DISTANCES_CALC_STEP);
                 for (int j = 0; j <= maxCount / step; j++)
                 {
@@ -175,80 +173,78 @@ namespace NLDB
                     int to = Math.Min(from + step, maxCount);
                     informer.Set(to);
                     IEnumerable<Word> wordsPacket = words.Skip(from).Take(step).ToList();
+                    sw.Restart();
                     //PositionsMean(wordsPacket);
                     ContextMatrix(wordsPacket);
+                    sw.Stop();
+                    //Debug.WriteLine(sw.Elapsed.TotalSeconds);
                     DB.Commit();
                 }
                 informer.Set(maxCount);
-                sw.Stop();
-                Debug.WriteLine(sw.Elapsed.TotalSeconds);
             }
             Data = null;
             return new CalculationResult(this, OperationType.DistancesCalculation, ResultType.Success);
         }
 
-        //Вычисляет матожидание вектора расстояний для каждого из слов words
-        private int PositionsMean(IEnumerable<Word> words)
-        {
-            int wordsCount = words.Count();
-            ConcurrentDictionary<int, Dictionary<int, AValue>> result = new ConcurrentDictionary<int, Dictionary<int, AValue>>(4, wordsCount);
-            foreach (var w in words)
-            {
-                int[] childs = w.ChildsId;
-                Enumerable.Range(0, childs.Length - 1).AsParallel().ForAll((i) =>
-                {
-                    Dictionary<int, AValue> row = new Dictionary<int, AValue>(childs.Length - 1);
-                    for (int j = 0; j < childs.Length; j++)
-                    {
-                        if (childs[i] == childs[j]) continue;
-                        if (!row.TryGetValue(j, out var value))
-                        {
-                            row[j] = new AValue(w.Rank - 1, childs[i], childs[j], j - i, 1);
-                        }
-                        else
-                        {
-                            value.Count++;
-                            value.Sum += j - i;
-                            row[j] = value;
-                        }
-                    }
-                    //Вставляем вектор-строку, только если он не пустой
-                    if (row.Count > 0) result[i] = row;
-                });
-            }
-            if (result.Count == 0) return 0;
-            //Сброс данных в БД
-            result.Values.ToList().ForEach(r => DB.InsertAll(r.Values));
-            return result.Count;
-        }
+        ////Вычисляет матожидание вектора расстояний для каждого из слов words
+        //private int PositionsMean(IEnumerable<Word> words)
+        //{
+        //    int wordsCount = words.Count();
+        //    ConcurrentDictionary<int, Dictionary<int, AValue>> result = new ConcurrentDictionary<int, Dictionary<int, AValue>>(4, wordsCount);
+        //    foreach (var w in words)
+        //    {
+        //        int[] childs = w.ChildsId;
+        //        Enumerable.Range(0, childs.Length - 1).AsParallel().ForAll((i) =>
+        //        {
+        //            Dictionary<int, AValue> row = new Dictionary<int, AValue>(childs.Length - 1);
+        //            for (int j = 0; j < childs.Length; j++)
+        //            {
+        //                if (childs[i] == childs[j]) continue;
+        //                if (!row.TryGetValue(j, out var value))
+        //                {
+        //                    row[j] = new AValue(w.Rank - 1, childs[i], childs[j], j - i, 1);
+        //                }
+        //                else
+        //                {
+        //                    value.Count++;
+        //                    value.Sum += j - i;
+        //                    row[j] = value;
+        //                }
+        //            }
+        //            //Вставляем вектор-строку, только если он не пустой
+        //            if (row.Count > 0) while (!result.TryAdd(i, row)) ;
+        //        });
+        //    }
+        //    if (result.Count == 0) return 0;
+        //    //Сброс данных в БД
+        //    Debug.WriteLine(result.Count);
+        //    List<ulong> c = result.Values.SelectMany(v => v.Values).Select(v => (ulong)v.R << 32 | (uint)v.C).OrderBy(v => v).ToList();
+        //    result.Values.ToList().ForEach(r => DB.InsertAll(r.Values));
+        //    return result.Count;
+        //}
 
         private int ContextMatrix(IEnumerable<Word> words)
         {
-            var result = words
+            int rank = words.First().Rank;
+            List<AValue> result = words
                 .AsParallel()
                 .SelectMany(w =>
                 {
                     int[] childs = w.ChildsId;
-                    return childs
-                        .SelectMany((a, i) => childs.Select((b, j) => new AValue(w.Rank - 1, a, b, j - i, 1)))
-                        .GroupBy(v => (ulong)v.R << 32 | (uint)v.C)
-                        .Select(group =>
-                        {
-                            var pattern = group.First();
-                            var values = group.ToList();
-                            return new AValue(pattern.Rank, pattern.R, pattern.C, values.Sum(e => e.Sum), values.Count);
-                        });
+                    return childs.SelectMany((a, i) => childs.Select((b, j) => new AValue(w.Rank - 1, a, b, j - i, 1)));
+                    //.GroupBy(v => v.Key)
+                    //.Select(group =>
+                    //{
+                    //    List<AValue> values = group.ToList();
+                    //    return new AValue(rank, AValue.RowFromKey(group.Key), AValue.ColumnFromKey(group.Key), values.AsParallel().Sum(e => e.Sum), values.Count);
+                    //});
                 })
+                .GroupBy(v => v.Key)
                 .AsParallel()
-                .GroupBy(w => (ulong)w.R << 32 | (uint)w.C)
-                .AsParallel()
-                .Select(group =>
-                {
-                    var pattern = group.First();
-                    var values = group.ToList();
-                    return new AValue(pattern.Rank, pattern.R, pattern.C, values.Sum(e => e.Sum), values.Count);
-                })
+                .Select(group => new AValue(rank, AValue.RowFromKey(group.Key), AValue.ColumnFromKey(group.Key), group.AsParallel().Sum(e => e.Sum), group.Count()))
                 .ToList();
+            Debug.WriteLine(result.Count);
+            //List<ulong> keys = result.Select(v => (ulong)v.R << 32 | (uint)v.C).Distinct().OrderBy(v => v).ToList();
             DB.InsertAll(result);
             return result.Count;
         }
@@ -474,8 +470,8 @@ namespace NLDB
         //--------------------------------------------------------------------------------------------
         private DataBase DB { get; }
         private readonly string dbpath;
-        private const int SIMILARITY_CALC_STEP = 1 << 19;   //Оптимальный шаг для отношения Производительность/Память примерно 262 144
-        private const int DISTANCES_CALC_STEP = 1 << 12;     //Оптимальный шаг для вычисления матрицы расстояний примерно 1024
+        private const int SIMILARITY_CALC_STEP = 1 << 20;   //Оптимальный шаг для отношения Производительность/Память примерно 262 144
+        private const int DISTANCES_CALC_STEP = 1 << 20;     //Оптимальный шаг для вычисления матрицы расстояний примерно 1024
         private const int TEXT_BUFFER_SIZE = 1 << 28;
     }
 }

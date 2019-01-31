@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.Data.SQLite;
 using System.Linq;
 using System.Threading.Tasks;
@@ -58,7 +57,7 @@ namespace NLDB.DAL
         //---------------------------------------------------------------------------------------------------------
         public void Create()
         {
-            SQLiteCommand cmd = db.CreateCommand();
+            var cmd = db.CreateCommand();
             cmd.CommandText =
                 "DROP TABLE IF EXISTS Splitters;" +
                 "DROP TABLE IF EXISTS Words;" +
@@ -157,7 +156,7 @@ namespace NLDB.DAL
             List<Splitter> result = new List<Splitter>();
             using (SQLiteCommand cmd = new SQLiteCommand("SELECT * FROM Splitters ORDER BY Rank;", db))
             {
-                SQLiteDataReader reader = cmd.ExecuteReader();
+                var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     result.Add(new Splitter(reader.GetInt32(0), reader.GetString(1)));
             }
@@ -183,7 +182,7 @@ namespace NLDB.DAL
             string text = "INSERT INTO Parents(WordId, ParentId) VALUES (@w,@p);";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
             {
-                foreach (Parent p in parents)
+                foreach (var p in parents)
                 {
                     cmd.Parameters.AddWithValue("@w", p.WordId);
                     cmd.Parameters.AddWithValue("@p", p.ParentId);
@@ -200,7 +199,7 @@ namespace NLDB.DAL
             List<Word> result = new List<Word>();
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words WHERE {where};", db))
             {
-                SQLiteDataReader reader = cmd.ExecuteReader();
+                var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     result.Add(new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3)));
             }
@@ -212,7 +211,7 @@ namespace NLDB.DAL
             if (GetFromCash(id, out Word word)) return word;
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words WHERE Id={id};", db))
             {
-                SQLiteDataReader reader = cmd.ExecuteReader();
+                var reader = cmd.ExecuteReader();
                 if (reader.Read())
                     word = new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3));
             }
@@ -238,7 +237,7 @@ namespace NLDB.DAL
             string text = "INSERT INTO Words(Id, Rank, Symbol, Childs) VALUES (@a,@b,@c,@d);";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
             {
-                foreach (Word w in words)
+                foreach (var w in words)
                 {
                     cmd.Parameters.AddWithValue("@a", w.Id);
                     cmd.Parameters.AddWithValue("@b", w.Rank);
@@ -253,7 +252,7 @@ namespace NLDB.DAL
         {
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words WHERE Childs='{childs}' LIMIT 1", db))
             {
-                SQLiteDataReader reader = cmd.ExecuteReader();
+                var reader = cmd.ExecuteReader();
                 if (reader.Read())
                 {
                     return new Word()
@@ -274,7 +273,7 @@ namespace NLDB.DAL
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words WHERE Symbol=@s LIMIT 1", db))
             {
                 cmd.Parameters.AddWithValue("@s", s);
-                SQLiteDataReader reader = cmd.ExecuteReader();
+                var reader = cmd.ExecuteReader();
                 if (reader.Read())
                 {
                     word = new Word()
@@ -302,7 +301,7 @@ namespace NLDB.DAL
                 $"SELECT DISTINCT  Words.Id, Words.Rank, Words.Symbol, Words.Childs, Parents.WordId FROM Words " +
                 $"INNER JOIN Parents ON Words.Id=Parents.ParentId WHERE Parents.WordId={wordId};", db))
             {
-                SQLiteDataReader reader = cmd.ExecuteReader();
+                var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     result.Add(new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3)));
                 AddToCash(wordId, result);
@@ -314,7 +313,7 @@ namespace NLDB.DAL
         {
             List<Word> result = new List<Word>();
             //Фильтруем список id, оставляя только те, которых нет в кэше
-            var ids = wordsId.Where(i =>
+            List<int> ids = wordsId.Where(i =>
             {
                 if (GetFromCash(i, out List<Word> parents))
                 {
@@ -325,19 +324,19 @@ namespace NLDB.DAL
                     return true;
             }).ToList();
             if (ids.Count == 0) return result;
-            var cash = new Dictionary<int, List<Word>>();
+            Dictionary<int, List<Word>> cash = new Dictionary<int, List<Word>>();
             string id_string = string.Join(",", ids);
             using (SQLiteCommand cmd = new SQLiteCommand(
                 $"SELECT DISTINCT Words.Id, Words.Rank, Words.Symbol, Words.Childs, Parents.WordId FROM Words " +
                 $"INNER JOIN Parents ON Words.Id=Parents.ParentId WHERE Parents.WordId IN ({id_string});", db))
             {
-                SQLiteDataReader reader = cmd.ExecuteReader();
+                var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
                     int id = reader.GetInt32(4);
-                    var w = new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3));
+                    Word w = new Word(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3));
                     result.Add(w);
-                    if (!cash.TryGetValue(id, out List<Word> plist))
+                    if (!cash.TryGetValue(id, out var plist))
                     {
                         plist = new List<Word>();
                         cash[id] = plist;
@@ -367,8 +366,8 @@ namespace NLDB.DAL
             if (GetFromCash(row, column, out AValue value)) return value;
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT Row, Column, Count, Sum FROM MatrixA WHERE Row={row} AND Column={column} LIMIT 1", db))
             {
-                DbDataReader reader = await cmd.ExecuteReaderAsync();
-                if (!reader.Read()) return null;
+                var reader = await cmd.ExecuteReaderAsync();
+                if (!reader.Read()) return default;
                 value = new AValue()
                 {
                     Rank = rank,
@@ -384,9 +383,9 @@ namespace NLDB.DAL
 
         public async void SetAValue(int rank, int row, int column, int d)
         {
-            AValue value = GetAValue(row, column, rank).Result;
+            var value = GetAValue(row, column, rank).Result;
             string text;
-            if (value == null)
+            if (value.R == 0 && value.C == 0)
             {
                 value = new AValue(rank, row, column, d, 1);
                 text = $"INSERT INTO MatrixA(Row, Column, Count, Sum, Rank) SELECT {row}, {column}, 1, {d}, {rank};";
@@ -420,11 +419,11 @@ namespace NLDB.DAL
                 cmdUpdate.Parameters.Add("@c", System.Data.DbType.Int32);
                 cmdUpdate.Parameters.Add("@cnt", System.Data.DbType.Int32);
                 cmdUpdate.Parameters.Add("@sm", System.Data.DbType.Double);
-                foreach (AValue v in values)
+                foreach (var v in values)
                 {
                     //Поиск в БД значения соответствующего v
-                    AValue value = GetAValue(v.R, v.C, v.Rank).Result;
-                    if (value == null)
+                    var value = GetAValue(v.R, v.C, v.Rank).Result;
+                    if (value.R == 0 && value.C == 0)
                     {
                         value = v;
                         cmdInsert.Parameters["@rnk"].Value = value.Rank;
@@ -444,7 +443,7 @@ namespace NLDB.DAL
                         cmdUpdate.Parameters["@sm"].Value = value.Sum;
                         await cmdUpdate.ExecuteNonQueryAsync();
                     }
-                    //AddToCash(value);
+                    AddToCash(value);
                 }
             }
         }
@@ -464,14 +463,14 @@ namespace NLDB.DAL
                           $"WHERE {from}<=Row AND Row<{to} AND Rank={rank} ";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
             {
-                SQLiteDataReader reader = cmd.ExecuteReader();
+                var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
                     int r = reader.GetInt32(0);
                     int c = reader.GetInt32(1);
                     double sum = reader.GetDouble(2);
                     int count = reader.GetInt32(3);
-                    if (!rows.TryGetValue(r, out VectorDictionary row))
+                    if (!rows.TryGetValue(r, out var row))
                     {
                         row = new VectorDictionary();
                         rows[r] = row;
@@ -491,11 +490,11 @@ namespace NLDB.DAL
                           $"WHERE Row IN ({rows_ids});";
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
             {
-                SQLiteDataReader reader = cmd.ExecuteReader();
+                var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
                     AValue value = new AValue(rank: rank, row: reader.GetInt32(0), column: reader.GetInt32(1), sum: reader.GetDouble(2), count: reader.GetInt32(3));
-                    if (!rows.TryGetValue(value.R, out VectorDictionary row))
+                    if (!rows.TryGetValue(value.R, out var row))
                     {
                         row = new VectorDictionary();
                         rows[value.R] = row;
@@ -522,7 +521,7 @@ namespace NLDB.DAL
             m = new List<Tuple<int, int, double>>();
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
             {
-                SQLiteDataReader reader = cmd.ExecuteReader();
+                var reader = cmd.ExecuteReader();
                 int rowsCount = 0;
                 int columnsCount = 0;
                 while (reader.Read())
@@ -555,7 +554,7 @@ namespace NLDB.DAL
             if (GetFromCash(row, column, out BValue value)) return value;
             using (SQLiteCommand cmd = new SQLiteCommand($"SELECT Row, Column, Similarity, Rank FROM MatrixB WHERE Row={row} AND Column={column} LIMIT 1", db))
             {
-                DbDataReader reader = await cmd.ExecuteReaderAsync();
+                var reader = await cmd.ExecuteReaderAsync();
                 if (!reader.Read()) return null;
                 return new BValue(rank, row, column, reader.GetInt32(2));
             }
@@ -580,7 +579,7 @@ namespace NLDB.DAL
                 cmd.Parameters.Add("@c", System.Data.DbType.Int32);
                 cmd.Parameters.Add("@s", System.Data.DbType.Double);
                 cmd.Parameters.Add("@rnk", System.Data.DbType.Int32);
-                foreach (BValue v in values)
+                foreach (var v in values)
                 {
                     cmd.Parameters["@rnk"].Value = v.Rank;
                     cmd.Parameters["@r"].Value = v.R;
@@ -602,7 +601,7 @@ namespace NLDB.DAL
                 cmd.Parameters.Add("@c", System.Data.DbType.Int32);
                 cmd.Parameters.Add("@s", System.Data.DbType.Double);
                 cmd.Parameters.Add("@rnk", System.Data.DbType.Int32);
-                foreach (Tuple<int, int, double> v in values)
+                foreach (var v in values)
                 {
                     cmd.Parameters["@rnk"].Value = rank;
                     cmd.Parameters["@r"].Value = v.Item1;
@@ -621,7 +620,7 @@ namespace NLDB.DAL
             m = new List<Tuple<int, int, double>>();
             using (SQLiteCommand cmd = new SQLiteCommand(text, db))
             {
-                SQLiteDataReader reader = cmd.ExecuteReader();
+                var reader = cmd.ExecuteReader();
                 int rowsCount = 0;
                 int columnsCount = 0;
                 while (reader.Read())
@@ -760,7 +759,7 @@ namespace NLDB.DAL
 
         private void AddToCash(AValue value)
         {
-            if (value == null) return;
+            if (value.R == 0 && value.C == 0) return;
             long key = (((long)value.R) << 32) | (uint)value.C;
             if (matrixACash.Count > MATRIXA_CASH_SIZE)
                 RemoveFromCash(matrixACash, 2);
@@ -820,14 +819,14 @@ namespace NLDB.DAL
         {
             int current = 0;
             while (current < count && cash.Count > 0)
-                current += cash.TryRemove(cash.First().Key, out AValue value) ? 1 : 0;
+                current += cash.TryRemove(cash.First().Key, out var value) ? 1 : 0;
         }
 
         private void RemoveFromCash(ConcurrentDictionary<long, BValue> cash, int count)
         {
             int current = 0;
             while (current < count && cash.Count > 0)
-                current += cash.TryRemove(cash.First().Key, out BValue value) ? 1 : 0;
+                current += cash.TryRemove(cash.First().Key, out var value) ? 1 : 0;
         }
 
         #region IDisposable Support
