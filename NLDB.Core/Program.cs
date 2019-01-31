@@ -10,7 +10,7 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
-            string filename = "full.txt";
+            string filename = "1200kb.txt";
             string trainfile = @"D:\Data\Wiki\ru\" + filename;
             string dbpath = @"D:\Data\Result\" + Path.ChangeExtension(filename, "db");
             Engine engine = new Engine(dbpath, ExecuteMode.Verbose);
@@ -26,10 +26,10 @@ namespace NLDB
             //   .Then(OperationType.FileWriting, Path.ChangeExtension(dbpath, "norm"))
             //   .Then(OperationType.TextSplitting, engine.Data)
             //   .Then(OperationType.WordsExtraction, engine.Data);
-            //engine.Clear("MatrixA");
-            //engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
-            //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
-            //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
+            engine.Clear("MatrixA");
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
             //engine.Clear("MatrixB");
             //engine.Execute(OperationType.SimilarityCalculation, 0);
             //engine.Execute(OperationType.SimilarityCalculation, 1, 0);

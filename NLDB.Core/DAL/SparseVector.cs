@@ -164,7 +164,7 @@ namespace NLDB.DAL
         {
             double d = NormL2();
             if (d == 0)
-                values.ForEach(x => x.V = 0);
+                values.AsParallel().ForAll(x => x.V = 0);
             else
                 values.AsParallel().ForAll(x => x.V /= d);
             ResetProperties();

@@ -165,24 +165,30 @@ namespace NLDB
             if (maxCount == 0) return new CalculationResult(this, OperationType.DistancesCalculation, ResultType.Error);
             using (ProgressInformer informer = new ProgressInformer($"Матрица расстояний:", maxCount, measurment: $"слов р{words.First().Rank - 1}", barSize: 64))
             {
-                int step = Math.Max(1, maxCount / DISTANCES_CALC_STEP);
+                var sw = new Stopwatch();
+                sw.Start();
+                int step = Math.Max(1, DISTANCES_CALC_STEP);
                 for (int j = 0; j <= maxCount / step; j++)
                 {
                     DB.BeginTransaction();
                     int from = j * step;    //левый индекс диапазона
-                    informer.Set(from + step);
+                    int to = Math.Min(from + step, maxCount);
+                    informer.Set(to);
                     IEnumerable<Word> wordsPacket = words.Skip(from).Take(step).ToList();
-                    PositionsMean(wordsPacket);
+                    //PositionsMean(wordsPacket);
+                    ContextMatrix(wordsPacket);
                     DB.Commit();
                 }
                 informer.Set(maxCount);
+                sw.Stop();
+                Debug.WriteLine(sw.Elapsed.TotalSeconds);
             }
             Data = null;
             return new CalculationResult(this, OperationType.DistancesCalculation, ResultType.Success);
         }
 
         //Вычисляет матожидание вектора расстояний для каждого из слов words
-        private void PositionsMean(IEnumerable<Word> words)
+        private int PositionsMean(IEnumerable<Word> words)
         {
             int wordsCount = words.Count();
             ConcurrentDictionary<int, Dictionary<int, AValue>> result = new ConcurrentDictionary<int, Dictionary<int, AValue>>(4, wordsCount);
@@ -210,9 +216,41 @@ namespace NLDB
                     if (row.Count > 0) result[i] = row;
                 });
             }
-            if (result.Count == 0) return;
+            if (result.Count == 0) return 0;
             //Сброс данных в БД
             result.Values.ToList().ForEach(r => DB.InsertAll(r.Values));
+            return result.Count;
+        }
+
+        private int ContextMatrix(IEnumerable<Word> words)
+        {
+            var result = words
+                .AsParallel()
+                .SelectMany(w =>
+                {
+                    int[] childs = w.ChildsId;
+                    return childs
+                        .SelectMany((a, i) => childs.Select((b, j) => new AValue(w.Rank - 1, a, b, j - i, 1)))
+                        .GroupBy(v => (ulong)v.R << 32 | (uint)v.C)
+                        .Select(group =>
+                        {
+                            var pattern = group.First();
+                            var values = group.ToList();
+                            return new AValue(pattern.Rank, pattern.R, pattern.C, values.Sum(e => e.Sum), values.Count);
+                        });
+                })
+                .AsParallel()
+                .GroupBy(w => (ulong)w.R << 32 | (uint)w.C)
+                .AsParallel()
+                .Select(group =>
+                {
+                    var pattern = group.First();
+                    var values = group.ToList();
+                    return new AValue(pattern.Rank, pattern.R, pattern.C, values.Sum(e => e.Sum), values.Count);
+                })
+                .ToList();
+            DB.InsertAll(result);
+            return result.Count;
         }
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -437,7 +475,7 @@ namespace NLDB
         private DataBase DB { get; }
         private readonly string dbpath;
         private const int SIMILARITY_CALC_STEP = 1 << 19;   //Оптимальный шаг для отношения Производительность/Память примерно 262 144
-        private const int DISTANCES_CALC_STEP = 1 << 8;     //Оптимальный шаг для вычисления матрицы расстояний примерно 1024
+        private const int DISTANCES_CALC_STEP = 1 << 12;     //Оптимальный шаг для вычисления матрицы расстояний примерно 1024
         private const int TEXT_BUFFER_SIZE = 1 << 28;
     }
 }
