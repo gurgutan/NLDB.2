@@ -369,7 +369,7 @@ namespace NLDB.DAL
             {
                 DbDataReader reader = await cmd.ExecuteReaderAsync();
                 if (!reader.Read()) return null;
-                return new AValue()
+                value = new AValue()
                 {
                     Rank = rank,
                     R = row,
@@ -377,6 +377,8 @@ namespace NLDB.DAL
                     Count = reader.GetInt32(2),
                     Sum = reader.GetDouble(3)
                 };
+                AddToCash(value);
+                return value;
             }
         }
 
