@@ -42,7 +42,7 @@ namespace NLDB
         /// <param name="a">терм</param>
         /// <param name="b">терм</param>
         /// <returns>оценка схожести из интервала [0,1], где 0 - не похожи, 1 - максимально похожи</returns>
-        private static float Inclusive(DAL.Term a, DAL.Term b)
+        private static float Overlapping(DAL.Term a, DAL.Term b)
         {
             int count = a.Childs.Sum(c => b.Contains(c) ? 1 : 0);
             return count / a.Count;
@@ -54,7 +54,7 @@ namespace NLDB
         /// <param name="a"></param>
         /// <param name="b"></param>
         /// <returns></returns>
-        private static float Inclusive(int[] a, int[] b)
+        private static float Overlapping(int[] a, int[] b)
         {
             int count = a.Sum(c => b.Contains(c) ? 1 : 0);
             return count / a.Length;
@@ -67,13 +67,13 @@ namespace NLDB
         /// <param name="a"></param>
         /// <param name="b"></param>
         /// <returns></returns>
-        private static float SoftInclusive(DAL.Term a, DAL.Term b)
+        private static float SoftOverlapping(DAL.Term a, DAL.Term b)
         {
             float count = a.Childs.Sum(c => b.Childs.Max(bc => Confidence.Compare(bc, c)));
             return count / a.Count;
         }
 
-        private static float SoftInclusive(int[] a, int[] b)
+        private static float SoftOverlapping(int[] a, int[] b)
         {
             float count = a.Sum(c => b.Max(bc => Confidence.Compare(bc, c)));
             return count / a.Length;
@@ -204,9 +204,9 @@ namespace NLDB
         {
             Confidence.Equality,        //для букв
             Confidence.Cosine,          //для слов
-            Confidence.SoftInclusive,   //для предложений
-            Confidence.SoftInclusive,   //для параграфов
-            Confidence.SoftInclusive    //зарезервивровано
+            Confidence.SoftOverlapping,   //для предложений
+            Confidence.SoftOverlapping,   //для параграфов
+            Confidence.SoftOverlapping    //зарезервивровано
         };
 
     }
