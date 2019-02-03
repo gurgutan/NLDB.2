@@ -1,6 +1,6 @@
 ﻿namespace NLDB.DAL
 {
-    public struct AValue
+    public class AValue
     {
         public int Rank { get; set; }
 
@@ -24,6 +24,8 @@
         {
             return (int)(key & 0xFFFFFFFF);
         }
+
+        public AValue() { }
 
         public AValue(int rank, int row, int column, double sum, int count)
         {

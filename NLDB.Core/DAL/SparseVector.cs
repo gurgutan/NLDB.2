@@ -8,45 +8,44 @@ namespace NLDB.DAL
     public class IndexedValue : IEquatable<IndexedValue>,IComparable<IndexedValue>
     {
         public readonly int Index;
-        public double V;
+        public double Value;
 
         public IndexedValue(int index, double value)
         {
             Index = index;
-            V = value;
+            Value = value;
         }
 
         public override bool Equals(object obj)
         {
-            var value = obj as IndexedValue;
-            return value != null &&
+            return obj is IndexedValue value &&
                    Index == value.Index &&
-                   V == value.V;
+                   Value == value.Value;
         }
 
         public bool Equals(IndexedValue other)
         {
             return other != null &&
                    Index == other.Index &&
-                   V == other.V;
+                   Value == other.Value;
         }
 
         public override int GetHashCode()
         {
             var hashCode = 1405935468;
             hashCode = hashCode * -1521134295 + Index.GetHashCode();
-            hashCode = hashCode * -1521134295 + V.GetHashCode();
+            hashCode = hashCode * -1521134295 + Value.GetHashCode();
             return hashCode;
         }
 
         public override string ToString()
         {
-            return $"{Index}:{V}";
+            return $"{Index}:{Value}";
         }
 
         int IComparable<IndexedValue>.CompareTo(IndexedValue other)
         {
-            return Math.Sign(this.V - other.V);
+            return Math.Sign(Value - other.Value);
         }
     }
 
@@ -99,19 +98,19 @@ namespace NLDB.DAL
 
         public double NormL1()
         {
-            if (normL1 == null) normL1 = values.AsParallel().Sum(e => Math.Abs(e.V));
+            if (normL1 == null) normL1 = values.AsParallel().Sum(e => Math.Abs(e.Value));
             return (double)normL1;
         }
 
         public double NormL2()
         {
-            if (normL2 == null) normL2 = Math.Sqrt(values.AsParallel().Sum(e => e.V * e.V));
+            if (normL2 == null) normL2 = Math.Sqrt(values.AsParallel().Sum(e => e.Value * e.Value));
             return (double)normL2;
         }
 
         public double SquareNormL2()
         {
-            return values.AsParallel().Sum(e => e.V * e.V);
+            return values.AsParallel().Sum(e => e.Value * e.Value);
         }
 
         public double Mean()
@@ -123,7 +122,7 @@ namespace NLDB.DAL
 
         public double Sum()
         {
-            return values.AsParallel().Sum(e => e.V);
+            return values.AsParallel().Sum(e => e.Value);
         }
 
         public double Dispersion()
@@ -146,7 +145,7 @@ namespace NLDB.DAL
         public SparseVector BuildCentered()
         {
             double mx = Mean();
-            return new SparseVector(values.AsParallel().Select(v => Tuple.Create(v.Index, v.V - mx)));
+            return new SparseVector(values.AsParallel().Select(v => Tuple.Create(v.Index, v.Value - mx)));
         }
 
         //-------------------------------------------------------------------------------------------------
@@ -155,7 +154,7 @@ namespace NLDB.DAL
         public void Center()
         {
             double mx = Mean();
-            values.AsParallel().ForAll(x => x.V -= mx);
+            values.AsParallel().ForAll(x => x.Value -= mx);
             ResetProperties();
             //mean = 0;
         }
@@ -164,9 +163,9 @@ namespace NLDB.DAL
         {
             double d = NormL2();
             if (d == 0)
-                values.AsParallel().ForAll(x => x.V = 0);
+                values.AsParallel().ForAll(x => x.Value = 0);
             else
-                values.AsParallel().ForAll(x => x.V /= d);
+                values.AsParallel().ForAll(x => x.Value /= d);
             ResetProperties();
         }
 
@@ -177,7 +176,7 @@ namespace NLDB.DAL
         /// <param name="right">правая граница диапазона</param>
         public int RemoveValuesFromRange(double left, double right)
         {
-            int count = values.RemoveAll(e => e.V >= left && e.V <= right);
+            int count = values.RemoveAll(e => e.Value >= left && e.Value <= right);
             ResetProperties();
             return count;
         }
@@ -192,7 +191,7 @@ namespace NLDB.DAL
             get
             {
                 int index = values.BinarySearch(new IndexedValue(i, 0), new ItemIndexComparer());
-                if (index >= 0) return values[i].V;
+                if (index >= 0) return values[i].Value;
                 else
                     return 0;
             }
@@ -200,7 +199,7 @@ namespace NLDB.DAL
 
         public IEnumerable<Tuple<int, double>> EnumerateIndexed()
         {
-            return values.Select(t => Tuple.Create(t.Index, t.V));
+            return values.Select(t => Tuple.Create(t.Index, t.Value));
         }
 
         public IEnumerator<IndexedValue> GetEnumerator()
@@ -255,7 +254,7 @@ namespace NLDB.DAL
                 IndexedValue b = b_enumerator.Current;
                 if (a.Index == b.Index)
                 {
-                    result += a.V * b.V;
+                    result += a.Value * b.Value;
                     end = !(a_enumerator.MoveNext() && b_enumerator.MoveNext());
                 }
                 else if (a.Index < b.Index)

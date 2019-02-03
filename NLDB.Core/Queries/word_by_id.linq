@@ -17,9 +17,9 @@ void Main()
 {
 	var s = MatrixBs
 	.Take(1000)
-	.Where(v=>v.Rank==0 /*&& Math.Abs(v.Row-v.Column)>8000*/ && v.Similarity*5>4)
+	.Where(v=>v.Rank==2 && Math.Abs(v.Row-v.Column)>0 && v.Similarity>1/2)
 	.OrderByDescending(v=>v.Similarity)
-	.Take(100)
+	.Take(1000)
 	.Select(v=>new { v.Row, слово1=StringView(v.Row), v.Column, слово2=StringView(v.Column), совместность=v.Similarity })
 	.ToList();
 	s.Dump();
@@ -27,12 +27,14 @@ void Main()
 
 string StringView(int id)
 {
+	var wr = Words.First(w=>w.Id==id);
+	if(wr.Rank==0) return wr.Symbol;
 	return string.Join("", 
 		Words
 		.First(w=>w.Id==id)
 		.Childs
 		.Split(',')
-		.Select(c=>int.Parse(c))
+		.Select(c=>{ int s=0; if(int.TryParse(c,out s)) return s; else return 0; })
 		.Select(ci=>
 			{ 
 			var w = Words.First(cw=>cw.Id==ci);

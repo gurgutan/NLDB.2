@@ -19,7 +19,7 @@
   <Namespace>System.Linq</Namespace>
 </Query>
 
-select MatrixA.Row, Words1.Symbol, MatrixA.Column, Words2.Symbol, MatrixA.Sum/MatrixA.Count as avgsum from MatrixA 
+select Words1.Symbol, Words2.Symbol, MatrixA.Sum/MatrixA.Count as avgsum from MatrixA 
 Left join Words Words1 ON MatrixA.Row=Words1.Id 
 left join Words Words2 ON MatrixA.Column=Words2.Id
-order by MatrixA.Row, avgsum desc;
+order by Words1.Symbol, avgsum desc;

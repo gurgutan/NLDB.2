@@ -104,9 +104,13 @@ namespace NLDB.Utils
             if (!IsTimeToShow(alwaysShow)) return;
             lock (ConsoleWriterLock)
             {
-                double percents = Math.Truncate(100.0 / Max * Current);
+                double percents = 100;
+                if (Max != 0)
+                    percents = Math.Truncate(100.0 / Max * Current);
                 //int parts = (int)((percents - Math.Truncate(percents)) * this.animationChars.Length);
-                int barPos = (int)(BarSize / (double)Max * Current);
+                int barPos = 0;
+                if (Max != 0)
+                    barPos = (int)(BarSize / (double)Max * Current);
                 animateFrame++;
                 StringBuilder strBuilder = new StringBuilder();
                 if (barPos > 0)

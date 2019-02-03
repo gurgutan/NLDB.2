@@ -127,10 +127,10 @@ namespace NLDB.DAL
                 //foreach (var r in rows)
                 {
                     List<Tuple<int, double>> tuples = new List<Tuple<int, double>>();
-                    foreach (IndexedVector c in rows)
+                    foreach (var c in rows)
                     {
-                        SparseVector x = r.V;
-                        SparseVector y = c.V;
+                        var x = r.V;
+                        var y = c.V;
                         if (x.Count > 0 && y.Count > 0)
                         {
                             double cxy = x * y;
@@ -193,7 +193,7 @@ namespace NLDB.DAL
             Parallel.ForEach(a.Rows, (r) =>
             {
                 List<Tuple<int, double>> tuples = new List<Tuple<int, double>>();
-                foreach (IndexedVector c in b.Rows)
+                foreach (var c in b.Rows)
                 {
                     if (c == r)
                         tuples.Add(Tuple.Create(c.Index, 1.0));
@@ -211,19 +211,28 @@ namespace NLDB.DAL
             return new SparseMatrix(indexedVectors);
         }
 
-        public static SparseMatrix Covariation(SparseMatrix a, SparseMatrix b, double zeroingRadius = 0)
+        public static SparseMatrix Covariation(SparseMatrix a, SparseMatrix b, double pruneValue = 0)
         {
-            if (zeroingRadius < 0) zeroingRadius = -zeroingRadius;
-            var tuples = a.SelectMany(r => b.Select(c => (r, c)))
+            if (pruneValue < 0) pruneValue = -pruneValue;
+            List<(int, int, double)> tuples = a
                 .AsParallel()
+                .SelectMany(r => b.Select(c => (r, c)))
                 .Select(t =>
-                {
-                    if (t.r.V.Count > 0 && t.c.V.Count > 0)
-                        return (t.r.Index, t.c.Index, t.r.V * t.c.V);
-                    else
-                        return (t.r.Index, t.c.Index, 0);
-                })
-                .Where(t => t.Item3 > zeroingRadius || t.Item3 < -zeroingRadius);
+                 {
+                     if (t.r.Index == t.c.Index)
+                     {
+                         return (t.r.Index, t.c.Index, t.r.V.SquareNormL2());
+                     }
+                     else if (t.r.V.Count > 0 && t.c.V.Count > 0)
+                     {
+                         double dot = t.r.V * t.c.V;
+                         return (t.r.Index, t.c.Index, dot);
+                     }
+                     else
+                         return (t.r.Index, t.c.Index, 0);
+                 })
+            .Where(t => t.Item3 > pruneValue || t.Item3 < -pruneValue)
+            .ToList();
             return new SparseMatrix(tuples);
         }
 

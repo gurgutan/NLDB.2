@@ -1,11 +1,11 @@
 <Query Kind="SQL">
   <Connection>
-    <ID>0889947e-f13f-490f-b1c1-63789e168985</ID>
+    <ID>18fe903e-7abc-4322-bec1-63b4ae725e8b</ID>
     <Persist>true</Persist>
     <Driver Assembly="IQDriver" PublicKeyToken="5b59726538a49684">IQDriver.IQDriver</Driver>
     <Provider>System.Data.SQLite</Provider>
-    <CustomCxString>Data Source=D:\Data\Result\5mb.db;FailIfMissing=True</CustomCxString>
-    <AttachFileName>D:\Data\Result\5mb.db</AttachFileName>
+    <CustomCxString>Data Source=D:\Data\Result\1mb.db;FailIfMissing=True</CustomCxString>
+    <AttachFileName>D:\Data\Result\1mb.db</AttachFileName>
     <DriverData>
       <StripUnderscores>false</StripUnderscores>
       <QuietenAllCaps>false</QuietenAllCaps>

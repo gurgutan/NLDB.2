@@ -23,10 +23,10 @@ namespace NLDB.DAL
         private Dictionary<int, Word> wordsCash = new Dictionary<int, Word>(WORDS_CASH_SIZE);
         private Dictionary<string, Word> symbolsCash = new Dictionary<string, Word>(SYMBOLS_CASH_SIZE);
 
-        private const int PARENTS_CASH_SIZE = 1 << 20;
+        private const int PARENTS_CASH_SIZE = 1 << 18;
         private const int SPARSEMATRIX_CASH_SIZE = 1 << 10;
-        private const int MATRIXA_CASH_SIZE = 1 << 20;
-        private const int MATRIXB_CASH_SIZE = 1 << 20;
+        private const int MATRIXA_CASH_SIZE = 1 << 18;
+        private const int MATRIXB_CASH_SIZE = 1 << 18;
         private const int TERMS_CASH_SIZE = 1 << 20;
         private const int WORDS_CASH_SIZE = 1 << 20;
         private const int SYMBOLS_CASH_SIZE = 1 << 10;
@@ -385,7 +385,7 @@ namespace NLDB.DAL
         {
             var value = GetAValue(row, column, rank).Result;
             string text;
-            if (value.R == 0 && value.C == 0)
+            if (value == null)
             {
                 value = new AValue(rank, row, column, d, 1);
                 text = $"INSERT INTO MatrixA(Row, Column, Count, Sum, Rank) SELECT {row}, {column}, 1, {d}, {rank};";
@@ -423,7 +423,7 @@ namespace NLDB.DAL
                 {
                     //Поиск в БД значения соответствующего v
                     var value = GetAValue(v.R, v.C, v.Rank).Result;
-                    if (value.R == 0 && value.C == 0)
+                    if (value == null)
                     {
                         value = v;
                         cmdInsert.Parameters["@rnk"].Value = value.Rank;
@@ -443,7 +443,7 @@ namespace NLDB.DAL
                         cmdUpdate.Parameters["@sm"].Value = value.Sum;
                         await cmdUpdate.ExecuteNonQueryAsync();
                     }
-                    AddToCash(value);
+                    //AddToCash(value);
                 }
             }
         }
@@ -534,7 +534,7 @@ namespace NLDB.DAL
                     if (r > rowsCount) rowsCount = r;
                     if (c > columnsCount) columnsCount = c;
                 }
-                return Tuple.Create(rowsCount, columnsCount);
+                return Tuple.Create(rowsCount + 1, columnsCount + 1);
             }
         }
 
@@ -759,7 +759,7 @@ namespace NLDB.DAL
 
         private void AddToCash(AValue value)
         {
-            if (value.R == 0 && value.C == 0) return;
+            if (value == null) return;
             long key = (((long)value.R) << 32) | (uint)value.C;
             if (matrixACash.Count > MATRIXA_CASH_SIZE)
                 RemoveFromCash(matrixACash, 2);
