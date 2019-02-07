@@ -17,7 +17,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NLDB.Core", "NLDB.Core\NLDB.Core.csproj", "{58AA6313-E922-46B9-803D-20EAB977867E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NLDB.Core", "NLDB.Core\NLDB.Core.csproj", "{58AA6313-E922-46B9-803D-20EAB977867E}"
+EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "nldbscripts", "nldbscripts\nldbscripts.pyproj", "{D24DF220-CC64-4AE8-8A27-5F5F2EE04E1E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -77,6 +79,12 @@ Global
 		{58AA6313-E922-46B9-803D-20EAB977867E}.Release|x64.Build.0 = Release|Any CPU
 		{58AA6313-E922-46B9-803D-20EAB977867E}.Release|x86.ActiveCfg = Release|Any CPU
 		{58AA6313-E922-46B9-803D-20EAB977867E}.Release|x86.Build.0 = Release|Any CPU
+		{D24DF220-CC64-4AE8-8A27-5F5F2EE04E1E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D24DF220-CC64-4AE8-8A27-5F5F2EE04E1E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D24DF220-CC64-4AE8-8A27-5F5F2EE04E1E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D24DF220-CC64-4AE8-8A27-5F5F2EE04E1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D24DF220-CC64-4AE8-8A27-5F5F2EE04E1E}.Release|x64.ActiveCfg = Release|Any CPU
+		{D24DF220-CC64-4AE8-8A27-5F5F2EE04E1E}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
