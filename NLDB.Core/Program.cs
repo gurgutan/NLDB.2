@@ -10,10 +10,12 @@ namespace NLDB
 
         private static void Main(string[] args)
         {
+            string path = "/mnt/1C82D43582D414DC/Data/Result/5mb.db";
+
             string filename = "5mb.txt";
             string trainfile = @"D:\Data\Wiki\ru\" + filename;
             string dbpath = @"D:\Data\Result\" + Path.ChangeExtension(filename, "db");
-            Engine engine = new Engine(dbpath, ExecuteMode.Verbose);
+            Engine engine = new Engine(path, ExecuteMode.Verbose);
 
             //engine.Create();
             //engine.Insert(new Splitter(0, ""));
@@ -46,7 +48,7 @@ namespace NLDB
                 if (line == "") continue;
                 var terms = engine.Similars(line, 1, 8);
                 Console.WriteLine(string.Join("\n", terms.Select(t => "[" + t.confidence.ToString("F4") + "] " + t.ToString())));
-                var nearest = terms.SelectMany(t=>engine.Nearest(terms.First(), 4)).Distinct().ToList();
+                var nearest = terms.SelectMany(t => engine.Nearest(terms.First(), 4)).Distinct().ToList();
                 Console.WriteLine("\nСовместные:\n" + nearest.Aggregate("", (c, n) => c + $"\n" + "[" + n.confidence.ToString("F4") + "] " + n.ToString()));
             }
             Console.WriteLine("\n\nНажмите любую клавишу для продолжения");
