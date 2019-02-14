@@ -1,11 +1,24 @@
 import dbtransform
-import dbcalc
+import nldb
 
-dbpath = '/home/ivan/dev/Data/Result/884mb.db'
-dst_dbpath = '/home/ivan/dev/Data/Result/884.db'
+old_dbpath = 'D:/Data/Result/1200kb.db'#'/home/ivan/dev/Data/Result/884mb.db'
+db = 'D:/Data/Result/1200kb_clone.db'#'/home/ivan/dev/Data/Result/884.db'
 
-dbtransform.convert_words(dbpath, dst_dbpath)
-dbtransform.test_words(dst_dbpath)
-dbcalc.calc_mean(dst_dbpath, 0)
-dbcalc.calc_mean(dst_dbpath, 1)
-dbcalc.calc_mean(dst_dbpath, 2)
+#dbtransform.download_splitters(old_dbpath, db)
+#dbtransform.download_words(old_dbpath, db)
+
+engine = nldb.Calculations(db)
+
+#print('Вычисление calc_words_pos_mean(0)')
+#engine.calc_pos_mean(0)
+#print('Вычисление calc_words_pos_mean(1)')
+#engine.calc_pos_mean(1)
+#print('Вычисление calc_words_pos_mean(2)')
+#engine.calc_pos_mean(2)
+
+print('Вычисление calc_pos_cos_distance(0)')
+engine.calc_pos_cos_distance(0)
+print('Вычисление calc_pos_cos_distance(1)')
+engine.calc_pos_cos_distance(1)
+#print('Вычисление calc_pos_cos_distance(2)')
+#engine.calc_pos_cos_distance(2)
