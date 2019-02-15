@@ -3,8 +3,7 @@ import numpy as np
 import scipy.sparse as sparse
 from sklearn.metrics.pairwise import cosine_similarity
 import timeit
-
-#from scipy.spatial import distance
+import os
 
 
 class Calculations(object):
@@ -25,14 +24,19 @@ class Calculations(object):
         except:
             print('Не удалось закрыть соединение с БД ', self.dbpath)
 
+    def fname_mean(self, rank):
+        name, extension = os.path.splitext(self.dbpath)
+        return name+'_r'+str(rank)+'_mean.npz'
+
+    def fname_dist(self, rank):
+        name, extension = os.path.splitext(self.dbpath)
+        return name+'_r'+str(rank)+'_dist.npz'
+
     def dbget_words(self, rank):
         query = self.db.execute(
             'select Id, Childs from Words where Rank=?;', (rank,))
         data = [(r[0], np.frombuffer(r[1], dtype=np.int32)) for r in query]
         return data
-
-    def dbget_pos_mean(self, rank):
-        pass
 
     def calc_pos_mean(self, rank):
         """Расчет матрицы матожиданий взаимных расстояний для слов ранга rank"""
@@ -41,8 +45,7 @@ class Calculations(object):
             print("Параметр rank не может быть меньше 0")
             return
         # Пересоздаем таблицу для матрицы матожиданий
-        self.db.execute(
-            '''
+        self.db.execute('''
             CREATE TABLE IF NOT EXISTS MatrixM (
             [Row]    INTEGER NOT NULL,
             [Column] INTEGER NOT NULL,
@@ -57,61 +60,66 @@ class Calculations(object):
             print('Слов в БД не найдено')
             return
         # Определим размер результирующей матрицы - максимальны Id
-        n = max([w[1].max() for w in words])+1
+        n = max([w[1].max() for w in words]) + 1
         # Создаем вспомогательные матрицы для вычислений
         m_sum = sparse.lil_matrix((n, n), dtype=np.float32)
         m_count = sparse.lil_matrix((n, n), dtype=np.float32)
         words_count = len(words)
         timestart = timeit.default_timer()
         for idx, word in enumerate(words):
-            if(idx % 771 == 0):
+            if(idx % 1771 == 0):
                 print(idx, 'из', words_count)
             for i, row in enumerate(word[1]):
                 for j, column in enumerate(word[1]):
-                    m_sum[row, column] += j-i
+                    m_sum[row, column] += j - i
                     m_count[row, column] += 1
-        print("Время: ", timeit.default_timer()-timestart)
+        print("Время: ", timeit.default_timer() - timestart)
         print('Вычисление среднего')
         timestart = timeit.default_timer()
         # Вычисление среднего
         m_means = m_sum.tocsr(copy=False).multiply(
             m_count.tocsr(copy=False).power(-1, dtype=np.float32))
-        print("Время: ", timeit.default_timer()-timestart)
+        print("Время: ", timeit.default_timer() - timestart)
         # запись в БД
         timestart = timeit.default_timer()
         print("Сохранение...")
-        #means_tuples = sparse.find(m_means.tocoo())
-        sparse.save_npz('means_'+str(rank)+'.npz', m_means)
+        sparse.save_npz(self.fname_mean(rank), m_means)
+#        means_tuples = sparse.find(m_means.tocoo())
 #        for i in range(len(means_tuples[0])):
 #            self.db.execute(
-#                'INSERT OR REPLACE INTO MatrixM([Row], [Column], Mean, Rank) VALUES(?,?,?,?);',
-#                (int(means_tuples[0][i]), int(means_tuples[1][i]), int(means_tuples[2][i]), rank))
-        print("Время: ", timeit.default_timer()-timestart)
+#                'INSERT OR REPLACE INTO MatrixM([Row], [Column], Mean, Rank)
+#                VALUES(?,?,?,?);',
+#                (int(means_tuples[0][i]), int(means_tuples[1][i]),
+#                int(means_tuples[2][i]), rank))
+        print("Время: ", timeit.default_timer() - timestart)
         timestart = timeit.default_timer()
         # self.db.commit()
 
-    def calc_pos_cos_distance(self, rank):
+    def calc_pos_cos_similarity(self, rank):
         """Расчет матрицы косинусных расстояний контекстов"""
 
         print('Чтение данных')
-        m = sparse.load_npz('means_'+str(rank)+'.npz')
-        d_all = sparse.csr_matrix([0,0,0])
+        m = sparse.load_npz(self.fname_mean(rank))
+        result = sparse.csr_matrix([0])
         rows_count = m.shape[0]
-        stride = min(rows_count, 256)
-        steps_count = int(rows_count/stride)
+        batch_size = min(rows_count, 1 << 10)
+        batch_count = int(rows_count / batch_size)
         print('Вычисление расстояний')
-        for i in range(steps_count):
-            first = i*stride
-            last = min((i+1)*stride, rows_count)
+        for i in range(batch_count):
+            first = i * batch_size
+            last = min((i + 1) * batch_size, rows_count)
             d = cosine_similarity(m[first:last], dense_output=False)
-            segment_name = str(first) + '-'+str(last)
+            segment_name = str(first) + '-' + str(last)
             print(segment_name)
-            if(i==0):
-                d_all = d
+            if(i == 0):
+                result = d
             else:
-                d_all = sparse.bmat([[d_all],[d]])
-        print('Сохранение ', segment_name, '...')
-        sparse.save_npz('dist_'+str(rank)+'.npz', d_all)
+                result = sparse.bmat([[result], [d]])
+        print('Сохранение ', self.fname_dist(rank), '...')
+        sparse.save_npz(self.fname_dist(rank), result)
 
     def calc_word_memebership_cov(self, rank):
         pass
+    
+    
+    
