@@ -4,14 +4,17 @@ import re
 class Splitter(object):
     """Класс реализующий методы работы с исходным текстом"""
 
-    splitters = [r'[^а-яёА-ЯЁ\d\{\}\-]+', r'[\n\r\?\!\:\;]+', r'\[\[\d+\]\]']
-
     def __init__(self, splitters=None):
+        '''
+        splitters - список строк-разделителей в формате языка регулярных выражений
+        '''
         if splitters != None:
             self.splitters = splitters
+        else:
+            self.splitters = [r'[^а-яёА-ЯЁ\d\{\}\-]+', r'[\.\n\r\?\!\:\;]+', r'\[\[\d+\]\]']
         self._remove_pattern = re.compile(r'[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\*\+\-\&\\\/\%\$\^\[\]\{\}\=\<\>]')
         self.lower = True
-        self.patterns = [re.compile(x) for x in splitters]
+        self.patterns = [re.compile(x) for x in self.splitters]
 
     def length(self):
         return len(self.splitters)
