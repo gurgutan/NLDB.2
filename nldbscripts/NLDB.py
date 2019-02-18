@@ -45,15 +45,15 @@ class Calculations(object):
             print("Параметр rank не может быть меньше 0")
             return
         # Пересоздаем таблицу для матрицы матожиданий
-        self.db.execute('''
-            CREATE TABLE IF NOT EXISTS MatrixM (
-            [Row]    INTEGER NOT NULL,
-            [Column] INTEGER NOT NULL,
-            Mean     REAL NOT NULL,
-            Rank     INTEGER NOT NULL,
-            PRIMARY KEY ([Row], [Column]));
-            ''')
-        self.db.execute('delete from MatrixM where Rank=?', (rank,))
+#        self.db.execute('''
+#            CREATE TABLE IF NOT EXISTS MatrixM (
+#            [Row]    INTEGER NOT NULL,
+#            [Column] INTEGER NOT NULL,
+#            Mean     REAL NOT NULL,
+#            Rank     INTEGER NOT NULL,
+#            PRIMARY KEY ([Row], [Column]));
+#            ''')
+#        self.db.execute('delete from MatrixM where Rank=?', (rank,))
         # Запрос слов ранга rank+1
         words = self.dbget_words(rank + 1)
         if(len(words) == 0):

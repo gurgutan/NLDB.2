@@ -6,18 +6,23 @@ import numpy as np
 class Tokenizer(object):
     """Класс с методами для преобразования дерева строк в дерево токенов"""
 
-    def __init__(self):
+    def __init__(self, dbpath=''):
         self.id = 65535
-        self.db = sqlite.connect(':memory:')
+        if dbpath=='':
+            self.db = sqlite.connect(':memory:')
+        else:
+            self.db=sqlite.connect(dbpath)
+#        self.db.execute(
+#            'drop table if exists words')
         self.db.execute(
-            'create table words(id integer primary key, childs BLOB not null, rank integer not null)')
+            'create table if not exists words(id integer primary key, childs BLOB not null, rank integer not null)')
         self.db.execute('create unique index childs on words(childs)')
         self.db.commit()
 
     def __del__(self):
         self.db.close()
 
-    def get_token(self, childs, rank):
+    def _get_token(self, childs, rank):
         a = np.array(childs, dtype=np.int32)
         cur = self.db.cursor()
         cur.execute(
@@ -27,13 +32,12 @@ class Tokenizer(object):
             self.id += 1
             self.db.execute('insert into words(id, childs, rank) values(?,?,?)',
                             (self.id, a.tobytes(), rank))
-            self.db.commit()
             token=self.id
         else:
             token=result[0]
         return token
-    
-    def get_word(self, token):
+
+    def _get_word(self, token):
         cur=self.db.cursor()
         cur.execute('select id, childs, rank from words where id=?',(token,))
         result = cur.fetchone()
@@ -46,24 +50,25 @@ class Tokenizer(object):
             if rank==1:
                 return (id, np_array.tolist(), 1)
             else:
-                childs=[self.get_word(c) for c in np_array.tolist()]
+                childs=[self._get_word(c) for c in np_array.tolist()]
             return (id, childs, rank)
 
-    def tokenize(self, text_tree, rank):
+    def _tokenize(self, text_tree, rank):
         if rank == 0:
             return [ord(c) for c in text_tree]
         tokens=[]
         for t in text_tree:
-            childs=self.tokenize(t, rank-1)
+            childs=self._tokenize(t, rank-1)
             if len(childs) == 0:
                 continue
-            id=self.get_token(childs, rank)
+            id=self._get_token(childs, rank)
             tokens.append(id)
+        self.db.commit()
         return tokens
-    
-    def get_tokens_tree(self, text_tree, rank):
-        tokens=self.tokenize(text_tree, rank)
-        result=[self.get_word(t) for t in tokens]
+
+    def tokenize(self, text_tree, rank):
+        tokens=self._tokenize(text_tree, rank)
+        result=[self._get_word(t) for t in tokens]
         return result
-    
-    
+
+
