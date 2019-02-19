@@ -19,14 +19,14 @@ t.tokenize(text_tree, 3)
 
 engine = nldb.Calculations(dbpath)
 
-print('Вычисление calc_memebership_matrix')
-engine.calc_memebership_matrix()
+# print('Вычисление calc_memebership_matrix')
+# engine.calc_memebership_matrix()
 
 print('Вычисление calc_context_mean_matrix')
 engine.calc_context_mean_matrix()
 
-print('Вычисление calc_context_similarity_matrix')
-engine.calc_context_similarity_matrix()
+# print('Вычисление calc_context_similarity_matrix')
+# engine.calc_context_similarity_matrix()
 
-print('Вычисление calc_membeship_similarity_matrix')
-engine.calc_membeship_similarity_matrix()
+# print('Вычисление calc_membeship_similarity_matrix')
+# engine.calc_membeship_similarity_matrix()

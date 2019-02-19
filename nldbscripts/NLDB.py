@@ -53,20 +53,38 @@ class Calculations(object):
             print('Слов в БД не найдено')
             return
         # Определим размер результирующей матрицы - максимальны Id
-        n = max([w[1].max() for w in words]) + 1
-        # Создаем вспомогательные матрицы для вычислений
-        m_sum = sparse.lil_matrix((n, n), dtype=np.float32)
-        m_count = sparse.lil_matrix((n, n), dtype=np.float32)
         words_count = len(words)
         timestart = timeit.default_timer()
+        n = max([w[1].max() for w in words]) + 1
+        # Создаем вспомогательные матрицы для вычислений
+        # m_sum = sparse.lil_matrix((n, n), dtype=np.float32)
+        # m_count = sparse.lil_matrix((n, n), dtype=np.float32)
+        # for idx, word in enumerate(words):
+        #     if(idx % 1771 == 0):
+        #         print(idx, 'из', words_count, ' ', end='\r', flush=True)
+        #     for i, row in enumerate(word[1]):
+        #         for j, column in enumerate(word[1]):
+        #             m_sum[row, column] += j - i
+        #             m_count[row, column] += 1
+        sum_row, sum_col, sum_data = [], [], []
+        count_row, count_col, count_data = [], [], []
         for idx, word in enumerate(words):
             if(idx % 1771 == 0):
-                print(idx, 'из', words_count,' ', end='\r', flush=True)
+                print(idx, 'из', words_count, ' ', end='\r', flush=True)
             for i, row in enumerate(word[1]):
                 for j, column in enumerate(word[1]):
-                    m_sum[row, column] += j - i
-                    m_count[row, column] += 1
-        print("Заполнение таблицы контекста: ", timeit.default_timer() - timestart, 'сек.')
+                    sum_row.append(row)
+                    sum_col.append(column)
+                    sum_data.append(j-i)
+                    count_row.append(row)
+                    count_col.append(column)
+                    count_data.append(1)
+        m_sum = sparse.coo_matrix(
+            (sum_data, (sum_row, sum_col)), dtype=np.float32)
+        m_count = sparse.coo_matrix(
+            (count_data, (count_row, count_col)), dtype=np.float32)
+        print("Заполнение таблицы контекста: ",
+              timeit.default_timer() - timestart, 'сек.')
         timestart = timeit.default_timer()
         # Вычисление среднего
         m_means = m_sum.tocsr(copy=False).multiply(
@@ -92,7 +110,7 @@ class Calculations(object):
             last = min((i + 1) * batch_size, rows_count)
             d = cosine_similarity(m[first:last], dense_output=False)
             segment_name = str(last)
-            print(segment_name,'  ', end='\r', flush=True)
+            print(segment_name, '  ', end='\r', flush=True)
             if(i == 0):
                 result = d
             else:
@@ -113,7 +131,7 @@ class Calculations(object):
         csr_matrix = matrix.tocsr()
         csr_matrix.eliminate_zeros()
         sparse.save_npz(self.fname_membership(), csr_matrix)
-    
+
     def calc_membeship_similarity_matrix(self):
         fname = self.fname_membership()
         print('Чтение данных из', fname)
@@ -128,7 +146,7 @@ class Calculations(object):
             last = min((i + 1) * batch_size, rows_count)
             d = cosine_similarity(m[first:last], dense_output=False)
             segment_name = str(last)
-            print(segment_name,'  ', end='\r', flush=True)
+            print(segment_name, '  ', end='\r', flush=True)
             if(i == 0):
                 result = d
             else:
@@ -136,23 +154,22 @@ class Calculations(object):
         result.eliminate_zeroes()
         print('Сохранение ', self.fname_member_dist(), '...')
         sparse.save_npz(self.fname_member_dist(), result)
-        
+
     def similars_by_membership(self, token):
         """Возвращает список пар (id_слова, величина_схожести). Близость определяется по совместным вхождениям в другие слова"""
-        m=sparse.load_npz(self.fname_member_dist())
-        a=m[token].toarray()[0] # i-я строка матрицы как 1-D массив
-        row=np.argsort(a)       # индексы колонок, отсортированные по значению
-        return [(i, a[i]) for i in reversed(row) if a[i]>0.0]
-    
+        m = sparse.load_npz(self.fname_member_dist())
+        a = m[token].toarray()[0]  # i-я строка матрицы как 1-D массив
+        # индексы колонок, отсортированные по значению
+        row = np.argsort(a)
+        return [(i, a[i]) for i in reversed(row) if a[i] > 0.0]
+
     def nearest_by_context(self, token):
         """Возвращает список пар (id_слова, величина_близости_к_i). Близость определяется по схожести контекстов"""
-        m=sparse.load_npz(self.fname_context_dist())
-        a=m[token].toarray()[0] # i-я строка матрицы как 1-D массив
-        row=np.argsort(a)       # индексы колонок, отсортированные по значению
-        return [(i, a[i]) for i in reversed(row) if a[i]>0.0]
+        m = sparse.load_npz(self.fname_context_dist())
+        a = m[token].toarray()[0]  # i-я строка матрицы как 1-D массив
+        # индексы колонок, отсортированные по значению
+        row = np.argsort(a)
+        return [(i, a[i]) for i in reversed(row) if a[i] > 0.0]
 
     def get_word(self, token):
         pass
-
-    
-    
