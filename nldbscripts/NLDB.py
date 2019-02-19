@@ -25,12 +25,20 @@ class Calculations(object):
             print('Не удалось закрыть соединение с БД ', self.dbpath)
 
     def fname_mean(self, rank):
-        name, extension = os.path.splitext(self.dbpath)
+        name, _ = os.path.splitext(self.dbpath)
         return name+'_r'+str(rank)+'_mean.npz'
 
-    def fname_dist(self, rank):
-        name, extension = os.path.splitext(self.dbpath)
+    def fname_context_dist(self, rank):
+        name, _ = os.path.splitext(self.dbpath)
         return name+'_r'+str(rank)+'_dist.npz'
+
+    def fname_membership(self, rank):
+        name, _ = os.path.splitext(self.dbpath)
+        return name+'_r'+str(rank)+'_memb.npz'
+
+    def fname_member_dist(self, rank):
+        name, _ = os.path.splitext(self.dbpath)
+        return name+'_r'+str(rank)+'_memb_dist.npz'
 
     def dbget_words(self, rank):
         query = self.db.execute(
@@ -38,22 +46,12 @@ class Calculations(object):
         data = [(r[0], np.frombuffer(r[1], dtype=np.int32)) for r in query]
         return data
 
-    def calc_pos_mean(self, rank):
+    def calc_context_mean_matrix(self, rank):
         """Расчет матрицы матожиданий взаимных расстояний для слов ранга rank"""
 
         if rank < 0:
             print("Параметр rank не может быть меньше 0")
             return
-        # Пересоздаем таблицу для матрицы матожиданий
-#        self.db.execute('''
-#            CREATE TABLE IF NOT EXISTS MatrixM (
-#            [Row]    INTEGER NOT NULL,
-#            [Column] INTEGER NOT NULL,
-#            Mean     REAL NOT NULL,
-#            Rank     INTEGER NOT NULL,
-#            PRIMARY KEY ([Row], [Column]));
-#            ''')
-#        self.db.execute('delete from MatrixM where Rank=?', (rank,))
         # Запрос слов ранга rank+1
         words = self.dbget_words(rank + 1)
         if(len(words) == 0):
@@ -68,7 +66,7 @@ class Calculations(object):
         timestart = timeit.default_timer()
         for idx, word in enumerate(words):
             if(idx % 1771 == 0):
-                print(idx, 'из', words_count)
+                print(idx, 'из', words_count,' ', end='\r', flush=True)
             for i, row in enumerate(word[1]):
                 for j, column in enumerate(word[1]):
                     m_sum[row, column] += j - i
@@ -84,42 +82,85 @@ class Calculations(object):
         timestart = timeit.default_timer()
         print("Сохранение...")
         sparse.save_npz(self.fname_mean(rank), m_means)
-#        means_tuples = sparse.find(m_means.tocoo())
-#        for i in range(len(means_tuples[0])):
-#            self.db.execute(
-#                'INSERT OR REPLACE INTO MatrixM([Row], [Column], Mean, Rank)
-#                VALUES(?,?,?,?);',
-#                (int(means_tuples[0][i]), int(means_tuples[1][i]),
-#                int(means_tuples[2][i]), rank))
         print("Время: ", timeit.default_timer() - timestart)
         timestart = timeit.default_timer()
         # self.db.commit()
 
-    def calc_pos_cos_similarity(self, rank):
+    def calc_context_similarity_matrix(self, rank):
         """Расчет матрицы косинусных расстояний контекстов"""
 
         print('Чтение данных')
         m = sparse.load_npz(self.fname_mean(rank))
         result = sparse.csr_matrix([0])
         rows_count = m.shape[0]
-        batch_size = min(rows_count, 1 << 10)
+        batch_size = min(rows_count, 1 << 12)
         batch_count = int(rows_count / batch_size)
         print('Вычисление расстояний')
         for i in range(batch_count):
             first = i * batch_size
             last = min((i + 1) * batch_size, rows_count)
             d = cosine_similarity(m[first:last], dense_output=False)
-            segment_name = str(first) + '-' + str(last)
-            print(segment_name)
+            segment_name = str(last)
+            print(segment_name,'  ', end='\r', flush=True)
             if(i == 0):
                 result = d
             else:
                 result = sparse.bmat([[result], [d]])
-        print('Сохранение ', self.fname_dist(rank), '...')
-        sparse.save_npz(self.fname_dist(rank), result)
+        result.eliminate_zeroes()
+        print('Сохранение ', self.fname_context_dist(rank), '...')
+        sparse.save_npz(self.fname_context_dist(rank), result)
 
-    def calc_word_memebership_cov(self, rank):
-        pass
+    def calc_memebership_matrix(self, rank):
+
+        words = self.dbget_words(rank+1)
+        n = max([w[1].max() for w in words]) + 1
+        m = max([w[0] for w in words])+1
+        tuples = [(w[1][i], w[0]) for w in words for i in range(len(w[1]))]
+        matrix = sparse.lil_matrix((n, m), dtype=np.int8)
+        for t in tuples:
+            matrix[t[0], t[1]] = 1 
+        matrix.eliminate_zeroes()
+        sparse.save_npz(self.fname_membership(rank), matrix.tocsr())
     
+    def calc_membeship_similarity_matrix(self, rank):
+        fname = self.fname_membership(rank)
+        print('Чтение данных из', fname)
+        m = sparse.load_npz(fname)
+        result = sparse.csr_matrix([0])
+        rows_count = m.shape[0]
+        batch_size = min(rows_count, 1 << 14)
+        batch_count = int(rows_count / batch_size)
+        print('Вычисление схожести по включению')
+        for i in range(batch_count):
+            first = i * batch_size
+            last = min((i + 1) * batch_size, rows_count)
+            d = cosine_similarity(m[first:last], dense_output=False)
+            segment_name = str(last)
+            print(segment_name,'  ', end='\r', flush=True)
+            if(i == 0):
+                result = d
+            else:
+                result = sparse.bmat([[result], [d]])
+        result.eliminate_zeroes()
+        print('Сохранение ', self.fname_member_dist(rank), '...')
+        sparse.save_npz(self.fname_member_dist(rank), result)
+        
+    def nearest_by_membership(self, i, rank):
+        """Возвращает список пар (id_слова, величина_близости_к_i). Близость определяется по совместным вхождениям в другие слова"""
+        m=sparse.load_npz(self.fname_member_dist(rank))
+        a=m[i].toarray()[0] # i-я строка матрицы как 1-D массив
+        row=np.argsort(a)   # индексы колонок, отсортированные по значению
+        return [(i, a[i]) for i in reversed(row) if a[i]>0.0]
+    
+    def nearest_by_context(self, i, rank):
+        """Возвращает список пар (id_слова, величина_близости_к_i). Близость определяется по схожести контекстов"""
+        m=sparse.load_npz(self.fname_context_dist(rank))
+        a=m[i].toarray()[0] # i-я строка матрицы как 1-D массив
+        row=np.argsort(a)   # индексы колонок, отсортированные по значению
+        return [(i, a[i]) for i in reversed(row) if a[i]>0.0]
+
+    def get_word(self, token):
+        pass
+
     
     

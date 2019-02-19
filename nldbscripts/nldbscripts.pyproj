@@ -5,8 +5,7 @@
     <ProjectGuid>d24df220-cc64-4ae8-8a27-5f5f2ee04e1e</ProjectGuid>
     <ProjectHome>.</ProjectHome>
     <StartupFile>nldbscripts.py</StartupFile>
-    <SearchPath>
-    </SearchPath>
+    <SearchPath>..\nldbscripts</SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>nldbscripts</Name>
@@ -21,11 +20,12 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="NLDB.py">
+    <Compile Include="nldb.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="nldbscripts.py" />
-    <Compile Include="transformdb.py" />
+    <Compile Include="splitter.py" />
+    <Compile Include="tokenizer.py" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
