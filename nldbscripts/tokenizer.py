@@ -11,7 +11,7 @@ class Tokenizer(object):
         if dbpath == '':
             self.db = sqlite.connect(':memory:')
         else:
-            if os.path.exists(dbpath):
+            if os.path.isfile(dbpath):
                 self.db = sqlite.connect(dbpath)
                 c = self.db.cursor()
                 c.execute('select max(id) from words')

@@ -262,3 +262,10 @@ __pycache__/
 /NLDB.Core/D:/Data/Result/5mb.db
 /NLDB.Core/D:/Data/Result
 *.db
+
+# Spyder
+.spyproject/
+
+# NumPy & SciPy data files
+*.npz
+

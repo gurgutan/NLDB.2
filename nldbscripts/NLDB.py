@@ -3,13 +3,14 @@ import numpy as np
 import scipy.sparse as sparse
 from sklearn.metrics.pairwise import cosine_similarity
 import timeit
-import os
+import os 
 
-
+ 
 class Calculations(object):
     """description of class"""
 
     dbpath = ""
+    words_matrix = None    
 
     def __init__(self, dbpath):
         self.dbpath = dbpath
@@ -34,7 +35,7 @@ class Calculations(object):
 
     def fname_membership(self):
         name, _ = os.path.splitext(self.dbpath)
-        return name+'_membs.npz'
+        return name+'_words.npz'
 
     def fname_member_dist(self):
         name, _ = os.path.splitext(self.dbpath)
@@ -44,6 +45,34 @@ class Calculations(object):
         query = self.db.execute('select Id, Childs from Words')
         data = [(r[0], np.frombuffer(r[1], dtype=np.int32)) for r in query]
         return data
+
+    def dbget_word(self, token):
+        if token<=0: return None
+        if token<=65535: return chr(token)
+        cursor = self.db.cursor()
+        first = cursor.execute('select Id, Childs from Words where Id=?',(token,)).fetchone()
+        if first==None: return None
+        a = np.frombuffer(first[1], dtype=np.int32)
+        if len(a)==0: return None
+        if a[0]<=65535:
+            word = ''.join([chr(c) for c in a])
+        else:
+            word = [self.dbget_word(int(x)) for x in a]
+        return word
+    
+    def calc_memebership_matrix(self):
+
+        words = self.dbget_words()
+        n = max([w[1].max() for w in words]) + 1
+        m = max([w[0] for w in words]) + 1
+        tuples = [(w[1][i], w[0], ) for w in words for i in range(len(w[1]))]
+        matrix = sparse.lil_matrix((n, m), dtype=np.int16)
+        for t in tuples:
+            matrix[t[0], t[1]] = 1
+        csr_matrix = matrix.tocsr()
+        csr_matrix.eliminate_zeros()
+        self.words_matrix = csr_matrix.tocsc()
+        sparse.save_npz(self.fname_membership(), csr_matrix)
 
     def calc_context_mean_matrix(self):
         """Расчет матрицы матожиданий взаимных расстояний для слов ранга rank"""
@@ -55,17 +84,7 @@ class Calculations(object):
         # Определим размер результирующей матрицы - максимальны Id
         words_count = len(words)
         timestart = timeit.default_timer()
-        n = max([w[1].max() for w in words]) + 1
-        # Создаем вспомогательные матрицы для вычислений
-        # m_sum = sparse.lil_matrix((n, n), dtype=np.float32)
-        # m_count = sparse.lil_matrix((n, n), dtype=np.float32)
-        # for idx, word in enumerate(words):
-        #     if(idx % 1771 == 0):
-        #         print(idx, 'из', words_count, ' ', end='\r', flush=True)
-        #     for i, row in enumerate(word[1]):
-        #         for j, column in enumerate(word[1]):
-        #             m_sum[row, column] += j - i
-        #             m_count[row, column] += 1
+        # Списки индексов и значений для разреженных матриц
         sum_row, sum_col, sum_data = [], [], []
         count_row, count_col, count_data = [], [], []
         for idx, word in enumerate(words):
@@ -119,19 +138,6 @@ class Calculations(object):
         print('Сохранение ', self.fname_context_dist(), '...')
         sparse.save_npz(self.fname_context_dist(), result)
 
-    def calc_memebership_matrix(self):
-
-        words = self.dbget_words()
-        n = max([w[1].max() for w in words]) + 1
-        m = max([w[0] for w in words])+1
-        tuples = [(w[1][i], w[0]) for w in words for i in range(len(w[1]))]
-        matrix = sparse.lil_matrix((n, m), dtype=np.int8)
-        for t in tuples:
-            matrix[t[0], t[1]] = 1
-        csr_matrix = matrix.tocsr()
-        csr_matrix.eliminate_zeros()
-        sparse.save_npz(self.fname_membership(), csr_matrix)
-
     def calc_membeship_similarity_matrix(self):
         fname = self.fname_membership()
         print('Чтение данных из', fname)
@@ -171,5 +177,7 @@ class Calculations(object):
         row = np.argsort(a)
         return [(i, a[i]) for i in reversed(row) if a[i] > 0.0]
 
-    def get_word(self, token):
-        pass
+
+
+
+
