@@ -3,14 +3,14 @@ import numpy as np
 import scipy.sparse as sparse
 from sklearn.metrics.pairwise import cosine_similarity
 import timeit
-import os 
+import os
 
- 
+
 class Calculations(object):
     """description of class"""
 
     dbpath = ""
-    words_matrix = None    
+    words_matrix = None
 
     def __init__(self, dbpath):
         self.dbpath = dbpath
@@ -47,19 +47,24 @@ class Calculations(object):
         return data
 
     def dbget_word(self, token):
-        if token<=0: return None
-        if token<=65535: return chr(token)
+        if token <= 0:
+            return None
+        if token <= 65535:
+            return chr(token)
         cursor = self.db.cursor()
-        first = cursor.execute('select Id, Childs from Words where Id=?',(token,)).fetchone()
-        if first==None: return None
+        first = cursor.execute(
+            'select Id, Childs from Words where Id=?', (token,)).fetchone()
+        if first is None:
+            return None
         a = np.frombuffer(first[1], dtype=np.int32)
-        if len(a)==0: return None
-        if a[0]<=65535:
+        if len(a) == 0:
+            return None
+        if a[0] <= 65535:
             word = ''.join([chr(c) for c in a])
         else:
             word = [self.dbget_word(int(x)) for x in a]
         return word
-    
+
     def calc_memebership_matrix(self):
 
         words = self.dbget_words()
@@ -75,7 +80,9 @@ class Calculations(object):
         sparse.save_npz(self.fname_membership(), csr_matrix)
 
     def calc_context_mean_matrix(self):
-        """Расчет матрицы матожиданий взаимных расстояний для слов ранга rank"""
+        """
+        Расчет матрицы матожиданий взаимных расстояний для слов ранга rank
+        """
 
         words = self.dbget_words()
         if(len(words) == 0):
@@ -108,7 +115,8 @@ class Calculations(object):
         # Вычисление среднего
         m_means = m_sum.tocsr(copy=False).multiply(
             m_count.tocsr(copy=False).power(-1, dtype=np.float32))
-        print('Вычисление среднего: ', timeit.default_timer() - timestart, 'сек.')
+        print('Вычисление среднего: ', timeit.default_timer() - timestart,
+              'сек.')
         timestart = timeit.default_timer()
         sparse.save_npz(self.fname_mean(), m_means)
         print('Сохранение...', timeit.default_timer() - timestart)
@@ -162,22 +170,23 @@ class Calculations(object):
         sparse.save_npz(self.fname_member_dist(), result)
 
     def similars_by_membership(self, token):
-        """Возвращает список пар (id_слова, величина_схожести). Близость определяется по совместным вхождениям в другие слова"""
+        """
+        Возвращает список пар (id_слова, величина_схожести).
+        Близость определяется по совместным вхождениям в другие слова
+        """
         m = sparse.load_npz(self.fname_member_dist())
         a = m[token].toarray()[0]  # i-я строка матрицы как 1-D массив
         # индексы колонок, отсортированные по значению
         row = np.argsort(a)
         return [(i, a[i]) for i in reversed(row) if a[i] > 0.0]
 
-    def nearest_by_context(self, token):
-        """Возвращает список пар (id_слова, величина_близости_к_i). Близость определяется по схожести контекстов"""
+    def similars_by_context(self, token):
+        """
+        Возвращает список пар (id_слова, величина_близости_к_i).
+        Близость определяется по схожести контекстов
+        """
         m = sparse.load_npz(self.fname_context_dist())
         a = m[token].toarray()[0]  # i-я строка матрицы как 1-D массив
         # индексы колонок, отсортированные по значению
         row = np.argsort(a)
         return [(i, a[i]) for i in reversed(row) if a[i] > 0.0]
-
-
-
-
-

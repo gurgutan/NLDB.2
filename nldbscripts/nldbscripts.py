@@ -1,7 +1,8 @@
 import dbtransform
-import nldb
+import calc
 import splitter
 import tokenizer
+
 
 # old_dbpath = 'D:/Data/Result/5mb.db'#'/home/ivan/dev/Data/Result/884mb.db'
 text = 'D:/Data/Wiki/ru/5mb.txt'
@@ -17,9 +18,9 @@ dbpath = 'D:/Data/Result/py5mb.db'#'/home/ivan/dev/Data/Result/884.db'
 #t = tokenizer.Tokenizer(dbpath)
 #t.tokenize(text_tree, 3)
 
-engine = nldb.Calculations(dbpath)
+engine = calc.Calculations(dbpath)
 
-print(engine.get_word(70000))
+print(engine.dbget_word(70000))
 
 # print('Вычисление calc_memebership_matrix')
 # engine.calc_memebership_matrix()
