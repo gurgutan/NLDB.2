@@ -2,11 +2,14 @@ import dbtransform
 import calc
 import splitter
 import tokenizer
+import search
+import scipy.sparse as sparse
+import names
 
 
 # old_dbpath = 'D:/Data/Result/5mb.db'#'/home/ivan/dev/Data/Result/884mb.db'
 text = 'D:/Data/Wiki/ru/5mb.txt'
-dbpath = 'D:/Data/Result/py5mb.db'#'/home/ivan/dev/Data/Result/884.db'
+dbpath = 'D:/Data/Result/py5mb.db'  # '/home/ivan/dev/Data/Result/884.db'
 
 # print('Разбиение файла', text, 'на слова')
 # s = splitter.Splitter()
@@ -17,8 +20,12 @@ dbpath = 'D:/Data/Result/py5mb.db'#'/home/ivan/dev/Data/Result/884.db'
 
 engine = calc.Calculations(dbpath)
 
-# print('Вычисление memebership_matrix')
-# mm=engine.memebership_matrix()
+print('Вычисление memebership_matrix')
+# wm = engine.memebership_matrix()
+wm = sparse.load_npz(names.fname_membership(dbpath))
+token = search.find_word([ord(c) for c in 'ступенька'], wm)
+word = engine.dbget_word(token)
+print(token, word)
 
 # print('Вычисление context_mean_matrix')
 # cmm=engine.context_mean_matrix()

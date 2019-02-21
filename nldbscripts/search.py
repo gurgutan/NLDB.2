@@ -4,10 +4,13 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 def find_word(tokens_list, wm):
-    w = sparse.csr_matrix(([1 for i in tokens_list], ([0], [
-                          i for i in tokens_list])), shape=(1, wm.shape[0]))
-    result = (cosine_similarity(w, wm, dense_output=False)).argmax()
-    return result
+    w = sparse.csr_matrix(
+        ([1 for i in tokens_list],
+         ([0 for i in tokens_list],
+          [i for i in tokens_list])), shape=(1, wm.shape[0]))
+    cos_sim = cosine_similarity(w, wm.transpose(), dense_output=False)
+    result = int(cos_sim.argmax())
+    return int(result)
 
 
 def similars_by_membership(token, m):

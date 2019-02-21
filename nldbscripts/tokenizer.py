@@ -16,12 +16,17 @@ class Tokenizer(object):
                 c = self.db.cursor()
                 c.execute('select max(id) from words')
                 maxid = c.fetchone()
-                if maxid!=None:
+                if maxid is not None:
                     self.id = maxid[0]
             else:
                 self.db = sqlite.connect(dbpath)
                 self.db.execute(
-                        'create table if not exists words(id integer primary key, childs BLOB not null, rank integer not null)')
+                    '''
+                    create table words(
+                        id integer primary key,
+                        childs BLOB not null,
+                        rank integer not null)
+                    ''')
                 self.db.execute('create unique index childs on words(childs)')
                 self.db.commit()
 
@@ -39,10 +44,13 @@ class Tokenizer(object):
         cur.execute(
             'select id from words where childs=?', (a.tobytes(),))
         result = cur.fetchone()
-        if result == None:
+        if result is None:
             self.id += 1
-            self.db.execute('insert into words(id, childs, rank) values(?,?,?)',
-                            (self.id, a.tobytes(), rank))
+            self.db.execute(
+                '''
+                insert into words(id, childs, rank) values(?,?,?)
+                ''',
+                (self.id, a.tobytes(), rank))
             token = self.id
         else:
             token = result[0]
@@ -52,7 +60,7 @@ class Tokenizer(object):
         cur = self.db.cursor()
         cur.execute('select id, childs, rank from words where id=?', (token,))
         result = cur.fetchone()
-        if result == None:
+        if result is None:
             return None
         else:
             id = result[0]
