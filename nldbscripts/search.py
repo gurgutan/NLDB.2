@@ -2,6 +2,19 @@ import scipy.sparse as sparse
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from const import WORD_MAX_SIZE
+from scipy.spatial.distance import cdist
+
+
+def ischar(c):
+    return type(c) == str and len(c) == 1
+
+
+def isstring(s):
+    return type(s) == str
+
+
+def istoken(t):
+    return type(t) == int
 
 
 def find_word(tokens_list, wm):
@@ -12,10 +25,27 @@ def find_word(tokens_list, wm):
               for i, t in enumerate(tokens_list)]
     w = sparse.csr_matrix(
         (data, (row, column)),
-        shape=(1, wm.shape[1]), dtype=np.int8)
+        shape=(1, wm.shape[1]),
+        dtype=np.int8)
     cos_sim = cosine_similarity(w, wm, dense_output=False)
-    result = int(cos_sim.argmax())
-    return int(result)
+    t = int(cos_sim.argmax())
+    score = cos_sim[0][t]
+    result = (t, score)
+    return result
+
+
+def estimate_text_tree(text_tree, wm):
+    if ischar(text_tree):
+        childs = ord(text_tree)
+        scores = np.ones((1, len(text_tree)), dtype=np.float32)
+    if isinstance(text_tree, list):
+        e = [estimate_text_tree(t, wm) for t in text_tree]
+        childs = [t[0] for t in e]
+        scores = np.array([t[1] for t in e], dtype=np.float32)
+    word = find_word(childs, wm)
+    childs_score = np.sqrt(np.dot(scores, scores.T))
+    score = word[1]*childs_score/len(text_tree)
+    return
 
 
 def similars_by_membership(token, m):
