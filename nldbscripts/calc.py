@@ -5,6 +5,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import timeit
 import os
 import names
+from const import WORD_MAX_SIZE
 
 
 class Calculations(object):
@@ -63,15 +64,15 @@ class Calculations(object):
     def memebership_matrix(self, save=True):
         """Расчет матрицы принадлежности"""
         words = self.dbget_words()
-        n = max([w[1].max() for w in words]) + 1
-        m = max([w[0] for w in words]) + 1
-        tuples = [(w[0], w[1][i]) for w in words for i in range(len(w[1]))]
-        matrix = sparse.lil_matrix((n, m), dtype=np.int16)
+        n = max([w[0] for w in words]) + 1  # размерность матрицы на 1 больше максимального индекса
+        m = n*WORD_MAX_SIZE # количество столбцов в WORD_MAX_SIZE больше количества строк
+        tuples = [(w[0], v, min([i, WORD_MAX_SIZE]))
+                  for w in words for i, v in enumerate(w[1])]
+        matrix = sparse.lil_matrix((n, m), dtype=np.int8)
         for t in tuples:
-            matrix[t[1], t[0]] = 1
+            matrix[t[0], t[1]*WORD_MAX_SIZE+t[2]] = 1
         csr_matrix = matrix.tocsr()
         csr_matrix.eliminate_zeros()
-        self.words_matrix = csr_matrix.tocsc()
         if save:
             sparse.save_npz(names.fname_membership(self.dbpath), csr_matrix)
         return csr_matrix

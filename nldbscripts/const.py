@@ -1,0 +1,2 @@
+
+WORD_MAX_SIZE = 256

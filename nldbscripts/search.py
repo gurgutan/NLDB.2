@@ -1,14 +1,19 @@
 import scipy.sparse as sparse
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from const import WORD_MAX_SIZE
 
 
 def find_word(tokens_list, wm):
+    size = len(tokens_list)
+    data = [1 for i in range(size)]
+    row = [0 for i in range(size)]
+    column = [t*WORD_MAX_SIZE+min([i, WORD_MAX_SIZE])
+              for i, t in enumerate(tokens_list)]
     w = sparse.csr_matrix(
-        ([1 for i in tokens_list],
-         ([0 for i in tokens_list],
-          [i for i in tokens_list])), shape=(1, wm.shape[0]))
-    cos_sim = cosine_similarity(w, wm.transpose(), dense_output=False)
+        (data, (row, column)),
+        shape=(1, wm.shape[1]), dtype=np.int8)
+    cos_sim = cosine_similarity(w, wm, dense_output=False)
     result = int(cos_sim.argmax())
     return int(result)
 

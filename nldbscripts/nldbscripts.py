@@ -5,6 +5,7 @@ import tokenizer
 import search
 import scipy.sparse as sparse
 import names
+import timeit
 
 
 # old_dbpath = 'D:/Data/Result/5mb.db'#'/home/ivan/dev/Data/Result/884mb.db'
@@ -21,11 +22,7 @@ dbpath = 'D:/Data/Result/py5mb.db'  # '/home/ivan/dev/Data/Result/884.db'
 engine = calc.Calculations(dbpath)
 
 print('Вычисление memebership_matrix')
-# wm = engine.memebership_matrix()
-wm = sparse.load_npz(names.fname_membership(dbpath))
-token = search.find_word([ord(c) for c in 'ступенька'], wm)
-word = engine.dbget_word(token)
-print(token, word)
+wm = engine.memebership_matrix()
 
 # print('Вычисление context_mean_matrix')
 # cmm=engine.context_mean_matrix()
@@ -36,4 +33,10 @@ print(token, word)
 # print('Вычисление membeship_similarity_matrix')
 # msm=engine.membeship_similarity_matrix()
 
+wm = sparse.load_npz(names.fname_membership(dbpath))
+start_time = timeit.default_timer()
+token = search.find_word([ord(c) for c in 'патока'], wm)
+print(timeit.default_timer()-start_time)
+word = engine.dbget_word(token)
+print(token, word)
 # print(engine.dbget_word(70000))
