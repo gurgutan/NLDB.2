@@ -1,7 +1,7 @@
 import scipy.sparse as sparse
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from const import WORD_MAX_SIZE
+from const import WORD_SIZES
 from scipy.spatial.distance import cdist
 
 
@@ -17,35 +17,43 @@ def istoken(t):
     return type(t) == int
 
 
-def find_word(tokens_list, wm):
-    size = len(tokens_list)
-    data = [1 for i in range(size)]
-    row = [0 for i in range(size)]
-    column = [t*WORD_MAX_SIZE+min([i, WORD_MAX_SIZE])
-              for i, t in enumerate(tokens_list)]
+def find_word(tokens_list, rank, wm):
+    word_size = len(tokens_list)
+    data = [1 for i in range(word_size)]
+    row = [0 for i in range(word_size)]
+    column = []
+    scale = WORD_SIZES[rank-1]
+    for child_pos, child_id in enumerate(tokens_list):
+        c = child_id*scale+int(child_pos*scale/word_size)
+        column.append(c)
+        # column = [t*WORD_SIZES+min([i, WORD_SIZES])
+        #           for i, t in enumerate(tokens_list)]
     w = sparse.csr_matrix(
         (data, (row, column)),
         shape=(1, wm.shape[1]),
         dtype=np.int8)
     cos_sim = cosine_similarity(w, wm, dense_output=False)
     t = int(cos_sim.argmax())
-    score = cos_sim[0][t]
+    score = cos_sim[0, t]
     result = (t, score)
     return result
 
 
-def estimate_text_tree(text_tree, wm):
+def find_text_tree(text_tree, rank, wm):
     if ischar(text_tree):
-        childs = ord(text_tree)
-        scores = np.ones((1, len(text_tree)), dtype=np.float32)
-    if isinstance(text_tree, list):
-        e = [estimate_text_tree(t, wm) for t in text_tree]
-        childs = [t[0] for t in e]
-        scores = np.array([t[1] for t in e], dtype=np.float32)
-    word = find_word(childs, wm)
+        word = ord(text_tree)
+        return (word, 1)
+    elif isinstance(text_tree, (list, str)):
+        e = [find_text_tree(t, rank-1, wm) for t in text_tree]
+        childs = [t[0] for t in e if t[0] is not None]
+        scores = np.array(
+            [t[1] for t in e if t[0] is not None], dtype=np.float32)
+    word = find_word(childs, rank, wm)
+    if word[0] is None:
+        return (None, None, None)
     childs_score = np.sqrt(np.dot(scores, scores.T))
     score = word[1]*childs_score/len(text_tree)
-    return
+    return (word[0], score)
 
 
 def similars_by_membership(token, m):

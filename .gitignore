@@ -269,3 +269,4 @@ __pycache__/
 # NumPy & SciPy data files
 *.npz
 
+nldbscripts/.spyproject/workspace.ini

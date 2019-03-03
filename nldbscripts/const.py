@@ -1,2 +1,3 @@
 
-WORD_MAX_SIZE = 256
+BATCH_SIZE = 1 << 14
+WORD_SIZES = [32, 2, 1]

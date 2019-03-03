@@ -1,13 +1,14 @@
 import sqlite3 as sqlite
 import numpy as np
 import os.path
+from tqdm import tqdm
 
 
 class Tokenizer(object):
     """Класс с методами для преобразования дерева строк в дерево токенов"""
 
     def __init__(self, dbpath=''):
-        self.id = 65535
+        self.word_id = 65535
         if dbpath == '':
             self.db = sqlite.connect(':memory:')
         else:
@@ -17,7 +18,7 @@ class Tokenizer(object):
                 c.execute('select max(id) from words')
                 maxid = c.fetchone()
                 if maxid is not None:
-                    self.id = maxid[0]
+                    self.word_id = maxid[0]
             else:
                 self.db = sqlite.connect(dbpath)
                 self.db.execute(
@@ -34,6 +35,7 @@ class Tokenizer(object):
         self.db.close()
 
     def tokenize(self, text_tree, rank):
+        self._max_rank = rank
         tokens = self._tokenize(text_tree, rank)
         self.db.commit()
         return [self._get_word(t) for t in tokens]
@@ -45,13 +47,13 @@ class Tokenizer(object):
             'select id from words where childs=?', (a.tobytes(),))
         result = cur.fetchone()
         if result is None:
-            self.id += 1
+            self.word_id += 1
             self.db.execute(
                 '''
                 insert into words(id, childs, rank) values(?,?,?)
                 ''',
-                (self.id, a.tobytes(), rank))
-            token = self.id
+                (self.word_id, a.tobytes(), rank))
+            token = self.word_id
         else:
             token = result[0]
         return token
@@ -76,10 +78,16 @@ class Tokenizer(object):
         if rank == 0:
             return [ord(c) for c in text_tree]
         tokens = []
+        if rank == self._max_rank:
+            progress = tqdm(total=len(text_tree), ncols=100, mininterval=0.5)
         for t in text_tree:
             childs = self._tokenize(t, rank-1)
             if len(childs) == 0:
                 continue
             id = self._get_token(childs, rank)
             tokens.append(id)
+            if rank == self._max_rank:
+                progress.update(1)
+        if rank == self._max_rank:
+            progress.close()
         return tokens
