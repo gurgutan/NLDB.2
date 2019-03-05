@@ -17,25 +17,22 @@ def istoken(t):
     return type(t) == int
 
 
-def find_word(tokens_list, rank, wm):
-    word_size = len(tokens_list)
-    data = [1 for i in range(word_size)]
-    row = [0 for i in range(word_size)]
-    column = []
+def find_word(tokens, scores, rank, wm):
+    word_size = len(tokens)
+    row = [0 for i in tokens]
     scale = WORD_SIZES[rank-1]
-    for child_pos, child_id in enumerate(tokens_list):
-        c = child_id*scale+int(child_pos*scale/word_size)
-        column.append(c)
-        # column = [t*WORD_SIZES+min([i, WORD_SIZES])
-        #           for i, t in enumerate(tokens_list)]
+    column = [child_id*scale+int(child_pos*scale/word_size)
+              for child_pos, child_id in enumerate(tokens)]
+    # вектор-строка для расчета имеет размерность равную количеству строк матрицы wm
     w = sparse.csr_matrix(
-        (data, (row, column)),
+        (scores, (row, column)),
         shape=(1, wm.shape[1]),
-        dtype=np.int8)
+        dtype=np.float32)
+    # результат - матрица состоит из одной строки
     cos_sim = cosine_similarity(w, wm, dense_output=False)
-    t = int(cos_sim.argmax())
-    score = cos_sim[0, t]
-    result = (t, score)
+    c = int(cos_sim.argmax())
+    score = cos_sim[0, c]
+    result = (c, score)
     return result
 
 
@@ -46,14 +43,9 @@ def find_text_tree(text_tree, rank, wm):
     elif isinstance(text_tree, (list, str)):
         e = [find_text_tree(t, rank-1, wm) for t in text_tree]
         childs = [t[0] for t in e if t[0] is not None]
-        scores = np.array(
-            [t[1] for t in e if t[0] is not None], dtype=np.float32)
-    word = find_word(childs, rank, wm)
-    if word[0] is None:
-        return (None, None, None)
-    childs_score = np.sqrt(np.dot(scores, scores.T))
-    score = word[1]*childs_score/len(text_tree)
-    return (word[0], score)
+        scores = [t[1] for t in e if t[0] is not None]
+    word = find_word(childs, scores, rank, wm)
+    return word
 
 
 def similars_by_membership(token, m):

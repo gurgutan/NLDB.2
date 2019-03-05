@@ -9,18 +9,18 @@ import timeit
 from platform import system
 
 
-textname = '100mb.txt'
-dbname = 'py100mb.db'
+textname = '5mb.txt'
+dbname = 'py5mb.db'
 
 if system() == 'Linux':
-    dbpath = '/home/ivan/dev/Data/Result/'+dbname
+    dbpath = '/home/ivan/dev/Data/Wiki/ru/'+dbname
     text = '/home/ivan/dev/Data/Result/'+textname
 else:
-    text = 'D:/Data/Result/'+textname  # '/home/ivan/dev/Data/Result/884.db'
+    text = 'D:/Data/Wiki/ru/'+textname
     dbpath = 'D:/Data/Result/'+dbname
-
-# print('Разбиение файла', text, 'на слова')
+ 
 s = splitter.Splitter()
+# print('Разбиение файла', text, 'на слова')
 # text_tree = s.split_file(text)
 # print('Токенизация')
 # t = tokenizer.Tokenizer(dbpath)
@@ -43,8 +43,12 @@ engine = calc.Calculations(dbpath)
 wm = sparse.load_npz(names.fname_membership(dbpath))
 start_time = timeit.default_timer()
 # token = search.find_word([ord(c) for c in 'патока'], 1, wm)
-text_tree = s.split_string('причины гражданской войны')
-word = search.find_text_tree(text_tree, 2, wm)
-if word[0] is not None:
-    print(word[1], ':', engine.dbget_word(word[0]))
+text = '-'
+while text!='':
+    print('Текст: ', end='')
+    text = input()
+    text_tree = s.split_string(text)
+    word = search.find_text_tree(text_tree, 2, wm)
+    if word[0] is not None:
+        print(word[1], ':', engine.dbget_word(word[0]))
 # print(timeit.default_timer()-start_time)

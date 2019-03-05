@@ -10,6 +10,7 @@
     <OutputPath>.</OutputPath>
     <Name>nldbscripts</Name>
     <RootNamespace>nldbscripts</RootNamespace>
+    <InterpreterId>CondaEnv|CondaEnv|Anaconda3_64</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -26,6 +27,9 @@
     <Compile Include="nldbscripts.py" />
     <Compile Include="splitter.py" />
     <Compile Include="tokenizer.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="CondaEnv|CondaEnv|Anaconda3_64" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

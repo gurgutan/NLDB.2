@@ -97,8 +97,6 @@ class Calculations(object):
         if(len(words) == 0):
             print('Слов в БД не найдено')
             return
-        # Определим размер результирующей матрицы - максимальны Id
-        words_count = len(words)
         # Списки индексов и значений для разреженных матриц
         sum_row, sum_col, sum_data = [], [], []
         count_row, count_col, count_data = [], [], []
@@ -148,7 +146,7 @@ class Calculations(object):
                 first = i * batch_size
                 last = min((i + 1) * batch_size, rows_count)
                 d = cosine_similarity(m[first:last], dense_output=False)
-                segment_name = str(last)
+                d = d[sparse.]
                 if(i == 0):
                     result = d
                 else:

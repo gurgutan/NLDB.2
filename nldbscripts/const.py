@@ -1,3 +1,3 @@
 
-BATCH_SIZE = 1 << 14
-WORD_SIZES = [32, 2, 1]
+BATCH_SIZE = 1 << 11
+WORD_SIZES = [32, 1, 1]
