@@ -146,7 +146,6 @@ class Calculations(object):
                 first = i * batch_size
                 last = min((i + 1) * batch_size, rows_count)
                 d = cosine_similarity(m[first:last], dense_output=False)
-                d = d[sparse.]
                 if(i == 0):
                     result = d
                 else:
