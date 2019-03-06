@@ -59,7 +59,9 @@ def similars_by_membership(token, m):
     a = m[token].toarray()[0]  # i-я строка матрицы как 1-D массив
     # индексы колонок, отсортированные по значению
     row = np.argsort(a)
-    return [(i, a[i]) for i in reversed(row) if a[i] > 0.0]
+    result = sorted([(i, a[i]) for i in row
+                     if a[i] > 0.0], key=lambda t: t[0], reverse=True)
+    return result
 
 
 def similars_by_context(token, m):
@@ -73,4 +75,6 @@ def similars_by_context(token, m):
     a = m[token].toarray()[0]  # i-я строка матрицы как 1-D массив
     # индексы колонок, отсортированные по значению
     row = np.argsort(a)
-    return [(i, a[i]) for i in reversed(row) if a[i] > 0.0]
+    result = sorted([(i, a[i]) for i in row
+                     if a[i] > 0.0], key=lambda t: t[0], reverse=True)
+    return result

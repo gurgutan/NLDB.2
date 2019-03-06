@@ -136,24 +136,31 @@ class Calculations(object):
     def context_similarity_matrix(self, save=True):
         """Расчет матрицы косинусных расстояний контекстов"""
         m = sparse.load_npz(names.fname_context_mean(self.dbpath))
-        result = sparse.csr_matrix([0])
+        start_time = timeit.default_timer()
         rows_count = m.shape[0]
         batch_size = min(rows_count, BATCH_SIZE)
         batch_count = int(rows_count / batch_size)
-        start_time = timeit.default_timer()
-        with tqdm(total=batch_count, ncols=100, mininterval=0.5) as progress:
+        with tqdm(total=batch_count*batch_count, ncols=100, mininterval=0.5) as progress:
             for i in range(batch_count):
-                first = i * batch_size
-                last = min((i + 1) * batch_size, rows_count)
-                d = cosine_similarity(m[first:last], dense_output=False)
+                for j in range(batch_count):
+                    x_first = i * batch_size
+                    x_last = min((i+1) * batch_size, rows_count)
+                    y_first = j*batch_size
+                    y_last = min((j+1) * batch_size, rows_count)
+                    xy = cosine_similarity(
+                        m[x_first:x_last], m[y_first:y_last], dense_output=False)
+                    self._eliminate_below(xy, 0.1)
+                    if j == 0:
+                        d = xy
+                    else:
+                        d = sparse.bmat([[d, xy]], format='csr')
+                    progress.update(1)
                 if(i == 0):
                     result = d
                 else:
                     result = sparse.bmat([[result], [d]], format='csr')
-                progress.update(1)
         print("")
         print("Время вычислений:", timeit.default_timer()-start_time)
-        result.eliminate_zeros()
         if save:
             print("Запись в файл ",
                   names.fname_context_similarity(self.dbpath))
@@ -169,26 +176,35 @@ class Calculations(object):
             print("Не найден файл ", names.fname_membership(self.dbpath))
             print("Файл содержит данные для расчета матрицы подобия")
             exit
-        result = sparse.csr_matrix([0])
+        start_time = timeit.default_timer()
         rows_count = m.shape[0]
         batch_size = min(rows_count, BATCH_SIZE)
         batch_count = int(rows_count / batch_size)
-        start_time = timeit.default_timer()
         with tqdm(total=batch_count, ncols=100, mininterval=0.5) as progress:
             for i in range(batch_count):
-                first = i * batch_size
-                last = min((i + 1) * batch_size, rows_count)
-                d = cosine_similarity(m[first:last], dense_output=False)
-                d.eliminate_zeros()
-                segment_name = str(last)
+                for j in range(batch_count):
+                    x_first = i * batch_size
+                    x_last = min((i+1) * batch_size, rows_count)
+                    y_first = j * batch_size
+                    y_last = min((j+1) * batch_size, rows_count)
+                    xy = cosine_similarity(
+                        m[x_first:x_last], m[y_first:y_last], dense_output=False)
+                    self._eliminate_below(xy, 0.1)
+                    if j == 0:
+                        d = xy
+                    else:
+                        d = sparse.bmat([[d, xy]], format='csr')
                 if(i == 0):
                     result = d
                 else:
-                    result = sparse.bmat([[result], [d]])
+                    result = sparse.bmat([[result], [d]], format='csr')
                 progress.update(1)
-        result.eliminate_zeros()
         print("")
         print("Время вычислений:", timeit.default_timer()-start_time)
         if save:
             sparse.save_npz(names.fname_member_similarity(self.dbpath), result)
         return result
+
+    def _eliminate_below(self, m, epsilon):
+        m.data = np.where(abs(m.data) < epsilon, 0, m.data)
+        m.eliminate_zeros()
