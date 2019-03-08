@@ -58,8 +58,10 @@ def similars_by_membership(token, m):
     # m = sparse.load_npz(fname_member_dist())
     a = m[token].toarray()[0]  # i-я строка матрицы как 1-D массив
     # индексы колонок, отсортированные по значению
-    row = np.argsort(a)
-    return [(i, a[i]) for i in reversed(row) if a[i] > 0.0]
+    # row = np.argsort(a)
+    result = reversed(sorted([(i, a[i])
+                              for i in a if a[i] > 0.0], key=lambda t: t[1]))
+    return result
 
 
 def similars_by_context(token, m):
@@ -70,7 +72,9 @@ def similars_by_context(token, m):
     token - идентификатор слова
     """
     # m = sparse.load_npz(fname_context_dist())
-    a = m[token].toarray()[0]  # i-я строка матрицы как 1-D массив
+    a = m[token].toarray()[0]  # token-я строка матрицы как 1-D массив
     # индексы колонок, отсортированные по значению
-    row = np.argsort(a)
-    return [(i, a[i]) for i in reversed(row) if a[i] > 0.0]
+    # row = np.argsort(a)
+    result = reversed(sorted([(i, a[i])
+                              for i in a if a[i] > 0.0], key=lambda t: t[1]))
+    return result

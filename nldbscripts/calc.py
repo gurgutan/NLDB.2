@@ -88,6 +88,7 @@ class Calculations(object):
                 progress.update(1)
         csr_matrix = sparse.csr_matrix((data, (rows, columns)), dtype=np.int8)
         if save:
+            print("Запись в файл ", names.fname_membership(self.dbpath))
             sparse.save_npz(names.fname_membership(self.dbpath), csr_matrix)
         return csr_matrix
 
@@ -129,7 +130,7 @@ class Calculations(object):
         m_means.eliminate_zeros()
         print("Время вычислений:", timeit.default_timer()-start_time)
         if save:
-            print("Запись на диск")
+            print("Запись в файл ", names.fname_context_mean(self.dbpath))
             sparse.save_npz(names.fname_context_mean(self.dbpath), m_means)
         return m_means
 
@@ -146,6 +147,8 @@ class Calculations(object):
                 first = i * batch_size
                 last = min((i + 1) * batch_size, rows_count)
                 d = cosine_similarity(m[first:last], dense_output=False)
+                self._eliminate_subzeroes(d, 0.1)
+                d.eliminate_zeros()
                 if(i == 0):
                     result = d
                 else:
@@ -179,6 +182,7 @@ class Calculations(object):
                 first = i * batch_size
                 last = min((i + 1) * batch_size, rows_count)
                 d = cosine_similarity(m[first:last], dense_output=False)
+                self._eliminate_subzeroes(d, 0.1)
                 d.eliminate_zeros()
                 segment_name = str(last)
                 if(i == 0):
@@ -190,5 +194,9 @@ class Calculations(object):
         print("")
         print("Время вычислений:", timeit.default_timer()-start_time)
         if save:
+            print("Запись в файл ", names.fname_member_similarity(self.dbpath))
             sparse.save_npz(names.fname_member_similarity(self.dbpath), result)
         return result
+
+    def _eliminate_subzeroes(self, m: sparse.csr_matrix, epsilon):
+        m.data = np.where(abs(m.data) < epsilon, 0, m.data)
