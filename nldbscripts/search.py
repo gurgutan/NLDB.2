@@ -48,7 +48,7 @@ def find_text_tree(text_tree, rank, wm):
     return word
 
 
-def similars_by_membership(token, m):
+def similars_by_membership(token, count, m):
     """
     Возвращает список пар (id_слова, величина_схожести).
     Близость определяется по совместным вхождениям в другие слова
@@ -58,13 +58,13 @@ def similars_by_membership(token, m):
     # m = sparse.load_npz(fname_member_dist())
     a = m[token].toarray()[0]  # i-я строка матрицы как 1-D массив
     # индексы колонок, отсортированные по значению
-    # row = np.argsort(a)
-    result = reversed(sorted([(i, a[i])
-                              for i in a if a[i] > 0.0], key=lambda t: t[1]))
-    return result
+    indices = np.argsort(a)
+    row = [(i, a[i]) for i in indices if a[i] > 0.0]
+    result = sorted(row, key=lambda t: t[0], reverse=True)
+    return result[:count]
 
 
-def similars_by_context(token, m):
+def similars_by_context(token, count, m):
     """
     Возвращает список пар (id_слова, величина_близости_к_i).
     Близость определяется по схожести контекстов.
@@ -74,7 +74,7 @@ def similars_by_context(token, m):
     # m = sparse.load_npz(fname_context_dist())
     a = m[token].toarray()[0]  # token-я строка матрицы как 1-D массив
     # индексы колонок, отсортированные по значению
-    # row = np.argsort(a)
-    result = reversed(sorted([(i, a[i])
-                              for i in a if a[i] > 0.0], key=lambda t: t[1]))
-    return result
+    indices = np.argsort(a)
+    row = [(i, a[i]) for i in indices if a[i] > 0.0]
+    result = sorted(row, key=lambda t: t[1], reverse=True)
+    return result[:count]

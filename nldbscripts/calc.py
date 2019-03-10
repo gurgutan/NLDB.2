@@ -101,7 +101,7 @@ class Calculations(object):
         # Списки индексов и значений для разреженных матриц
         sum_row, sum_col, sum_data = [], [], []
         count_row, count_col, count_data = [], [], []
-        with tqdm(total=len(words)*2, ncols=100, mininterval=0.5) as progress:
+        with tqdm(total=len(words)*2, ncols=120, mininterval=0.5) as progress:
             for idx, word in enumerate(words):
                 for i, row in enumerate(word[1]):
                     for j, column in enumerate(word[1]):
@@ -137,23 +137,29 @@ class Calculations(object):
     def context_similarity_matrix(self, save=True):
         """Расчет матрицы косинусных расстояний контекстов"""
         m = sparse.load_npz(names.fname_context_mean(self.dbpath))
-        result = sparse.csr_matrix([0])
         rows_count = m.shape[0]
         batch_size = min(rows_count, BATCH_SIZE)
         batch_count = int(rows_count / batch_size)
         start_time = timeit.default_timer()
-        with tqdm(total=batch_count, ncols=100, mininterval=0.5) as progress:
+        with tqdm(total=batch_count**2, ncols=120, mininterval=0.5) as progress:
             for i in range(batch_count):
-                first = i * batch_size
-                last = min((i + 1) * batch_size, rows_count)
-                d = cosine_similarity(m[first:last], dense_output=False)
-                self._eliminate_subzeroes(d, 0.1)
-                d.eliminate_zeros()
+                for j in range(batch_count):
+                    x_first = i * batch_size
+                    x_last = min((i + 1) * batch_size, rows_count)
+                    y_first = j * batch_size
+                    y_last = min((j + 1) * batch_size, rows_count)
+                    xy = cosine_similarity(
+                        m[x_first:x_last], m[y_first:y_last], dense_output=False)
+                    self._eliminate_subzeroes(xy, 0.1)
+                    progress.update(1)
+                    if j == 0:
+                        d = xy
+                    else:
+                        d = sparse.bmat([[d, xy]], format='csr')
                 if(i == 0):
                     result = d
                 else:
                     result = sparse.bmat([[result], [d]], format='csr')
-                progress.update(1)
         print("")
         print("Время вычислений:", timeit.default_timer()-start_time)
         result.eliminate_zeros()
@@ -177,19 +183,27 @@ class Calculations(object):
         batch_size = min(rows_count, BATCH_SIZE)
         batch_count = int(rows_count / batch_size)
         start_time = timeit.default_timer()
-        with tqdm(total=batch_count, ncols=100, mininterval=0.5) as progress:
+        with tqdm(total=batch_count**2, ncols=100, mininterval=0.5) as progress:
             for i in range(batch_count):
-                first = i * batch_size
-                last = min((i + 1) * batch_size, rows_count)
-                d = cosine_similarity(m[first:last], dense_output=False)
-                self._eliminate_subzeroes(d, 0.1)
-                d.eliminate_zeros()
-                segment_name = str(last)
+                for j in range(batch_count):
+                    x_first = i * batch_size
+                    x_last = min((i + 1) * batch_size, rows_count)
+                    y_first = j * batch_size
+                    y_last = min((j + 1) * batch_size, rows_count)
+                    if (x_last-x_first)*(y_last-y_first) == 0:
+                        continue
+                    xy = cosine_similarity(
+                        m[x_first:x_last], m[y_first:y_last], dense_output=False)
+                    self._eliminate_subzeroes(xy, 0.5)
+                    progress.update(1)
+                    if j == 0:
+                        d = xy
+                    else:
+                        d = sparse.bmat([[d, xy]], format='csr')
                 if(i == 0):
                     result = d
                 else:
-                    result = sparse.bmat([[result], [d]])
-                progress.update(1)
+                    result = sparse.bmat([[result], [d]], format='csr')
         result.eliminate_zeros()
         print("")
         print("Время вычислений:", timeit.default_timer()-start_time)
@@ -200,3 +214,4 @@ class Calculations(object):
 
     def _eliminate_subzeroes(self, m: sparse.csr_matrix, epsilon):
         m.data = np.where(abs(m.data) < epsilon, 0, m.data)
+        m.eliminate_zeros()
