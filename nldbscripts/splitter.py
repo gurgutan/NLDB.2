@@ -8,13 +8,14 @@ class Splitter(object):
         '''
         splitters - список строк-разделителей (регулярные выражения)
         '''
+        self.word_min_len = 3
         if splitters is not None:
             self.splitters = splitters
         else:
             self.splitters = [
-                r'[^а-яёА-ЯЁ\d]+', r'[\.\n\r\?\!\:\;]+', r'\[\[\d+\]\]']
+                r'[^а-яёА-ЯЁ]+', r'[\.\n\r\?\!\:\;]+', r'\[\[\d+\]\]']
         self._remove_pattern = re.compile(
-            r'[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\*\+\-\&\\\/\%\$\^\[\]\{\}\=\<\>]')
+            r'[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\*\+\-\&\\\/\%\$\^\[\]\{\}\=\<\>]+')
         self.lower = True
         self.patterns = [re.compile(x) for x in self.splitters]
 
@@ -36,9 +37,8 @@ class Splitter(object):
             return None
         terms = self.patterns[rank].split(text)
         if rank == 0:
-            result = [s for s in terms if len(s) > 0]
+            result = [s for s in terms if len(s) > self.word_min_len]
         else:
-            terms
             result = [self._split(t, rank-1) for t in terms if len(t) > 0]
         while len(result) == 1 and type(result) != str:
             result = result[0]

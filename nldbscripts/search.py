@@ -60,7 +60,7 @@ def similars_by_membership(token, count, m):
     # индексы колонок, отсортированные по значению
     indices = np.argsort(a)
     row = [(i, a[i]) for i in indices if a[i] > 0.0]
-    result = sorted(row, key=lambda t: t[0], reverse=True)
+    result = sorted(row, key=lambda t: t[1], reverse=True)
     return result[:count]
 
 

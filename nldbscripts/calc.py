@@ -139,18 +139,18 @@ class Calculations(object):
         m = sparse.load_npz(names.fname_context_mean(self.dbpath))
         rows_count = m.shape[0]
         batch_size = min(rows_count, BATCH_SIZE)
-        batch_count = int(rows_count / batch_size)
+        batch_amount = int(rows_count / batch_size)
         start_time = timeit.default_timer()
-        with tqdm(total=batch_count**2, ncols=120, mininterval=0.5) as progress:
-            for i in range(batch_count):
-                for j in range(batch_count):
+        with tqdm(total=batch_amount**2, ncols=120, mininterval=0.5) as progress:
+            for i in range(batch_amount):
+                for j in range(batch_amount):
                     x_first = i * batch_size
                     x_last = min((i + 1) * batch_size, rows_count)
                     y_first = j * batch_size
                     y_last = min((j + 1) * batch_size, rows_count)
                     xy = cosine_similarity(
                         m[x_first:x_last], m[y_first:y_last], dense_output=False)
-                    self._eliminate_subzeroes(xy, 0.1)
+                    self._eliminate_subzeroes(xy, 0.2)
                     progress.update(1)
                     if j == 0:
                         d = xy
@@ -193,7 +193,7 @@ class Calculations(object):
                         continue
                     xy = cosine_similarity(
                         m[x_first:x_last], m[y_first:y_last], dense_output=False)
-                    self._eliminate_subzeroes(xy, 0.5)
+                    self._eliminate_subzeroes(xy, 0.2)
                     progress.update(1)
                     if j == 0:
                         d = xy

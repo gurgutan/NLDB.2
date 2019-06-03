@@ -1,6 +1,7 @@
 import sqlite3 as sqlite
 import numpy as np
 import os.path
+import rlcompleter
 from tqdm import tqdm
 
 
@@ -8,7 +9,8 @@ class Tokenizer(object):
     """Класс с методами для преобразования дерева строк в дерево токенов"""
 
     def __init__(self, dbpath=''):
-        self.word_id = 65535
+        self.word_id = 65535    # начальный номер токена
+        self.word_min_len = 3   # минимальная длина слова
         if dbpath == '':
             self.db = sqlite.connect(':memory:')
         else:
@@ -76,12 +78,17 @@ class Tokenizer(object):
 
     def _tokenize(self, text_tree, rank):
         if rank == 0:
-            return [ord(c) for c in text_tree]
+            if(len(text_tree) < self.word_min_len):
+                return None
+            else:
+                return [ord(c) for c in text_tree]
         tokens = []
         if rank == self._max_rank:
             progress = tqdm(total=len(text_tree), ncols=100, mininterval=0.5)
         for t in text_tree:
             childs = self._tokenize(t, rank-1)
+            if childs is None:
+                continue
             if len(childs) == 0:
                 continue
             id = self._get_token(childs, rank)
