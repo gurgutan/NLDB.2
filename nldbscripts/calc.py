@@ -88,6 +88,7 @@ class Calculations(object):
                 progress.update(1)
         csr_matrix = sparse.csr_matrix((data, (rows, columns)), dtype=np.int8)
         if save:
+            print("Запись в файл ", names.fname_membership(self.dbpath))
             sparse.save_npz(names.fname_membership(self.dbpath), csr_matrix)
         return csr_matrix
 
@@ -100,7 +101,7 @@ class Calculations(object):
         # Списки индексов и значений для разреженных матриц
         sum_row, sum_col, sum_data = [], [], []
         count_row, count_col, count_data = [], [], []
-        with tqdm(total=len(words)*2, ncols=100, mininterval=0.5) as progress:
+        with tqdm(total=len(words)*2, ncols=120, mininterval=0.5) as progress:
             for idx, word in enumerate(words):
                 for i, row in enumerate(word[1]):
                     for j, column in enumerate(word[1]):
@@ -129,32 +130,32 @@ class Calculations(object):
         m_means.eliminate_zeros()
         print("Время вычислений:", timeit.default_timer()-start_time)
         if save:
-            print("Запись на диск")
+            print("Запись в файл ", names.fname_context_mean(self.dbpath))
             sparse.save_npz(names.fname_context_mean(self.dbpath), m_means)
         return m_means
 
     def context_similarity_matrix(self, save=True):
         """Расчет матрицы косинусных расстояний контекстов"""
         m = sparse.load_npz(names.fname_context_mean(self.dbpath))
-        start_time = timeit.default_timer()
         rows_count = m.shape[0]
         batch_size = min(rows_count, BATCH_SIZE)
         batch_count = int(rows_count / batch_size)
-        with tqdm(total=batch_count*batch_count, ncols=100, mininterval=0.5) as progress:
+        start_time = timeit.default_timer()
+        with tqdm(total=batch_count**2, ncols=120, mininterval=0.5) as progress:
             for i in range(batch_count):
                 for j in range(batch_count):
                     x_first = i * batch_size
-                    x_last = min((i+1) * batch_size, rows_count)
-                    y_first = j*batch_size
-                    y_last = min((j+1) * batch_size, rows_count)
+                    x_last = min((i + 1) * batch_size, rows_count)
+                    y_first = j * batch_size
+                    y_last = min((j + 1) * batch_size, rows_count)
                     xy = cosine_similarity(
                         m[x_first:x_last], m[y_first:y_last], dense_output=False)
-                    self._eliminate_below(xy, 0.1)
+                    self._eliminate_subzeroes(xy, 0.1)
+                    progress.update(1)
                     if j == 0:
                         d = xy
                     else:
                         d = sparse.bmat([[d, xy]], format='csr')
-                    progress.update(1)
                 if(i == 0):
                     result = d
                 else:
@@ -180,16 +181,20 @@ class Calculations(object):
         rows_count = m.shape[0]
         batch_size = min(rows_count, BATCH_SIZE)
         batch_count = int(rows_count / batch_size)
-        with tqdm(total=batch_count, ncols=100, mininterval=0.5) as progress:
+        start_time = timeit.default_timer()
+        with tqdm(total=batch_count**2, ncols=100, mininterval=0.5) as progress:
             for i in range(batch_count):
                 for j in range(batch_count):
                     x_first = i * batch_size
-                    x_last = min((i+1) * batch_size, rows_count)
+                    x_last = min((i + 1) * batch_size, rows_count)
                     y_first = j * batch_size
-                    y_last = min((j+1) * batch_size, rows_count)
+                    y_last = min((j + 1) * batch_size, rows_count)
+                    if (x_last-x_first)*(y_last-y_first) == 0:
+                        continue
                     xy = cosine_similarity(
                         m[x_first:x_last], m[y_first:y_last], dense_output=False)
-                    self._eliminate_below(xy, 0.1)
+                    self._eliminate_subzeroes(xy, 0.5)
+                    progress.update(1)
                     if j == 0:
                         d = xy
                     else:
@@ -198,13 +203,14 @@ class Calculations(object):
                     result = d
                 else:
                     result = sparse.bmat([[result], [d]], format='csr')
-                progress.update(1)
+        result.eliminate_zeros()
         print("")
         print("Время вычислений:", timeit.default_timer()-start_time)
         if save:
+            print("Запись в файл ", names.fname_member_similarity(self.dbpath))
             sparse.save_npz(names.fname_member_similarity(self.dbpath), result)
         return result
 
-    def _eliminate_below(self, m, epsilon):
+    def _eliminate_subzeroes(self, m: sparse.csr_matrix, epsilon):
         m.data = np.where(abs(m.data) < epsilon, 0, m.data)
         m.eliminate_zeros()
