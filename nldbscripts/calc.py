@@ -19,7 +19,11 @@ class Calculations(object):
         """dbpath - полное имя файла БД sqlite3"""
         self.dbpath = dbpath
         try:
-            self.db = sqlite.connect(self.dbpath)
+            if os.path.exists(dbpath):
+                self.db = sqlite.connect(self.dbpath)
+                print('Подключен к БД ', self.dbpath)
+            else:
+                print('Не найден файл БД ', self.dbpath)
         except:
             print('Не удалось подключиться к БД ', self.dbpath)
 
@@ -74,7 +78,7 @@ class Calculations(object):
         # количество столбцов в WORD_MAX_SIZE больше количества строк
         m = n*sum(WORD_SIZES)
         data, rows, columns = [], [], []
-        with tqdm(total=len(words), ncols=100, mininterval=0.5) as progress:
+        with tqdm(total=len(words), ncols=120, mininterval=0.5) as progress:
             for w in words:
                 word_id = w[0]
                 word_size = len(w[1])
@@ -182,7 +186,7 @@ class Calculations(object):
         batch_size = min(rows_count, BATCH_SIZE)
         batch_count = int(rows_count / batch_size)
         start_time = timeit.default_timer()
-        with tqdm(total=batch_count**2, ncols=100, mininterval=0.5) as progress:
+        with tqdm(total=batch_count**2, ncols=120, mininterval=0.5) as progress:
             for i in range(batch_count):
                 for j in range(batch_count):
                     x_first = i * batch_size

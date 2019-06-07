@@ -14,7 +14,7 @@ class Tokenizer(object):
         if dbpath == '':
             self.db = sqlite.connect(':memory:')
         else:
-            if os.path.isfile(dbpath):
+            if os.path.exists(dbpath):
                 self.db = sqlite.connect(dbpath)
                 c = self.db.cursor()
                 c.execute('select max(id) from words')
@@ -40,7 +40,7 @@ class Tokenizer(object):
         self._max_rank = rank
         tokens = self._tokenize(text_tree, rank)
         self.db.commit()
-        return [self._get_word(t) for t in tokens]
+        return [self._get_word(t) for t in tokens if not t is None]
 
     def _get_token(self, childs, rank):
         a = np.array(childs, dtype=np.int32)
@@ -84,17 +84,22 @@ class Tokenizer(object):
                 return [ord(c) for c in text_tree]
         tokens = []
         if rank == self._max_rank:
-            progress = tqdm(total=len(text_tree), ncols=100, mininterval=0.5)
+            progress = tqdm(total=len(text_tree), ncols=120, mininterval=0.5)
         for t in text_tree:
             childs = self._tokenize(t, rank-1)
             if childs is None:
+                if rank == self._max_rank:
+                    progress.update(1)
                 continue
             if len(childs) == 0:
+                if rank == self._max_rank:
+                    progress.update(1)
                 continue
             id = self._get_token(childs, rank)
             tokens.append(id)
             if rank == self._max_rank:
                 progress.update(1)
+        
         if rank == self._max_rank:
             progress.close()
         return tokens
