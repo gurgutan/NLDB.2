@@ -31,7 +31,7 @@ s = splitter.Splitter()
 # t = tokenizer.Tokenizer(dbpath)
 # t.tokenize(text_tree, 3)
 
-engine = calc.Calculations(dbpath)
+# engine = calc.Calculations(dbpath)
 
 # print('Вычисление memebership_matrix')
 # engine.memebership_matrix()
@@ -52,7 +52,7 @@ cs = sparse.load_npz(names.fname_context_similarity(dbpath))
 start_time = timeit.default_timer()
 
 # Размер обучающей выборки равен количеству ненулевых элементов матрицы
-print("Подготовка обучающей выборки")
+# print("Подготовка обучающей выборки")
 # train_size = 1000
 # inputX_train = []
 # inputY_train = []
@@ -67,9 +67,12 @@ print("Подготовка обучающей выборки")
 # x_train = tf.data.Dataset.from_tensor_slices(([inputX_train, inputY_train]
 # y_train = np.array(output_train)
 
-transformer = shrinker.Shrinker(in_size=cm.shape[0], out_size=64)
+transformer = shrinker.Shrinker(in_size=cm.shape[0], out_size=256)
 print("Обучение")
 transformer.train(cm)
+
+print("Сохранение модели")
+transformer.save('p23mb_model.h5')
 
 text = 'причина'
 print('Текст: ', text)

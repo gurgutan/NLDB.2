@@ -154,7 +154,7 @@ class Calculations(object):
                     y_last = min((j + 1) * batch_size, rows_count)
                     xy = cosine_similarity(
                         m[x_first:x_last], m[y_first:y_last], dense_output=False)
-                    self._eliminate_subzeroes(xy, 0.2)
+                    self._eliminate_subzeroes(xy, 0.4)
                     progress.update(1)
                     if j == 0:
                         d = xy

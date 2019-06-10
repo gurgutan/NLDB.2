@@ -3,6 +3,7 @@ from tensorflow.keras.initializers import *
 from tensorflow.keras.optimizers import Adam, Adagrad, RMSprop
 from tensorflow.keras.models import Model
 from tensorflow.keras import backend as backend
+from tensorflow.keras.models import load_model
 import scipy.sparse as sparse
 import random
 import numpy as np
@@ -42,7 +43,7 @@ class Shrinker(object):
         self.model = Model(inputs=[X, Y], outputs=[output])
         self.model.compile(loss='mean_squared_error',
                            optimizer='sgd',
-                           metrics=['acc', 'mae'])
+                           metrics=['mae'])
         return self.model
 
     def train(self, m: sparse.csr_matrix):
@@ -50,7 +51,7 @@ class Shrinker(object):
         Обучение модели созданной ранее на данных из m
         """
         self.model.fit_generator(
-            self._generate_from_sparse(m), steps_per_epoch=1024, epochs=32)
+            self._generate_from_sparse(m), steps_per_epoch=256, epochs=8)
         return self.model
 
     def _generate_from_sparse(self, m: sparse.csr_matrix):
@@ -76,3 +77,9 @@ class Shrinker(object):
         encode_model = Model(
             inputs=input, outputs=model.get_layer('encoding').output)
         return encode_model.predict(x)
+
+    def save(filename):
+        self.model.save(filename)
+
+    def load(filename):
+        self.model = load_model(filename)
