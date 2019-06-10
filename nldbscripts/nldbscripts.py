@@ -13,8 +13,8 @@ import shrinker
 import tensorflow as tf
 
 
-textname = '5mb.txt'
-dbname = 'py5mb.db'
+textname = '23mb.txt'
+dbname = 'py23mb.db'
 
 if system() == 'Linux':
     dbpath = '/home/ivan/dev/Data/Result/'+dbname
@@ -25,22 +25,22 @@ else:
 
 
 s = splitter.Splitter()
-print('Разбиение файла', text, 'на слова')
-text_tree = s.split_file(text)
-print('Токенизация')
-t = tokenizer.Tokenizer(dbpath)
-t.tokenize(text_tree, 3)
+# print('Разбиение файла', text, 'на слова')
+# text_tree = s.split_file(text)
+# print('Токенизация')
+# t = tokenizer.Tokenizer(dbpath)
+# t.tokenize(text_tree, 3)
 
 engine = calc.Calculations(dbpath)
 
-print('Вычисление memebership_matrix')
-engine.memebership_matrix()
+# print('Вычисление memebership_matrix')
+# engine.memebership_matrix()
 
-print('Вычисление context_mean_matrix')
-engine.context_mean_matrix()
+# print('Вычисление context_mean_matrix')
+# engine.context_mean_matrix()
 
-print('Вычисление context_similarity_matrix')
-engine.context_similarity_matrix()
+# print('Вычисление context_similarity_matrix')
+# engine.context_similarity_matrix()
 
 # print('Вычисление membeship_similarity_matrix')
 # engine.membeship_similarity_matrix()

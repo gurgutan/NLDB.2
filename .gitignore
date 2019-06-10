@@ -270,3 +270,4 @@ __pycache__/
 *.npz
 
 nldbscripts/.spyproject/workspace.ini
+nldbscripts/.vscode/settings.json

@@ -13,7 +13,7 @@ class Splitter(object):
             self.splitters = splitters
         else:
             self.splitters = [
-                r'[^а-яёА-ЯЁ]+'] #, r'[\.\n\r\?\!\:\;]+', r'\[\[\d+\]\]']
+                r'[^а-яёА-ЯЁ]', r'[\.\n\r\?\!\:\;]+', r'\[\[\d+\]\]']
         self._remove_pattern = re.compile(
             r'[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\*\+\-\&\\\/\%\$\^\[\]\{\}\=\<\>]+')
         self.lower = True
@@ -39,7 +39,8 @@ class Splitter(object):
         if rank == 0:
             result = [s for s in terms if len(s) > self.word_min_len]
         else:
-            result = [self._split(t, rank-1) for t in terms if len(t) > 0]
+            l = [self._split(t, rank-1) for t in terms if len(t) > 0]
+            result = [t for t in l if len(t) > 0]
         while len(result) == 1 and type(result) != str:
             result = result[0]
         return result

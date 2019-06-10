@@ -1,6 +1,6 @@
 from tensorflow.keras.layers import Input, Layer, Dense, Concatenate, Dot, Subtract
 from tensorflow.keras.initializers import *
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, Adagrad, RMSprop
 from tensorflow.keras.models import Model
 from tensorflow.keras import backend as backend
 import scipy.sparse as sparse
@@ -24,18 +24,25 @@ class Shrinker(object):
         Y = Input(shape=(in_size,))
         dot_XY = Dot(axes=-1, normalize=True)([X, Y])
 
+        # shared_dense_1 = Dense(
+        #     out_size, activation="relu", name="shared_dense_1")
+        # shared_dense_2 = Dense(out_size, activation="relu", name="encoding")
+        # s_x = shared_dense_1(X)
+        # s_y = shared_dense_1(Y)
+        # e_x = shared_dense_2(s_x)
+        # e_y = shared_dense_2(s_y)
         shared_dense = Dense(out_size, activation=None, name="encoding")
         e_x = shared_dense(X)
         e_y = shared_dense(Y)
         dot_xy = Dot(axes=-1, normalize=True)([e_x, e_y])
 
-        sub = Subtract()([dot_XY, dot_xy])
-        output = Dot(axes=-1, name="output")([sub, sub])
+        delta = Subtract()([dot_XY, dot_xy])
+        output = Dot(axes=-1, normalize=False, name="output")([delta, delta])
 
         self.model = Model(inputs=[X, Y], outputs=[output])
         self.model.compile(loss='mean_squared_error',
-                           optimizer=Adam(lr=0.01),
-                           metrics=['accuracy'])
+                           optimizer='sgd',
+                           metrics=['acc', 'mae'])
         return self.model
 
     def train(self, m: sparse.csr_matrix):

@@ -9,7 +9,9 @@ class Tokenizer(object):
     """Класс с методами для преобразования дерева строк в дерево токенов"""
 
     def __init__(self, dbpath=''):
-        self.word_id = 65535    # начальный номер токена
+        s = "абвгдежзиклмнопрстуфхцчьшщъэюя"
+        self.alphabet = {s[i]: i for i in range(len(s))}
+        self.word_id = 34    # начальный номер токена
         self.word_min_len = 3   # минимальная длина слова
         if dbpath == '':
             self.db = sqlite.connect(':memory:')
@@ -81,7 +83,7 @@ class Tokenizer(object):
             if(len(text_tree) < self.word_min_len):
                 return None
             else:
-                return [ord(c) for c in text_tree]
+                return [self.alphabet[c] for c in text_tree if c in self.alphabet]
         tokens = []
         if rank == self._max_rank:
             progress = tqdm(total=len(text_tree), ncols=120, mininterval=0.5)
@@ -99,7 +101,7 @@ class Tokenizer(object):
             tokens.append(id)
             if rank == self._max_rank:
                 progress.update(1)
-        
+
         if rank == self._max_rank:
             progress.close()
         return tokens
