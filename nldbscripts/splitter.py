@@ -13,7 +13,7 @@ class Splitter(object):
             self.splitters = splitters
         else:
             self.splitters = [
-                r'[^а-яёА-ЯЁ]+', r'[\.\n\r\?\!\:\;]+', r'\[\[\d+\]\]']
+                r'[^а-яёА-ЯЁ]+'] #, r'[\.\n\r\?\!\:\;]+', r'\[\[\d+\]\]']
         self._remove_pattern = re.compile(
             r'[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\*\+\-\&\\\/\%\$\^\[\]\{\}\=\<\>]+')
         self.lower = True

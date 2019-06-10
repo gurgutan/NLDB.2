@@ -25,22 +25,22 @@ else:
 
 
 s = splitter.Splitter()
-# print('Разбиение файла', text, 'на слова')
-# text_tree = s.split_file(text)
-# print('Токенизация')
-# t = tokenizer.Tokenizer(dbpath)
-# t.tokenize(text_tree, 3)
+print('Разбиение файла', text, 'на слова')
+text_tree = s.split_file(text)
+print('Токенизация')
+t = tokenizer.Tokenizer(dbpath)
+t.tokenize(text_tree, 3)
 
-# engine = calc.Calculations(dbpath)
+engine = calc.Calculations(dbpath)
 
-# print('Вычисление memebership_matrix')
-# engine.memebership_matrix()
+print('Вычисление memebership_matrix')
+engine.memebership_matrix()
 
-# print('Вычисление context_mean_matrix')
-# engine.context_mean_matrix()
+print('Вычисление context_mean_matrix')
+engine.context_mean_matrix()
 
-# print('Вычисление context_similarity_matrix')
-# engine.context_similarity_matrix()
+print('Вычисление context_similarity_matrix')
+engine.context_similarity_matrix()
 
 # print('Вычисление membeship_similarity_matrix')
 # engine.membeship_similarity_matrix()
