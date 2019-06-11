@@ -38,7 +38,7 @@ class Shrinker(object):
         dot_xy = Dot(axes=-1, normalize=True)([e_x, e_y])
 
         delta = Subtract()([dot_XY, dot_xy])
-        output = Dot(axes=-1, normalize=False, name="output")([delta, delta])
+        output = Dot(axes=-1, normalize=True, name="output")([delta, delta])
 
         self.model = Model(inputs=[X, Y], outputs=[output])
         self.model.compile(loss='mean_squared_error',
@@ -55,21 +55,20 @@ class Shrinker(object):
         return self.model
 
     def _generate_from_sparse(self, m: sparse.csr_matrix):
+        batch_size = 2**10
+        size = m.shape[0]
+        n_x = 0
         while True:
             input_1 = []
             input_2 = []
             output = []
-            batch_size = 2**8
-            size = m.shape[0]
             for i in range(batch_size):
-                n_x = random.randint(0, size-1)
+                # Выбираем случайно две строки, соответствующие словам
+                n_x = (n_x + 1) % size # random.randint(0, size-1)
                 n_y = random.randint(0, size-1)
-                X = [m[n_x].toarray()[0]]
-                Y = [m[n_y].toarray()[0]]
-                z = [0]
-                input_1 += X
-                input_2 += Y
-                output += z
+                input_1 += [m[n_x].toarray()[0]]
+                input_2 += [m[n_x].toarray()[0]]
+                output += [0]
             yield ({'input_1': np.array(input_1), 'input_2': np.array(input_2)}, {'output': np.array(output)})
 
     def shrink(x):

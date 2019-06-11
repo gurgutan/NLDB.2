@@ -1,4 +1,4 @@
 {
-    "python.pythonPath": "/home/ivan/anaconda3/envs/tf-gpu/bin/python",
+    "python.pythonPath": "D:\\Anaconda\\Miniconda3\\envs\\ml\\python.exe",
     "python.formatting.provider": "autopep8"
 }

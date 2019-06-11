@@ -13,8 +13,8 @@ import shrinker
 import tensorflow as tf
 
 
-textname = '23mb.txt'
-dbname = 'py23mb.db'
+textname = '5mb.txt'
+dbname = 'py5mb.db'
 
 if system() == 'Linux':
     dbpath = '/home/ivan/dev/Data/Result/'+dbname
@@ -31,7 +31,7 @@ s = splitter.Splitter()
 # t = tokenizer.Tokenizer(dbpath)
 # t.tokenize(text_tree, 3)
 
-# engine = calc.Calculations(dbpath)
+engine = calc.Calculations(dbpath)
 
 # print('Вычисление memebership_matrix')
 # engine.memebership_matrix()
@@ -51,28 +51,12 @@ wm = sparse.load_npz(names.fname_membership(dbpath))
 cs = sparse.load_npz(names.fname_context_similarity(dbpath))
 start_time = timeit.default_timer()
 
-# Размер обучающей выборки равен количеству ненулевых элементов матрицы
-# print("Подготовка обучающей выборки")
-# train_size = 1000
-# inputX_train = []
-# inputY_train = []
-# output_train = []
-# for i in range(train_size):
-#     n_x = random.randint(0, cm.shape[0])
-#     n_y = random.randint(0, cm.shape[0])
-#     output = [0]
-#     inputX_train += [cm[n_x].toarray()[0]]
-#     inputY_train += [cm[n_y].toarray()[0]]
-#     output_train += output
-# x_train = tf.data.Dataset.from_tensor_slices(([inputX_train, inputY_train]
-# y_train = np.array(output_train)
-
-transformer = shrinker.Shrinker(in_size=cm.shape[0], out_size=256)
+transformer = shrinker.Shrinker(in_size=cm.shape[0], out_size=16)
 print("Обучение")
 transformer.train(cm)
 
 print("Сохранение модели")
-transformer.save('p23mb_model.h5')
+transformer.save('p5mb_model.h5')
 
 text = 'причина'
 print('Текст: ', text)

@@ -17,6 +17,9 @@ class Calculations(object):
 
     def __init__(self, dbpath):
         """dbpath - полное имя файла БД sqlite3"""
+
+        s = "абвгдежзиклмнопрстуфхцчьшщъэюя"
+        self.alphabet = {s[i]: i for i in range(len(s))}
         self.dbpath = dbpath
         try:
             if os.path.exists(dbpath):
@@ -46,8 +49,8 @@ class Calculations(object):
         """Получение слова из БД по идентификатору token"""
         if token <= 0:
             return None
-        if token <= 65535:
-            return chr(token)
+        if token <= 33:
+            return self.alphabet[token]
         cursor = self.db.cursor()
         first = cursor.execute(
             'select Id, Childs, Rank from Words where Id=?',
@@ -57,17 +60,17 @@ class Calculations(object):
         a = np.frombuffer(first[1], dtype=np.int32)
         if len(a) == 0:
             return None
-        if a[0] <= 65535:
-            word = ''.join([chr(c) for c in a])
+        if a[0] <= 33:
+            word = ''.join([self.alphabet[c] for c in a])
         else:
             word = [self.dbget_word(int(x)) for x in a]
         return word
 
     def dbget_word_binvec(self, token, length):
-        """Вовзращает бинарное представление слова в разреженной матрице"""
+        """Возвращает бинарное представление слова в разреженной матрице"""
         if token <= 0:
             return None
-        if token <= 65535:
+        if token <= 33:
             return sparse.csr_matrix(([1], ([0], [token])), shape=(1, length))
 
     def memebership_matrix(self, save=True):
