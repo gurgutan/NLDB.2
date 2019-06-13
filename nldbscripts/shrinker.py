@@ -10,31 +10,42 @@ import numpy as np
 
 
 class Shrinker(object):
+    """
+    Класс для получения сжатого (фиксированной длины) представления векторов по 'длинным' векторам.
+    Для этого используется обучаемая нейросеть, преобразующая 'длинные' входные векторы в 'короткие'.
+    Обучение производится поиском линейного оператора L:A->B, где A - пространство 'длинных' векторов
+    размерности m, а B - пространство 'коротких' векторов размерности n.
+    Поиск линейного оператора осуществляется градиентным спуском по функции минимизирующей разницу матриц расстояний между парами векторов.
+    """
+    # TODO: Линейный оператор можно сделать нелинейным, усложнив обучаемую часть модели
 
     def __init__(self, in_size=256, out_size=64):
         """
-        size - выходной размер
-        m - исходная матрица
+        in_size - размерность пространства 'длинных' векторов
+        out_size - размерность пространства 'коротких' векторов
         """
         self.input_size = in_size
         self.output_size = out_size
         self.model = self._get_model(in_size, out_size)
 
     def _get_model(self, in_size, out_size):
+        """
+        Создает обучаемую модель для поиска линейного оператора. На вход модели подается два вектора области определения искомого оператора.
+        """
         X = Input(shape=(in_size,))
         Y = Input(shape=(in_size,))
         dot_XY = Dot(axes=-1, normalize=True)([X, Y])
 
-        # shared_dense_1 = Dense(
-        #     out_size, activation="relu", name="shared_dense_1")
-        # shared_dense_2 = Dense(out_size, activation="relu", name="encoding")
-        # s_x = shared_dense_1(X)
-        # s_y = shared_dense_1(Y)
-        # e_x = shared_dense_2(s_x)
-        # e_y = shared_dense_2(s_y)
-        shared_dense = Dense(out_size, activation=None, name="encoding")
-        e_x = shared_dense(X)
-        e_y = shared_dense(Y)
+        shared_dense = Dense(
+            out_size*2, activation='softsign', name="shared_dense")
+        encoding = Dense(out_size, activation="softsign", name="encoding")
+        s_x = shared_dense(X)
+        s_y = shared_dense(Y)
+        e_x = encoding(s_x)
+        e_y = encoding(s_y)
+        # shared_dense = Dense(out_size, activation=None, name="encoding")
+        # e_x = shared_dense(X)
+        # e_y = shared_dense(Y)
         dot_xy = Dot(axes=-1, normalize=True)([e_x, e_y])
 
         delta = Subtract()([dot_XY, dot_xy])
@@ -48,14 +59,18 @@ class Shrinker(object):
 
     def train(self, m: sparse.csr_matrix):
         """
-        Обучение модели созданной ранее на данных из m
+        Обучение модели на данных из разреженной матрицы m. В m каждая строка - 'длинный' вектор области определения искомого оператора.
         """
         self.model.fit_generator(
             self._generate_from_sparse(m), steps_per_epoch=256, epochs=8)
         return self.model
 
     def _generate_from_sparse(self, m: sparse.csr_matrix):
-        batch_size = 2**10
+        """
+        Генератор пакетов обучающей выборки
+        """
+        # Размер пакета (пока фиксирован в коде)
+        batch_size = 2**12
         size = m.shape[0]
         n_x = 0
         while True:
@@ -63,22 +78,27 @@ class Shrinker(object):
             input_2 = []
             output = []
             for i in range(batch_size):
-                # Выбираем случайно две строки, соответствующие словам
-                n_x = (n_x + 1) % size # random.randint(0, size-1)
+                # Один из выбираемых векторов циклически пробегает весь диапазон
+                n_x = (n_x + 1) % size  # random.randint(0, size-1)
+                # Второй вектор выбираем случайно строку из матрицы m
                 n_y = random.randint(0, size-1)
                 input_1 += [m[n_x].toarray()[0]]
                 input_2 += [m[n_x].toarray()[0]]
                 output += [0]
             yield ({'input_1': np.array(input_1), 'input_2': np.array(input_2)}, {'output': np.array(output)})
 
-    def shrink(x):
+    def shrink(self, x):
+        """
+        Преобразует 'длинный' вектор x в 'короткий' вектор y и возвращает y
+        """
         input = Input(shape=(self.input_size,))
+        # Линейный оператор - один из обучаемых слоёв модели
         encode_model = Model(
             inputs=input, outputs=model.get_layer('encoding').output)
         return encode_model.predict(x)
 
-    def save(filename):
+    def save(self, filename):
         self.model.save(filename)
 
-    def load(filename):
+    def load(self, filename):
         self.model = load_model(filename)
