@@ -7,6 +7,7 @@ import os
 import names
 from const import *
 from tqdm import tqdm
+import alphabet
 
 
 class Calculations(object):
@@ -17,9 +18,7 @@ class Calculations(object):
 
     def __init__(self, dbpath):
         """dbpath - полное имя файла БД sqlite3"""
-
-        s = "абвгдежзиклмнопрстуфхцчьшщъэюя"
-        self.alphabet = {s[i]: i for i in range(len(s))}
+        self._letters = alphabet.Alphabet()
         self.dbpath = dbpath
         try:
             if os.path.exists(dbpath):
@@ -45,33 +44,29 @@ class Calculations(object):
         ]
         return data
 
-    def dbget_word(self, token):
+    def dbget_word(self, id):
         """Получение слова из БД по идентификатору token"""
-        if token <= 0:
-            return None
-        if token <= 33:
-            return self.alphabet[token]
+        assert (id >= 0), "id слова не может быть отрицательным"
+        if id < self._letters.size:
+            return self._letters.get_char(id)
         cursor = self.db.cursor()
         first = cursor.execute(
             'select Id, Childs, Rank from Words where Id=?',
-            (token,)).fetchone()
+            (id,)).fetchone()
         if first is None:
             return None
-        a = np.frombuffer(first[1], dtype=np.int32)
-        if len(a) == 0:
+        childs = np.frombuffer(first[1], dtype=np.int32)
+        if len(childs) == 0:
             return None
-        if a[0] <= 33:
-            word = ''.join([self.alphabet[c] for c in a])
-        else:
-            word = [self.dbget_word(int(x)) for x in a]
-        return word
+        return '('+''.join(
+            [self._letters.get_char(i) if i < self._letters.size
+             else self.dbget_word(int(i)) for i in childs])+')'
 
-    def dbget_word_binvec(self, token, length):
+    def dbget_word_binvec(self, id, length):
         """Возвращает бинарное представление слова в разреженной матрице"""
-        if token <= 0:
-            return None
-        if token <= 33:
-            return sparse.csr_matrix(([1], ([0], [token])), shape=(1, length))
+        assert (id >= 0), "id слова не может быть отрицательным"
+        if id < self._letters.size:
+            return sparse.csr_matrix(([1], ([0], [id])), shape=(1, length))
 
     def memebership_matrix(self, save=True):
         """Расчет матрицы принадлежности"""
