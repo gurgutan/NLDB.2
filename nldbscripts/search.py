@@ -52,30 +52,14 @@ def find_text(text_tree, rank, wm):
     return find_word(childs, scores, rank, wm)
 
 
-def similars_by_membership(id, count, m):
+def get_similars(id, count, m):
     """
     Возвращает список пар (id_слова, величина_схожести).
     Близость определяется по совместным вхождениям в другие слова
-    m - разреженная матрица принадлежности
+    m - разреженная матрица сходства
     token - идентификатор слова
     """
     # m = sparse.load_npz(fname_member_dist())
-    a = m[id].toarray()[0]  # id-я строка матрицы как 1-D массив
-    # индексы колонок, отсортированные по значению
-    indices = np.argsort(a)
-    row = [(i, a[i]) for i in indices if a[i] > 0.0]
-    result = sorted(row, key=lambda t: t[1], reverse=True)
-    return result[:count]
-
-
-def similars_by_context(id, count, m):
-    """
-    Возвращает список пар (id_слова, величина_близости_к_id).
-    Близость определяется по схожести контекстов.
-    m - разреженная матрица контекстов
-    token - идентификатор слова
-    """
-    # m = sparse.load_npz(fname_context_dist())
     a = m[id].toarray()[0]  # id-я строка матрицы как 1-D массив
     # индексы колонок, отсортированные по значению
     indices = np.argsort(a)

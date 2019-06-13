@@ -13,7 +13,6 @@ import shrinker
 import tensorflow as tf
 
 
-
 textname = '5mb.txt'
 dbname = 'py5mb.db'
 
@@ -26,25 +25,25 @@ else:
 
 
 s = splitter.Splitter()
-# print('Разбиение текста', text, 'на слова')
-# text_tree = s.split_file(text)
-# print('Векторизация текста')
-# v = tokenizer.Vectorizer(dbpath, max_rank=3)
-# v.vectorize(text_tree)
+print('Разбиение текста "%s" на слова', text)
+text_tree = s.split_file(text)
+print('Векторизация текста')
+v = tokenizer.Vectorizer(dbpath, max_rank=3)
+v.vectorize(text_tree)
 
 engine = calc.Calculations(dbpath)
 
-# print('Вычисление memebership_matrix')
-# engine.memebership_matrix()
+print('Вычисление memebership_matrix')
+engine.memebership_matrix()
 
-# print('Вычисление context_mean_matrix')
-# engine.context_mean_matrix()
+print('Вычисление context_mean_matrix')
+engine.context_mean_matrix()
 
-# print('Вычисление context_similarity_matrix')
-# engine.context_similarity_matrix()
+print('Вычисление context_similarity_matrix')
+engine.context_similarity_matrix()
 
-# print('Вычисление membeship_similarity_matrix')
-# engine.membeship_similarity_matrix()
+print('Вычисление membeship_similarity_matrix')
+engine.membeship_similarity_matrix()
 
 cm = sparse.load_npz(names.fname_context_mean(dbpath))
 wm = sparse.load_npz(names.fname_membership(dbpath))
@@ -72,15 +71,13 @@ while text != '':
         # v_long = cm[word[0]]
         # v_short = transformer.shrink(v_long)
         # print("Короткий вектор:", v_short)
-        print('С уверенностью %.2f введено "%s"' % (word[1], engine.dbget_word(word[0])))
-        # print("Поиск по принадлежности")
-        # s1 = search.similars_by_membership(word[0], words_to_find_count, ms)
-        # for t in s1:
-        #     print(t[1], ':', t[0], engine.dbget_word(int(t[0])))
+        print('С уверенностью %.2f введено "%s"' %
+              (word[1], engine.dbget_word(word[0])))
         print("Поиск по контексту:")
-        s2 = search.similars_by_context(word[0], words_to_find_count, cs)
+        s2 = search.get_similars(word[0], words_to_find_count, cs)
         for v in s2:
-            print('  (%.2f, %i) "%s"' % (v[1], v[0], engine.dbget_word(int(v[0]))))
+            print('  (%.2f, %i) "%s"' %
+                  (v[1], v[0], engine.dbget_word(int(v[0]))))
     print('Текст: ', end='')
     text = input()
 # print(timeit.default_timer()-start_time)
