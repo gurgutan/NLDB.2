@@ -18,6 +18,7 @@ class Calculations(object):
 
     def __init__(self, dbpath):
         """dbpath - полное имя файла БД sqlite3"""
+        self._subzero = 0.3
         self._letters = alphabet.Alphabet()
         self.dbpath = dbpath
         try:
@@ -73,7 +74,6 @@ class Calculations(object):
         words = self.dbget_words()
         # размерность матрицы на 1 больше максимального индекса
         n = max([w[0] for w in words]) + 1
-        # количество столбцов в WORD_MAX_SIZE больше количества строк
         m = n*sum(WORD_SIZES)
         data, rows, columns = [], [], []
         with tqdm(total=len(words), ncols=120, mininterval=0.5) as progress:
@@ -100,6 +100,7 @@ class Calculations(object):
         if(len(words) == 0):
             print('Слов в БД не найдено')
             return
+        start_time = timeit.default_timer()
         # Списки индексов и значений для разреженных матриц
         sum_row, sum_col, sum_data = [], [], []
         count_row, count_col, count_data = [], [], []
@@ -125,7 +126,6 @@ class Calculations(object):
             (count_data, (count_row, count_col)), dtype=np.float32)
         count_row, count_col, count_data = None, None, None
         # Вычисление среднего
-        start_time = timeit.default_timer()
         print("Вычисление среднего")
         m_count = m_count.power(-1, dtype=np.float32)
         m_means = m_sum.multiply(m_count)
@@ -146,22 +146,24 @@ class Calculations(object):
         with tqdm(total=batch_amount**2, ncols=120, mininterval=0.5) as progress:
             for i in range(batch_amount):
                 for j in range(batch_amount):
+                    # Определяем 1-й диапазон строк матрицы m
                     x_first = i * batch_size
                     x_last = min((i + 1) * batch_size, rows_count)
                     y_first = j * batch_size
                     y_last = min((j + 1) * batch_size, rows_count)
-                    xy = cosine_similarity(
+                    cos_xy = cosine_similarity(
                         m[x_first:x_last], m[y_first:y_last], dense_output=False)
-                    self._eliminate_subzeroes(xy, 0.4)
+                    self._eliminate_subzeroes(cos_xy, self._subzero)
                     progress.update(1)
                     if j == 0:
-                        d = xy
+                        d = cos_xy
                     else:
-                        d = sparse.bmat([[d, xy]], format='csr')
+                        d = sparse.bmat([[d, cos_xy]], format='csr')
                 if(i == 0):
                     result = d
                 else:
                     result = sparse.bmat([[result], [d]], format='csr')
+        result.resize(m.shape)
         print("")
         print("Время вычислений:", timeit.default_timer()-start_time)
         if save:
@@ -193,14 +195,14 @@ class Calculations(object):
                     y_last = min((j + 1) * batch_size, rows_count)
                     if (x_last-x_first)*(y_last-y_first) == 0:
                         continue
-                    xy = cosine_similarity(
+                    cos_xy = cosine_similarity(
                         m[x_first:x_last], m[y_first:y_last], dense_output=False)
-                    self._eliminate_subzeroes(xy, 0.2)
+                    self._eliminate_subzeroes(cos_xy, self._subzero)
                     progress.update(1)
                     if j == 0:
-                        d = xy
+                        d = cos_xy
                     else:
-                        d = sparse.bmat([[d, xy]], format='csr')
+                        d = sparse.bmat([[d, cos_xy]], format='csr')
                 if(i == 0):
                     result = d
                 else:

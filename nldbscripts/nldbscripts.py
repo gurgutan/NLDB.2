@@ -13,8 +13,8 @@ import shrinker
 import tensorflow as tf
 
 
-textname = '5mb.txt'
-dbname = 'py5mb.db'
+textname = '23mb.txt'
+dbname = '23mb.db'
 
 if system() == 'Linux':
     dbpath = '/home/ivan/dev/Data/Result/'+dbname
@@ -25,30 +25,31 @@ else:
 
 
 s = splitter.Splitter()
-print('Разбиение текста "%s" на слова', text)
-text_tree = s.split_file(text)
-print('Векторизация текста')
-v = tokenizer.Vectorizer(dbpath, max_rank=3)
-v.vectorize(text_tree)
+# print('Разбиение текста "%s" на слова' % text)
+# text_tree = s.split_file(text)
+# print('Векторизация текста "%s"' % text)
+# v = tokenizer.Vectorizer(dbpath, max_rank=3)
+# v.vectorize(text_tree)
 
 engine = calc.Calculations(dbpath)
 
-print('Вычисление memebership_matrix')
-engine.memebership_matrix()
+# print('Вычисление memebership_matrix')
+# engine.memebership_matrix()
 
-print('Вычисление context_mean_matrix')
-engine.context_mean_matrix()
+# print('Вычисление context_mean_matrix')
+# engine.context_mean_matrix()
 
-print('Вычисление context_similarity_matrix')
-engine.context_similarity_matrix()
+# print('Вычисление context_similarity_matrix')
+# engine.context_similarity_matrix()
 
-print('Вычисление membeship_similarity_matrix')
-engine.membeship_similarity_matrix()
+# print('Вычисление membeship_similarity_matrix')
+# engine.membeship_similarity_matrix()
 
+print("Загрузка данных...")
 cm = sparse.load_npz(names.fname_context_mean(dbpath))
 wm = sparse.load_npz(names.fname_membership(dbpath))
 cs = sparse.load_npz(names.fname_context_similarity(dbpath))
-# ms = sparse.load_npz(names.fname_member_similarity(dbpath))
+ms = sparse.load_npz(names.fname_member_similarity(dbpath))
 
 # start_time = timeit.default_timer()
 
@@ -74,10 +75,10 @@ while text != '':
         print('С уверенностью %.2f введено "%s"' %
               (word[1], engine.dbget_word(word[0])))
         print("Поиск по контексту:")
-        s2 = search.get_similars(word[0], words_to_find_count, cs)
-        for v in s2:
-            print('  (%.2f, %i) "%s"' %
-                  (v[1], v[0], engine.dbget_word(int(v[0]))))
+        s = search.get_similars(word[0], words_to_find_count, cs)
+        print(['(%.2f, %i) %s' % (v[1], v[0], engine.dbget_word(int(v[0]))) for v in s])
+        s = search.get_similars(word[0], words_to_find_count, ms)
+        print(['(%.2f, %i) %s' % (v[1], v[0], engine.dbget_word(int(v[0]))) for v in s])
     print('Текст: ', end='')
     text = input()
 # print(timeit.default_timer()-start_time)

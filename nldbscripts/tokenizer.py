@@ -15,12 +15,8 @@ class Vectorizer(object):
         self._current_id = self._letters.size+1    # текущий id слова
         # минимальная длина слова, всё что меньше - пропускается
         self.word_min_len = word_min_len
-        create_table = 'create table words(id integer primary key,childs BLOB not null,rank integer not null)'
         if dbpath == '':
-            self.db = sqlite.connect(':memory:')
-            self.db.execute(create_table)
-            self.db.execute('create unique index childs on words(childs)')
-            self.db.commit()
+            _create_db(':memory:')
         else:
             if os.path.exists(dbpath):
                 self.db = sqlite.connect(dbpath)
@@ -30,18 +26,12 @@ class Vectorizer(object):
                 if maxid is not None:
                     self.current_id = maxid[0]
             else:
-                self.db = sqlite.connect(dbpath)
-                self.db.execute(create_table)
-                self.db.execute('create unique index childs on words(childs)')
-                self.db.commit()
-
-    def __del__(self):
-        self.db.close()
+                self._create_db(dbpath)
 
     def vectorize(self, text_tree):
         ids = self._vectorize(text_tree, self._max_rank)
         self.db.commit()
-        return [self.get_word(t) for t in ids if not t is None]
+        return ids #[self.get_word(t) for t in ids if not t is None]
 
     def get_id(self, childs, rank):
         a = np.array(childs, dtype=np.int32).tobytes()
@@ -80,6 +70,17 @@ class Vectorizer(object):
             if (not childs is None) and (len(childs) > 0):
                 ids.append(self.get_id(childs, rank))
         return ids
+
+    def _create_db(self, dbpath):
+        create_table = 'create table words(id integer primary key,childs BLOB not null,rank integer not null)'
+        create_index = 'create unique index childs on words(childs)'
+        self.db = sqlite.connect(dbpath)
+        self.db.execute(create_table)
+        self.db.execute(create_index)
+        self.db.commit()
+
+    def __del__(self):
+        self.db.close()
 
 
 MODE_TEST = False
