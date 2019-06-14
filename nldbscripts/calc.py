@@ -102,29 +102,21 @@ class Calculations(object):
             return
         start_time = timeit.default_timer()
         # Списки индексов и значений для разреженных матриц
-        sum_row, sum_col, sum_data = [], [], []
-        count_row, count_col, count_data = [], [], []
-        with tqdm(total=len(words)*2, ncols=120, mininterval=0.5) as progress:
+        rows, cols, sum_data, count_data = [], [], [], []
+        with tqdm(total=len(words), ncols=120, mininterval=0.5) as progress:
             for idx, word in enumerate(words):
                 for i, row in enumerate(word[1]):
                     for j, column in enumerate(word[1]):
-                        sum_row.append(row)
-                        sum_col.append(column)
+                        rows.append(row)
+                        cols.append(column)
                         sum_data.append(j-i)
-                progress.update(1)
-            m_sum = sparse.csr_matrix(
-                (sum_data, (sum_row, sum_col)), dtype=np.float32)
-            sum_row, sum_col, sum_data = None, None, None
-            for idx, word in enumerate(words):
-                for i, row in enumerate(word[1]):
-                    for j, column in enumerate(word[1]):
-                        count_row.append(row)
-                        count_col.append(column)
                         count_data.append(1)
                 progress.update(1)
+        m_sum = sparse.csr_matrix(
+            (sum_data, (rows, cols)), dtype=np.float32)
         m_count = sparse.csr_matrix(
-            (count_data, (count_row, count_col)), dtype=np.float32)
-        count_row, count_col, count_data = None, None, None
+            (count_data, (rows, cols)), dtype=np.float32)
+        rows, cols, sum_data, count_data = None, None, None, None
         # Вычисление среднего
         print("Вычисление среднего")
         m_count = m_count.power(-1, dtype=np.float32)

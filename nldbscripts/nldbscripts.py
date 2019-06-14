@@ -33,17 +33,17 @@ s = splitter.Splitter()
 
 engine = calc.Calculations(dbpath)
 
-# print('Вычисление memebership_matrix')
-# engine.memebership_matrix()
+print('Вычисление memebership_matrix')
+engine.memebership_matrix()
 
-# print('Вычисление context_mean_matrix')
-# engine.context_mean_matrix()
+print('Вычисление context_mean_matrix')
+engine.context_mean_matrix()
 
-# print('Вычисление context_similarity_matrix')
-# engine.context_similarity_matrix()
+print('Вычисление context_similarity_matrix')
+engine.context_similarity_matrix()
 
-# print('Вычисление membeship_similarity_matrix')
-# engine.membeship_similarity_matrix()
+print('Вычисление membeship_similarity_matrix')
+engine.membeship_similarity_matrix()
 
 print("Загрузка данных...")
 cm = sparse.load_npz(names.fname_context_mean(dbpath))
