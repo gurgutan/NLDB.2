@@ -11,10 +11,11 @@ import random
 from platform import system
 import shrinker
 import tensorflow as tf
+import generator
 
 
-textname = '23mb.txt'
-dbname = '23mb.db'
+textname = '100mb.txt'
+dbname = '100mb.db'
 
 if system() == 'Linux':
     dbpath = '/home/ivan/dev/Data/Result/'+dbname
@@ -33,23 +34,23 @@ s = splitter.Splitter()
 
 engine = calc.Calculations(dbpath)
 
-print('Вычисление memebership_matrix')
-engine.memebership_matrix()
+# print('Вычисление memebership_matrix')
+# engine.memebership_matrix()
 
-print('Вычисление context_mean_matrix')
-engine.context_mean_matrix()
+# print('Вычисление context_mean_matrix')
+# engine.context_mean_matrix()
 
-print('Вычисление context_similarity_matrix')
-engine.context_similarity_matrix()
+# print('Вычисление context_similarity_matrix')
+# engine.context_similarity_matrix()
 
-print('Вычисление membeship_similarity_matrix')
-engine.membeship_similarity_matrix()
+# print('Вычисление membeship_similarity_matrix')
+# engine.membeship_similarity_matrix()
 
 print("Загрузка данных...")
 cm = sparse.load_npz(names.fname_context_mean(dbpath))
 wm = sparse.load_npz(names.fname_membership(dbpath))
 cs = sparse.load_npz(names.fname_context_similarity(dbpath))
-ms = sparse.load_npz(names.fname_member_similarity(dbpath))
+# ms = sparse.load_npz(names.fname_member_similarity(dbpath))
 
 # start_time = timeit.default_timer()
 
@@ -60,13 +61,13 @@ ms = sparse.load_npz(names.fname_member_similarity(dbpath))
 # print("Сохранение модели")
 # transformer.save('p5mb_model.h5')
 
-text = 'причина гражданской войны'
-words_to_find_count = 4
+text = 'причина гражданская война'
+words_to_find_count = 8
 print('Текст: ', text)
 
 while text != '':
     text_tree = s.split_string(text)
-    word = search.find_text(text_tree, 2, wm)
+    word = search.find_id(text_tree, 2, wm)
     if word[0] is not None:
         # Вектор контекста для слова word
         # v_long = cm[word[0]]
@@ -75,10 +76,20 @@ while text != '':
         print('С уверенностью %.2f введено "%s"' %
               (word[1], engine.dbget_word(word[0])))
         print("Поиск по контексту:")
-        s = search.get_similars(word[0], words_to_find_count, cs)
-        print(['(%.2f, %i) %s' % (v[1], v[0], engine.dbget_word(int(v[0]))) for v in s])
-        s = search.get_similars(word[0], words_to_find_count, ms)
-        print(['(%.2f, %i) %s' % (v[1], v[0], engine.dbget_word(int(v[0]))) for v in s])
+        similars = search.get_similars(word[0], words_to_find_count, cs)
+        for v in similars:
+            print('(%.2f, %i) %s' % (v[1], v[0], engine.dbget_word(int(v[0]))))
+        # print("Поиск по принадлежности:")
+        # similars = search.get_similars(word[0], words_to_find_count, ms)
+        # print(['(%.2f, %i) %s' % (v[1], v[0], engine.dbget_word(int(v[0])))
+        #        for v in similars])
+        childs = []
+        for p in similars:
+            p_childs = engine.dbget_childs(int(p[0]))
+            childs += [(c, p[1]) for c in p_childs]
+        print('Ответ: ')
+        term = generator.build_term(childs, cm, 12)
+        print([engine.dbget_word(int(t)) for t in term])
     print('Текст: ', end='')
     text = input()
 # print(timeit.default_timer()-start_time)

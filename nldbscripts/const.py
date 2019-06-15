@@ -1,3 +1,3 @@
 
-BATCH_SIZE = 1 << 13
+BATCH_SIZE = 1 << 15
 WORD_SIZES = [16, 1, 1]

@@ -18,6 +18,7 @@ class Calculations(object):
 
     def __init__(self, dbpath):
         """dbpath - полное имя файла БД sqlite3"""
+        self.db = None
         self._subzero = 0.3
         self._letters = alphabet.Alphabet()
         self.dbpath = dbpath
@@ -47,6 +48,7 @@ class Calculations(object):
 
     def dbget_word(self, id):
         """Получение слова из БД по идентификатору token"""
+        id = int(id)
         assert (id >= 0), "id слова не может быть отрицательным"
         if id < self._letters.size:
             return self._letters.get_char(id)
@@ -63,6 +65,21 @@ class Calculations(object):
             [self._letters.get_char(i) if i < self._letters.size
              else self.dbget_word(int(i)) for i in childs])+')'
 
+    def dbget_childs(self, id):
+        """Возвращает список id-в дочерних слов слова id"""
+        id = int(id)
+        assert (id >= 0), "id слова не может быть отрицательным"
+        if id < self._letters.size:
+            return self._letters.get_char(id)
+        cursor = self.db.cursor()
+        cursor.execute(
+            'select id, childs from words where id=?', (id,))
+        first = cursor.fetchone()
+        if first is None:
+            return None
+        childs = np.frombuffer(first[1], dtype=np.int32)
+        return childs.tolist()
+
     def dbget_word_binvec(self, id, length):
         """Возвращает бинарное представление слова в разреженной матрице"""
         assert (id >= 0), "id слова не может быть отрицательным"
@@ -74,7 +91,7 @@ class Calculations(object):
         words = self.dbget_words()
         # размерность матрицы на 1 больше максимального индекса
         n = max([w[0] for w in words]) + 1
-        m = n*sum(WORD_SIZES)
+        # m = n*sum(WORD_SIZES)
         data, rows, columns = [], [], []
         with tqdm(total=len(words), ncols=120, mininterval=0.5) as progress:
             for w in words:
@@ -102,9 +119,10 @@ class Calculations(object):
             return
         start_time = timeit.default_timer()
         # Списки индексов и значений для разреженных матриц
+        print("Добавление значений")
         rows, cols, sum_data, count_data = [], [], [], []
         with tqdm(total=len(words), ncols=120, mininterval=0.5) as progress:
-            for idx, word in enumerate(words):
+            for word in words:
                 for i, row in enumerate(word[1]):
                     for j, column in enumerate(word[1]):
                         rows.append(row)
@@ -112,15 +130,14 @@ class Calculations(object):
                         sum_data.append(j-i)
                         count_data.append(1)
                 progress.update(1)
-        m_sum = sparse.csr_matrix(
-            (sum_data, (rows, cols)), dtype=np.float32)
-        m_count = sparse.csr_matrix(
-            (count_data, (rows, cols)), dtype=np.float32)
+        print("Создание матриц:", end='')
+        m_s = sparse.csr_matrix((sum_data, (rows, cols)), dtype=np.float32)
+        m_c = sparse.csr_matrix((count_data, (rows, cols)), dtype=np.float32)
         rows, cols, sum_data, count_data = None, None, None, None
         # Вычисление среднего
         print("Вычисление среднего")
-        m_count = m_count.power(-1, dtype=np.float32)
-        m_means = m_sum.multiply(m_count)
+        m_c = m_c.power(-1, dtype=np.float32)
+        m_means = m_s.multiply(m_c)
         m_means.eliminate_zeros()
         print("Время вычислений:", timeit.default_timer()-start_time)
         if save:

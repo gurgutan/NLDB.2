@@ -6,49 +6,46 @@ import scipy.sparse as sparse
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-# def build_term(words, consistency_matrix, term_size=8):
-#     """
-#     words - список кортежей вида (id, confidence), где id - слово, confidence - значение из [0,1]
-#     consistency_matrix - csr матрица совместности слов
-#     """
-#     words = sorted(words, key=lambda w: w[1], reverse=True)
-#     term = []
-#     result = optimus_prime(term_size)
+def build_term(words, M, size=8):
+    """
+    words - список кортежей вида (id, confidence), где id - слово, confidence - значение из [0,1],
+    M - csr матрица средних расстояний между словами.
+    Возвращает список id слов длиной 8
+    """
 
-#     def optimus_prime(size):
-#         for i in range(size):
-#             optimus_consistency = 0
-#             optimus_word = bag_of_words[0]
-#             for w in bag_of_words:
-#                 if(len(term) == 0):
-#                     term = [w[0]]
-#                     continue
-#                 temp_term = term + [w[0]]
-#                 dm = dist_matrix(temp_term)
-#                 x = consistency_matrix[term]
-#                 y = consi
-#                 c = consistency(x, y)
-#                 if(c > optimus_consistency):
-#                     optimus_consistency = c
-#                     optimus_word = w[0]
-#             term.append(optimus_word)
+    def dist(t, M):
+        s = sparse.dok_matrix(M.shape, dtype=np.float32)
+        c = sparse.dok_matrix(M.shape, dtype=np.float32)
+        # Считаем матрицу средних расстояний между словами в терме t
+        for i, row in enumerate(t):
+            for j, column in enumerate(t):
+                s[row, column] += j-i
+                c[row, column] += 1
+        c = c.power(-1, dtype=np.float32)
+        s = s.multiply(c)
+        # Считаем сумму квадратов расстояний между М и s
+        r = 0
+        for i, row in enumerate(t):
+            for j, column in enumerate(t):
+                # Считаем квадратичную ошибку
+                r += (s[row, column]-M[row, column])**2
+        return r
 
-#     def dist_matrix(t):
-#         rows, columns, sum_data = [], [], []
-#         count_row, count_col, count_data = [], [], []
-#         for i, row in enumerate(t):
-#             for j, column in enumerate(t):
-#                 rows.append(row)
-#                 columns.append(column)
-#                 sum_data.append(j-i)
-#                 count_data.append(1)
-#         m_sum = sparse.csr_matrix(
-#             (sum_data, (rows, columns)), dtype=np.float32)
-#         m_count = sparse.csr_matrix(
-#             (count_data, (rows, columns)), dtype=np.float32)
-#             m_count.power(-1, dtype=np.float32)
-#         m_count = m_count.power(-1, dtype=np.float32)
-#         m = m_sum.multiply(m_count)
-#         return m
-#         # cos_xy = cosine_similarity(
-#         #                 m[x_first:x_last], m[y_first:y_last], dense_output=False)
+    bag = set([w[0] for w in words])
+    term = []
+    for i in range(size):
+        min_dist = 2**32
+        word = None
+        for w in bag:
+            # Повторять предыдущее слово нельзя, поэтому пропускаем
+            temp_term = term + [w]
+            # value = w[1]
+            d = dist(temp_term, M)
+            if(d < min_dist):
+                min_dist = d
+                word = w
+        # Добавляем оптимальное слово к терму
+        bag.remove(word)
+        term.append(word)
+        print(word, end=' ')  # !!!
+    return term

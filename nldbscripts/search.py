@@ -39,14 +39,14 @@ def find_word(ids, scores, rank, wm):
     return result
 
 
-def find_text(text_tree, rank, wm):
+def find_id(text_tree, rank, wm):
     '''
     Возвращает кортеж (id, confidence), где id - идентификатор слова, confidence - уверенность в слове
     '''
     if ischar(text_tree):
         return (letters.get_int(text_tree), 1)
     elif isinstance(text_tree, (list, str)):
-        e = [find_text(t, rank-1, wm) for t in text_tree]
+        e = [find_id(t, rank-1, wm) for t in text_tree]
         childs = [t[0] for t in e if t[0] is not None]
         scores = [t[1] for t in e if t[0] is not None]
     return find_word(childs, scores, rank, wm)
@@ -54,7 +54,7 @@ def find_text(text_tree, rank, wm):
 
 def get_similars(id, count, m):
     """
-    Возвращает список пар (id_слова, величина_схожести).
+    Возвращает список пар (id, confidence), где id - идентификатор слова, confidence - уверенность в слове
     Близость определяется по совместным вхождениям в другие слова
     m - разреженная матрица сходства
     token - идентификатор слова
