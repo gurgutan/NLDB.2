@@ -121,7 +121,7 @@ namespace NLDB.Core
                             _cur_node.Followers.Add(_id, _next);    //Добавим пермычку между _cur_node и _next
                             _path.Add(_next);   // добавим очередной пройденный узел в путь
                             _cur_node = _next;  // установим текущим узлом _next
-                            continue;
+                            break;
                         }
                     }
                     //поиск по всей допустимой глубине окончен, но результата так и нет, тогда создаем новый узел
