@@ -11,28 +11,28 @@ namespace NLDB
         private static void Main(string[] args)
         {
             //string path = "/mnt/1C82D43582D414DC/Data/Result/5mb.db";
-            string path = @"D:\Data\Result\CS\5mb.db";
+            string path = @"D:\Data\Result\CS\23mb.db";
 
-            string filename = "5mb.txt";
+            string filename = "23mb.txt";
             string trainfile = @"D:\Data\Wiki\ru\" + filename;
             string dbpath = @"D:\Data\Result\CS\" + Path.ChangeExtension(filename, "db");
             Engine engine = new Engine(path, ExecuteMode.Verbose);
 
-            //engine.Create();
-            ////engine.Insert(new Splitter(0, ""));
-            //engine.Insert(new Splitter(0, @"[^а-яё\{\}\-]+"));
-            //engine.Insert(new Splitter(1, @"[\n\r\?\!\:\;]+"));
-            //engine.Insert(new Splitter(2, @"\[\[{число}\]\]"));
-            //engine
-            //   .Execute(OperationType.FileReading, trainfile)
-            //   .Then(OperationType.TextNormalization, engine.Data)
-            //   .Then(OperationType.FileWriting, Path.ChangeExtension(dbpath, "norm"))
-            //   .Then(OperationType.TextSplitting, engine.Data)
-            //   .Then(OperationType.WordsExtraction, engine.Data);
-            //engine.Clear("MatrixA");
-            //engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
-            //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
-            //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
+            engine.Create();
+            //engine.Insert(new Splitter(0, ""));
+            engine.Insert(new Splitter(0, @"[^а-яё\{\}\-]+"));
+            engine.Insert(new Splitter(1, @"[\n\r\?\!\:\;]+"));
+            engine.Insert(new Splitter(2, @"\[\[{число}\]\]"));
+            engine
+               .Execute(OperationType.FileReading, trainfile)
+               .Then(OperationType.TextNormalization, engine.Data)
+               .Then(OperationType.FileWriting, Path.ChangeExtension(dbpath, "norm"))
+               .Then(OperationType.TextSplitting, engine.Data)
+               .Then(OperationType.WordsExtraction, engine.Data);
+            engine.Clear("MatrixA");
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
             //engine.Clear("MatrixB");
             //engine.Execute(OperationType.SimilarityCalculation, 0, 0);
             //engine.Execute(OperationType.SimilarityCalculation, 1, 0);

@@ -78,12 +78,6 @@
     <Compile Include="DAL\SparseVectorTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\NLDB\NLDB.csproj">
-      <Project>{ad3eb4bf-9934-4c99-a9b8-3797093bfa7f}</Project>
-      <Name>NLDB</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '10.0' And '$(IsCodedUITest)' == 'True'">
       <ItemGroup>
