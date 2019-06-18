@@ -21,9 +21,6 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="nldb.py">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="nldbscripts.py" />
     <Compile Include="splitter.py" />
     <Compile Include="tokenizer.py" />

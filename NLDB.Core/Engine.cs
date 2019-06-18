@@ -257,12 +257,7 @@ namespace NLDB
                 {
                     int[] childs = w.ChildsId;
                     return childs.SelectMany((a, i) => childs.Select((b, j) => new AValue(w.Rank - 1, a, b, j - i, 1)));
-                    //.GroupBy(v => v.Key)
-                    //.Select(group =>
-                    //{
-                    //    List<AValue> values = group.ToList();
-                    //    return new AValue(rank, AValue.RowFromKey(group.Key), AValue.ColumnFromKey(group.Key), values.AsParallel().Sum(e => e.Sum), values.Count);
-                    //});
+
                 })
                 .GroupBy(v => v.Key)
                 .AsParallel()
@@ -435,7 +430,7 @@ namespace NLDB
         private CalculationResult NormilizeText(IEnumerable<string> text)
         {
             List<string> result = new List<string>();
-            using (ProgressInformer informer = new ProgressInformer("Нормализация:", text.Count() - 1, "блоков"))
+            using (ProgressInformer informer = new ProgressInformer("Нормализация:", text.Count(), "блоков"))
             {
                 text.Select((s, i) =>
                 {
@@ -443,6 +438,7 @@ namespace NLDB
                     result.Add(Parser.Normilize(s));
                     return 0;
                 }).ToList();
+                informer.Set(text.Count());
             }
             Data = result;
             GC.Collect();

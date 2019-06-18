@@ -69,6 +69,7 @@ namespace NLDB.DAL
                 "CREATE TABLE Parents (WordId INTEGER NOT NULL, ParentId INTEGER NOT NULL);" +
                 "CREATE TABLE MatrixA (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Count INTEGER NOT NULL, Sum REAL NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
                 "CREATE TABLE MatrixB (Row INTEGER NOT NULL, Column INTEGER NOT NULL, Similarity REAL NOT NULL, Rank INTEGER NOT NULL, PRIMARY KEY(Row, Column));" +
+                "CREATE INDEX IWords_symbol ON Words(Symbol); " +
                 "CREATE INDEX IWords_childs ON Words(Childs); " +
                 "CREATE INDEX IParents_id ON Parents(WordId);" +
                 "CREATE INDEX IParents_parentid ON Parents(ParentId);" +

@@ -24,7 +24,7 @@ namespace NLDB
         private static Regex removeRegex = new Regex(@"[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\*\+\-\&\\\/\%\$\^\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
         private static Regex replaceNumbersRegex = new Regex(@"\b\d+((\.|\,)\d+)?", RegexOptions.Compiled);
         private static Regex replaceEnglishRegex = new Regex(@"[a-zA-Z]+", RegexOptions.Compiled);
-        private static Regex removeShorthands = new Regex(@"\b([а-яА-ЯёЁ]\s\.)", RegexOptions.Compiled);
+        private static Regex removeShorthands = new Regex(@"\b([а-яА-ЯёЁ]\s*\.)", RegexOptions.Compiled);
 
         public Parser(string splitExpr)
         {
