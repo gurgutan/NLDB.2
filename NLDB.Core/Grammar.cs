@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace NLDB.Core
+namespace NLDB
 {
     public class Node
     {
@@ -24,11 +24,22 @@ namespace NLDB.Core
 
         public override string ToString()
         {
-            string followers_str = followers.Values.Aggregate("", (c, n) => c + (c != "" ? "|" : "") + n.ToString());
-            if (string.IsNullOrEmpty(followers_str))
+            if (followers.Count == 0)
                 return id.ToString();
+            else if (followers.Count == 1)
+                return id.ToString() + "->" + followers.Values.First().ToString();
             else
-                return id.ToString() + " " + "(" + followers_str + ")";
+            {
+                var f = followers.Values.ToList();
+                string ending = "";
+                if (f.Count>4)
+                {
+                    f = f.Take(4).ToList();
+                    ending = "...";
+                }
+                string followers_str = f.Aggregate("", (c, n) => c + (c != "" ? "|" : "") + n.ToString());
+                return id.ToString() + "->" + "(" + followers_str + ending + ")";
+            }
         }
 
     }
@@ -44,11 +55,11 @@ namespace NLDB.Core
             }
         }
         private List<Node> _path;
-        private readonly int _max_depth;
+        private readonly int _max_search_depth; //глубина поиска при возвратном поиске узла
 
-        public Grammar(int max_depth = 2)
+        public Grammar(int max_search_depth = 2)
         {
-            _max_depth = max_depth;
+            _max_search_depth = max_search_depth;
         }
 
         public override string ToString()
@@ -56,7 +67,7 @@ namespace NLDB.Core
             return root.ToString();
         }
 
-        public List<Node> FindRule(int[] word)
+        public List<Node> Find(int[] word)
         {
             Node _cur_node = root;
             _path = new List<Node>
@@ -103,7 +114,7 @@ namespace NLDB.Core
                 {
                     int _depth = 0;
                     //Цикл по глубине поиска
-                    while (_depth < _max_depth && _depth < _path.Count - 1)
+                    while (_depth < _max_search_depth && _depth < _path.Count - 1)
                     {
                         //поиск начинается с глубины 1
                         //глубина отсчитывается в обратную сторону от текущего положения в цепочке
@@ -134,6 +145,7 @@ namespace NLDB.Core
                     }
                 }
             }
+            _path.Clear();
         }
 
         /// <summary>

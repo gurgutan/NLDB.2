@@ -14,7 +14,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NLDB.Core", "NLDB.Core\NLDB
 EndProject
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "nldbscripts", "nldbscripts\nldbscripts.pyproj", "{D24DF220-CC64-4AE8-8A27-5F5F2EE04E1E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NLDB.CoreTests", "NLDB.CoreTests\NLDB.CoreTests.csproj", "{7F8A01D2-7A47-4A7B-8A72-13FDC5E983C2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NLDB.CoreTests", "NLDBCoreTests\NLDB.CoreTests.csproj", "{7F8A01D2-7A47-4A7B-8A72-13FDC5E983C2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

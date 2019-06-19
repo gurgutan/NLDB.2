@@ -82,12 +82,29 @@ namespace NLDB
                 case OperationType.DistancesCalculation:
                     CalculationResult = CalculateDistances((IEnumerable<Word>)parameters[0]); break;
                 case OperationType.SimilarityCalculation:
-                    CalculationResult = CalculateSimilarity((int)parameters[0], (int)parameters[1]); break;
+                    CalculationResult = CalculateSimilarity((int)parameters[0]/*rank*/, (int)parameters[1]/*start from word*/); break;
+                case OperationType.GrammarCreating:
+                    CalculationResult = BuidGrammar((int)parameters[0]/*rank*/); break;
                 default:
                     throw new NotImplementedException();
             }
             Logger.WriteLine($"Завешена {CalculationResult.ToString()}");
             return CalculationResult;
+        }
+
+        /// <summary>
+        /// Построение грамматики для слов ранга rank
+        /// </summary>
+        /// <param name="rank"></param>
+        /// <returns></returns>
+        private CalculationResult BuidGrammar(int rank)
+        {
+            if (rank + 1 > DB.MaxRank)
+                throw new ArgumentOutOfRangeException($"Максимально допустимый ранг слов:{DB.MaxRank - 1}");
+            // перебор идет дочерних слов, поэтому получаем список слов ранга rank+1
+            List<Word> words = Words(rank + 1).ToList();
+            words.ForEach(w => grammar.Add(w.ChildsId));
+            return new CalculationResult(this, OperationType.GrammarCreating, ResultType.Success, grammar);
         }
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -490,6 +507,7 @@ namespace NLDB
         //Закрытые свойства
         //--------------------------------------------------------------------------------------------
         private DataBase DB { get; }
+        private Grammar grammar = new Grammar(2);
         private readonly string dbpath;
         private const int SIMILARITY_CALC_STEP = 1 << 12;   //Оптимальный шаг для отношения Производительность/Память примерно 262 144
         private const int DISTANCES_CALC_STEP = 1 << 20;     //Оптимальный шаг для вычисления матрицы расстояний примерно 1024

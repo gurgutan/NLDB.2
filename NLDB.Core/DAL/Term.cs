@@ -62,7 +62,7 @@ namespace NLDB.DAL
             if (rank == 0)
                 return text;
             else
-                return "{" + childs.Aggregate("", (c, n) => c == "" ? n.ToString() : c + "" + n.ToString()) + "}";
+                return "{" + childs.Aggregate("", (c, n) => c == "" ? n.ToString() : c + " " + n.ToString()) + "}";
         }
 
         /// <summary>

@@ -1,5 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NLDB.Core;
+using NLDB;
 
 namespace NLDBCoreTests
 {

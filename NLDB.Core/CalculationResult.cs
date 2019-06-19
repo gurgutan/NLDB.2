@@ -13,7 +13,8 @@ namespace NLDB
         TextSplitting,
         WordsExtraction,
         DistancesCalculation,
-        SimilarityCalculation
+        SimilarityCalculation,
+        GrammarCreating
     };
 
     public enum ExecuteMode

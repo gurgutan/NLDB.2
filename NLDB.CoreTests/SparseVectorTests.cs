@@ -89,13 +89,13 @@ namespace NLDB.DAL.Tests
             var v1 = new SparseVector(new double[] { 1.0, 2.0, 3.0, 4.0 });
             v1.RemoveValuesFromRange(0.0, 1.0);
             //Теперь первым элементом будет {Index=1, V=2.0}
-            Assert.AreEqual(2.0, v1.Values.First().V);
+            Assert.AreEqual(2.0, v1.Values.First().Value);
             v1.RemoveValuesFromRange(0.0, 2.0);
             //Теперь нулевым элементом будет {Index=1, V=3.0}
-            Assert.AreEqual(3.0, v1.Values.First().V);
+            Assert.AreEqual(3.0, v1.Values.First().Value);
             v1.RemoveValuesFromRange(0.0, 3.0);
             //Теперь нулевым элементом будет {Index=1, V=4.0}
-            Assert.AreEqual(4.0, v1.Values.First().V);
+            Assert.AreEqual(4.0, v1.Values.First().Value);
         }
 
         [TestMethod()]
