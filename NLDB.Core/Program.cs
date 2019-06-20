@@ -29,10 +29,10 @@ namespace NLDB
             //   .Then(OperationType.FileWriting, Path.ChangeExtension(dbpath, "norm"))
             //   .Then(OperationType.TextSplitting, engine.Data)
             //   .Then(OperationType.WordsExtraction, engine.Data);
-            //engine.Clear("MatrixA");
-            //engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
-            //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
-            //engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
+            engine.Clear("MatrixA");
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
+            engine.Execute(OperationType.DistancesCalculation, engine.Words(3));
             //engine.Clear("MatrixB");
             //engine.Execute(OperationType.SimilarityCalculation, 0, 0);
             //engine.Execute(OperationType.SimilarityCalculation, 1, 0);

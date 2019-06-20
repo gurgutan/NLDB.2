@@ -25,7 +25,7 @@ namespace NLDB.DAL
 
         private const int PARENTS_CASH_SIZE = 1 << 18;
         private const int SPARSEMATRIX_CASH_SIZE = 1 << 10;
-        private const int MATRIXA_CASH_SIZE = 1 << 18;
+        private const int MATRIXA_CASH_SIZE = 1 << 20;
         private const int MATRIXB_CASH_SIZE = 1 << 18;
         private const int TERMS_CASH_SIZE = 1 << 20;
         private const int WORDS_CASH_SIZE = 1 << 20;
@@ -73,10 +73,10 @@ namespace NLDB.DAL
                 "CREATE INDEX IWords_childs ON Words(Childs); " +
                 "CREATE INDEX IParents_id ON Parents(WordId);" +
                 "CREATE INDEX IParents_parentid ON Parents(ParentId);" +
-                "CREATE INDEX IMatrixA_row ON MatrixA(Row);" +
-                "CREATE INDEX IMatrixA_col ON MatrixA(Column);" +
-                "CREATE INDEX IMatrixA_row_col ON MatrixA(Row, Column);" +
-                "CREATE INDEX IMatrixA_rank ON MatrixA(Rank);" +
+                //"CREATE INDEX IMatrixA_row ON MatrixA(Row);" +
+                //"CREATE INDEX IMatrixA_col ON MatrixA(Column);" +
+                //"CREATE INDEX IMatrixA_row_col ON MatrixA(Row, Column);" +
+                //"CREATE INDEX IMatrixA_rank ON MatrixA(Rank);" +
                 "CREATE INDEX IMatrixB_row_col ON MatrixB(Row, Column);";
             cmd.ExecuteNonQuery();
         }
@@ -444,7 +444,7 @@ namespace NLDB.DAL
                         cmdUpdate.Parameters["@sm"].Value = value.Sum;
                         await cmdUpdate.ExecuteNonQueryAsync();
                     }
-                    //AddToCash(value);
+                    AddToCash(value);
                 }
             }
         }

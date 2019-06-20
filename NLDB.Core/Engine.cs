@@ -219,7 +219,7 @@ namespace NLDB
                     //PositionsMean(wordsPacket);
                     ContextMatrix(wordsPacket);
                     sw.Stop();
-                    //Debug.WriteLine(sw.Elapsed.TotalSeconds);
+                    Debug.WriteLine(sw.Elapsed.TotalSeconds);
                     DB.Commit();
                 }
                 informer.Set(maxCount);
@@ -273,15 +273,14 @@ namespace NLDB
                 .SelectMany(w =>
                 {
                     int[] childs = w.ChildsId;
-                    return childs.SelectMany((a, i) => childs.Select((b, j) => new AValue(w.Rank - 1, a, b, j - i, 1)));
-
+                    //создаем квадратную матрицу расстояний между элементами childs
+                    return childs.SelectMany((a, i) => childs.Select((b, j) => (a, b, d: j - i)));
                 })
-                .GroupBy(v => v.Key)
+                .GroupBy(v => (v.a, v.b))
                 .AsParallel()
-                .Select(group => new AValue(rank, AValue.RowFromKey(group.Key), AValue.ColumnFromKey(group.Key), group.AsParallel().Sum(e => e.Sum), group.Count()))
+                .Select(group => new AValue(rank, group.Key.a, group.Key.b, group.Sum(e => e.d), group.Count()))
                 .ToList();
             Debug.WriteLine(result.Count);
-            //List<ulong> keys = result.Select(v => (ulong)v.R << 32 | (uint)v.C).Distinct().OrderBy(v => v).ToList();
             DB.InsertAll(result);
             return result.Count;
         }
@@ -510,7 +509,7 @@ namespace NLDB
         private Grammar grammar = new Grammar(2);
         private readonly string dbpath;
         private const int SIMILARITY_CALC_STEP = 1 << 12;   //Оптимальный шаг для отношения Производительность/Память примерно 262 144
-        private const int DISTANCES_CALC_STEP = 1 << 20;     //Оптимальный шаг для вычисления матрицы расстояний примерно 1024
+        private const int DISTANCES_CALC_STEP = 1 << 12;     //Оптимальный шаг для вычисления матрицы расстояний примерно 1024
         private const int TEXT_BUFFER_SIZE = 1 << 28;
     }
 }
