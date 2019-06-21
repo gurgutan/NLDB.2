@@ -32,7 +32,7 @@ namespace NLDB
             {
                 var f = followers.Values.ToList();
                 string ending = "";
-                if (f.Count>4)
+                if (f.Count > 4)
                 {
                     f = f.Take(4).ToList();
                     ending = "...";
@@ -56,6 +56,17 @@ namespace NLDB
         }
         private List<Node> _path;
         private readonly int _max_search_depth; //глубина поиска при возвратном поиске узла
+        private int count = 0;
+        public int Count
+        {
+            get { return count; }
+        }
+
+        private int links_count = 0;
+        public int LinksCount
+        {
+            get { return links_count; }
+        }
 
         public Grammar(int max_search_depth = 2)
         {
@@ -67,7 +78,7 @@ namespace NLDB
             return root.ToString();
         }
 
-        public List<Node> Find(int[] word)
+        public List<Node> FindWord(int[] word)
         {
             Node _cur_node = root;
             _path = new List<Node>
@@ -88,6 +99,36 @@ namespace NLDB
             }
             return _path;
         }
+
+        public Node FindNode(int id, int depth = 64)
+        {
+            return FindNode(root, depth, id);
+        }
+        private Node FindNode(Node search_root, int depth, int i)
+        {
+            if (depth < 0)
+                throw new ArgumentOutOfRangeException("Аргумент depth не должен быть отрицательным");
+            else if (depth == 0)
+            {
+                if (search_root.id == i)
+                    return search_root;
+                else
+                    return null;
+            }
+            else
+            {
+                if (search_root.Followers.TryGetValue(i, out Node _next))
+                    return _next;
+                else
+                    foreach (var _node in search_root.Followers.Values)
+                    {
+                        _next = FindNode(_node, depth - 1, i);
+                        if (_next != null) return _next;
+                    }
+            }
+            return null;
+        }
+
 
         /// <summary>
         /// Добавляет слово word в грамматику, если его еще нет
@@ -122,7 +163,7 @@ namespace NLDB
                         //с узла _path[i-1], и продолжается до _path[i-_max_depth]
                         _depth++;
                         Node _search_root = _path[(_path.Count - 1) - _depth];
-                        _next = FindNode(_search_root, _depth + 1, _id);
+                        _next = FindNodeOnDepth(_search_root, _depth + 1, _id);
                         if (_next == null) // не нашли
                         {
                             continue;
@@ -132,6 +173,7 @@ namespace NLDB
                             _cur_node.Followers.Add(_id, _next);    //Добавим пермычку между _cur_node и _next
                             _path.Add(_next);   // добавим очередной пройденный узел в путь
                             _cur_node = _next;  // установим текущим узлом _next
+                            links_count++;
                             break;
                         }
                     }
@@ -140,8 +182,10 @@ namespace NLDB
                     {
                         _next = new Node(_id);
                         _cur_node.Followers.Add(_id, _next);
+                        links_count++;
                         _path.Add(_next);
                         _cur_node = _next;
+                        count++;
                     }
                 }
             }
@@ -155,7 +199,7 @@ namespace NLDB
         /// <param name="depth"></param>
         /// <param name="i"></param>
         /// <returns></returns>
-        private Node FindNode(Node search_root, int depth, int i)
+        private Node FindNodeOnDepth(Node search_root, int depth, int i)
         {
             if (depth < 0)
                 throw new ArgumentOutOfRangeException("Аргумент depth не должен быть отрицательным");
@@ -176,7 +220,7 @@ namespace NLDB
             else
                 foreach (var _node in search_root.Followers.Values)
                 {
-                    Node _next = FindNode(_node, depth - 1, i);
+                    Node _next = FindNodeOnDepth(_node, depth - 1, i);
                     if (_next != null) return _next;
                 }
             return null;

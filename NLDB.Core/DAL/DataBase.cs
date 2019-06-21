@@ -275,6 +275,7 @@ namespace NLDB.DAL
             {
                 cmd.Parameters.AddWithValue("@s", s);
                 var reader = cmd.ExecuteReader();
+                if (!reader.HasRows) return null;
                 if (reader.Read())
                 {
                     word = new Word()

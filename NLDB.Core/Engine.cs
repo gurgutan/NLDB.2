@@ -101,9 +101,13 @@ namespace NLDB
         {
             if (rank + 1 > DB.MaxRank)
                 throw new ArgumentOutOfRangeException($"Максимально допустимый ранг слов:{DB.MaxRank - 1}");
+            Logger.WriteLine($"Построение грамматики текста слов ранга {rank}");
+            Stopwatch stopwatch = new Stopwatch();
             // перебор идет дочерних слов, поэтому получаем список слов ранга rank+1
             List<Word> words = Words(rank + 1).ToList();
             words.ForEach(w => grammar.Add(w.ChildsId));
+            stopwatch.Stop();
+            Logger.WriteLine($"Затрачено: {stopwatch.Elapsed.TotalSeconds} сек., элементов: {grammar.Count}, связей: {grammar.LinksCount}");
             return new CalculationResult(this, OperationType.GrammarCreating, ResultType.Success, grammar);
         }
 
@@ -140,8 +144,8 @@ namespace NLDB
                     Logger.WriteLine($"Чтение матрицы для строк {words[startRowNumber].Id}-{words[endRowNumber].Id}");
                     var asize = DB.GetAMatrixAsTuples(rank, words[startRowNumber].Id, words[endRowNumber].Id, out var rows);
                     if (asize.Item1 == 0 || asize.Item2 == 0) continue;
-                    //SparseMatrix A = new SparseMatrix(rows);
-                    var A = Matrix<double>.Build.SparseOfIndexed(asize.Item1, maxIndex, rows);
+                    SparseMatrix A = new SparseMatrix(rows);
+                    //var A = Matrix<double>.Build.SparseOfIndexed(asize.Item1, maxIndex, rows);
                     for (int j = i; j <= max_number; j++)
                     {
                         DB.BeginTransaction();
@@ -153,10 +157,10 @@ namespace NLDB
                         var bsize = DB.GetAMatrixAsTuples(rank, words[startColumnNumber].Id, words[endColumnNumber].Id, out var columns);
                         if (bsize.Item1 == 0 || bsize.Item2 == 0) continue;
                         //Logger.WriteLine($"Построение разреженной подматрицы B");
-                        //SparseMatrix B = new SparseMatrix(columns);
-                        var B = Matrix<double>.Build.SparseOfIndexed(bsize.Item1, maxIndex, columns);
-                        //elementsCount += MatrixDotSquare(A, B, rank);
-                        elementsCount += CovariationMKL(A, B, rank);
+                        SparseMatrix B = new SparseMatrix(columns);
+                        //var B = Matrix<double>.Build.SparseOfIndexed(bsize.Item1, maxIndex, columns);
+                        elementsCount += MatrixDotSquare(A, B, rank);
+                        //elementsCount += CovariationMKL(A, B, rank);
                         stopwatch.Stop();
                         Logger.WriteLine($"[{i}/{max_number},{j}/{max_number}], всего эл-в:{elementsCount}, {stopwatch.Elapsed.TotalSeconds} сек");
                         DB.Commit();
@@ -343,7 +347,9 @@ namespace NLDB
             if (term.rank == 0)
             {
                 //При нулевом ранге терма (т.е. терм - это буква), confidence считаем исходя из наличия соответствующей буквы в алфавите
-                term.id = DB.GetWordBySymbol(term.text).Id;
+                var word = DB.GetWordBySymbol(term.text);
+                if (word == null) return result;
+                term.id = word.Id;
                 term.confidence = (term.id == 0 ? 0 : 1);
                 term.Identified = true;
                 result.Add(term);
@@ -506,10 +512,10 @@ namespace NLDB
         //Закрытые свойства
         //--------------------------------------------------------------------------------------------
         private DataBase DB { get; }
-        private Grammar grammar = new Grammar(2);
+        public Grammar grammar = new Grammar(3);
         private readonly string dbpath;
-        private const int SIMILARITY_CALC_STEP = 1 << 12;   //Оптимальный шаг для отношения Производительность/Память примерно 262 144
-        private const int DISTANCES_CALC_STEP = 1 << 12;     //Оптимальный шаг для вычисления матрицы расстояний примерно 1024
-        private const int TEXT_BUFFER_SIZE = 1 << 28;
+        private const int SIMILARITY_CALC_STEP = 1 << 8;   //Оптимальный шаг для отношения Производительность/Память примерно 262 144
+        private const int DISTANCES_CALC_STEP = 1 << 20;    //Оптимальный шаг для вычисления матрицы расстояний примерно 2^10-2^14
+        private const int TEXT_BUFFER_SIZE = 1 << 20;
     }
 }

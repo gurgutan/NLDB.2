@@ -49,7 +49,7 @@ namespace NLDB
         }
 
         /// <summary>
-        /// Аналог Inclusive, но для Слов, представленных своими id
+        /// Аналог Overlapping, но для Слов, представленных своими id
         /// </summary>
         /// <param name="a"></param>
         /// <param name="b"></param>
@@ -61,24 +61,44 @@ namespace NLDB
         }
 
         /// <summary>
-        /// Метрика схожести, аналогичная Inclusive (считается отношение количества совпадающих подслов к количеству подслов в Терме a),
+        /// Метрика схожести, аналогичная Overlapping (считается отношение количества совпадающих подслов к количеству подслов в Терме a),
         /// но также учитывается вес подслов в Слове b
+        /// Итоговое значение делится на длину слова a. Метрика тем больше, чем короче слово a.
         /// </summary>
         /// <param name="a"></param>
         /// <param name="b"></param>
         /// <returns></returns>
-        private static float SoftOverlapping(DAL.Term a, DAL.Term b)
+        private static float SoftOverlappingLeft(DAL.Term a, DAL.Term b)
         {
             float count = a.Childs.Sum(c => b.Childs.Max(bc => Confidence.Compare(bc, c)));
             return count / a.Count;
         }
 
-        private static float SoftOverlapping(int[] a, int[] b)
+        private static float SoftOverlappingLeft(int[] a, int[] b)
         {
             float count = a.Sum(c => b.Max(bc => Confidence.Compare(bc, c)));
             return count / a.Length;
         }
 
+        /// <summary>
+        /// Метрика схожести зависящая от количества совпадающих эелементов вне зависимости от их порядка.
+        /// Итоговое значение делится на длину слова b (отсюда в названии Right), т.о. метрика тем больше,
+        /// чем короче слово b
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <returns></returns>
+        private static float SoftOverlappingRight(DAL.Term a, DAL.Term b)
+        {
+            float count = a.Childs.Sum(c => b.Childs.Max(bc => Confidence.Compare(c, bc)));
+            return count / b.Count;
+        }
+
+        private static float SoftOverlappingRight(int[] a, int[] b)
+        {
+            float count = a.Sum(c => b.Max(bc => Confidence.Compare(bc, c)));
+            return count / b.Length;
+        }
         /// <summary>
         /// Косинусная метрика между Термами: сумма совпадающих подслов, делёная на произведение модулей Термов
         /// </summary>
@@ -200,13 +220,13 @@ namespace NLDB
         //----------------------------------------------------------------------------------------------------------------
         //Массив функций для поэлементного вычисления "похожести" векторов слов. Индекс в массиве - ранг сравниваемых слов.
         //Функция применяется к двум скалярным элементам веторов, в соответствующих позициях
-        private static readonly Func<DAL.Term, DAL.Term, float>[] Operations = new Func<DAL.Term, DAL.Term, float>[5]
+        private static readonly Func<DAL.Term, DAL.Term, float>[] Operations = new Func<DAL.Term, DAL.Term, float>[]
         {
             Confidence.Equality,        //для букв
-            Confidence.Cosine,          //для слов
-            Confidence.SoftOverlapping,   //для предложений
-            Confidence.SoftOverlapping,   //для параграфов
-            Confidence.SoftOverlapping    //зарезервивровано
+            //Confidence.Cosine,          //для слов
+            Confidence.SoftOverlappingRight,   //для предложений
+            Confidence.SoftOverlappingLeft,   //для параграфов
+            Confidence.SoftOverlappingLeft    //зарезервивровано
         };
 
     }
