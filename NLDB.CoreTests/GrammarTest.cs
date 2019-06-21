@@ -18,16 +18,16 @@ namespace NLDBCoreTests
         {
             Grammar g = new Grammar(2);
             Assert.IsNotNull(g.Root);
-            //Добавим одну цепочку 1 2 3
+            //Р”РѕР±Р°РІРёРј РѕРґРЅСѓ С†РµРїРѕС‡РєСѓ 1 2 3
             g.Add(new int[] { 1, 2, 3 });
             Assert.IsNotNull(g.Root.Followers[1].Followers[2].Followers[3]);
-            //Добавим вторую цепочку 1 2 4
+            //Р”РѕР±Р°РІРёРј С†РµРїРѕС‡РєСѓ 1 2 4
             g.Add(new int[] { 1, 2, 4 });
             Assert.IsNotNull(g.Root.Followers[1].Followers[2].Followers[4]);
-            //Добавим цепочки 1 2 3 5 и 1 2 4 5, замыкающиеся в 5
+            //Р”РѕР±Р°РІРёРј С†РµРїРѕС‡РєРё, СЃРµРґРёРЅРµРЅРЅС‹Рµ РІ РїРѕСЃР»РµРґРЅРµРј СЌР»РµРјРµРЅС‚Рµ
             g.Add(new int[] { 1, 2, 3, 5 });
             g.Add(new int[] { 1, 2, 4, 5 });
-            //попробуем разными путямиприйти к 5
+            //РџСЂРѕРІРµСЂРёРј РїРѕСЃР»РµРґРЅРёР№ СЌР»РµРјРµРЅС‚ 5
             var node5_1 = g.Root.Followers[1].Followers[2].Followers[3].Followers[5];
             var node5_2 = g.Root.Followers[1].Followers[2].Followers[4].Followers[5];
             Assert.AreEqual(node5_1, node5_2);
@@ -38,10 +38,8 @@ namespace NLDBCoreTests
         {
             Grammar g = new Grammar(2);
             Assert.IsNotNull(g.Root);
-            //Добавим одну цепочку 1 2 3
             g.Add(new int[] { 1, 2, 3 });
             Assert.IsNotNull(g.Root.Followers[1].Followers[2].Followers[3]);
-            //Добавим вторую цепочку 1 2 4
             g.Add(new int[] { 1, 2, 4 });
             Assert.IsNotNull(g.Root.Followers[1].Followers[2].Followers[4]);
             var node = g.FindNode(4);
@@ -52,10 +50,8 @@ namespace NLDBCoreTests
         {
             Grammar g = new Grammar(2);
             Assert.IsNotNull(g.Root);
-            //Добавим одну цепочку 1 2 3
             g.Add(new int[] { 1, 2, 3 });
             Assert.IsNotNull(g.Root.Followers[1].Followers[2].Followers[3]);
-            //Добавим вторую цепочку 1 2 4
             g.Add(new int[] { 1, 2, 4 });
             Assert.IsNotNull(g.Root.Followers[1].Followers[2].Followers[4]);
             var path = g.FindWord(new int[] { 1, 2, 4});
