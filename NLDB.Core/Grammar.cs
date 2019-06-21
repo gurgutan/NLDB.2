@@ -88,7 +88,7 @@ namespace NLDB
             for (int i = 0; i < word.Length; i++)
             {
                 int _id = word[i];
-                if (root.Followers.TryGetValue(_id, out Node _next))
+                if (_cur_node.Followers.TryGetValue(_id, out Node _next))
                 {
                     _path.Add(_next);
                     _cur_node = _next;
@@ -97,7 +97,7 @@ namespace NLDB
                 else
                     return null;
             }
-            return _path;
+            return new List<Node>(_path);
         }
 
         public Node FindNode(int id, int depth = 64)
