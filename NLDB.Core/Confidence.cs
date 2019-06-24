@@ -22,7 +22,7 @@ namespace NLDB
         public static float Compare(DAL.Term a, DAL.Term b)
         {
             if (a.rank != b.rank) throw new ArgumentException("Попытка сравнить термы разных рангов");
-            return Confidence.Operations[a.rank](a, b);
+            return Confidence.MetricsStack[a.rank](a, b);
         }
 
         /// <summary>
@@ -215,12 +215,14 @@ namespace NLDB
             return a == b ? 1 : 0;
         }
 
+
         //----------------------------------------------------------------------------------------------------------------
         //Частные свойства и поля
         //----------------------------------------------------------------------------------------------------------------
+        //TODO: Сделать изменяемым стек метрик
         //Массив функций для поэлементного вычисления "похожести" векторов слов. Индекс в массиве - ранг сравниваемых слов.
         //Функция применяется к двум скалярным элементам веторов, в соответствующих позициях
-        private static readonly Func<DAL.Term, DAL.Term, float>[] Operations = new Func<DAL.Term, DAL.Term, float>[]
+        private static Func<DAL.Term, DAL.Term, float>[] MetricsStack = new Func<DAL.Term, DAL.Term, float>[]
         {
             Confidence.Equality,        //для букв
             //Confidence.Cosine,          //для слов
