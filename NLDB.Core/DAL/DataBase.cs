@@ -14,7 +14,7 @@ namespace NLDB.DAL
         private SQLiteConnection db;
         private SQLiteTransaction transaction;
         private Parser[] parsers = null;
-
+        
         private Dictionary<string, MatrixDictionary> sparseMatrixCash = new Dictionary<string, MatrixDictionary>(SPARSEMATRIX_CASH_SIZE);
         private ConcurrentDictionary<long, AValue> matrixACash = new ConcurrentDictionary<long, AValue>(PARALLELIZM, MATRIXA_CASH_SIZE);
         private ConcurrentDictionary<long, BValue> matrixBCash = new ConcurrentDictionary<long, BValue>(PARALLELIZM, MATRIXB_CASH_SIZE);
@@ -31,6 +31,10 @@ namespace NLDB.DAL
         private const int WORDS_CASH_SIZE = 1 << 20;
         private const int SYMBOLS_CASH_SIZE = 1 << 10;
 
+        public string DBPath
+        {
+            get { return db.FileName;  }
+        }
 
         public Parser[] Parsers
         {
@@ -195,10 +199,10 @@ namespace NLDB.DAL
         //---------------------------------------------------------------------------------------------------------
         //CRUD для Words
         //---------------------------------------------------------------------------------------------------------
-        public IList<Word> Words(string where = "1")
+        public IList<Word> Words(string expr = "")
         {
             List<Word> result = new List<Word>();
-            using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words WHERE {where};", db))
+            using (SQLiteCommand cmd = new SQLiteCommand($"SELECT * FROM Words {expr};", db))
             {
                 var reader = cmd.ExecuteReader();
                 while (reader.Read())

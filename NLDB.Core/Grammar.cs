@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.SQLite;
 using System.Linq;
 
 namespace NLDB
@@ -7,11 +8,12 @@ namespace NLDB
     //TODO: Включить Grammar в состав класса DataBase. Реализовать сохранение/загрузку грамматики
 
     /// <summary>
-    /// Узел грамматики. Содержит идентификатор слова и ссылки на следующие узлы
+    /// Элемент (узел) грамматики. Содержит идентификатор слова и ссылки на следующие узлы
     /// </summary>
     public class Node
     {
-        public int id;
+        public int id;         // уникальный идентификатор элемента 
+        public int word_id;     // идент-р слова, соответствующего данному элементу грамматики
 
         private readonly Dictionary<int, Node> followers = new Dictionary<int, Node>();
         public Dictionary<int, Node> Followers
@@ -22,17 +24,19 @@ namespace NLDB
             }
         }
 
-        public Node(int _id)
+        public Node(int _id, int _word_id = -1)
         {
             id = _id;
+            if (_word_id == -1) word_id = id;
+            else word_id = _word_id;
         }
 
         public override string ToString()
         {
             if (followers.Count == 0)
-                return id.ToString();
+                return word_id.ToString();
             else if (followers.Count == 1)
-                return id.ToString() + "->" + followers.Values.First().ToString();
+                return word_id.ToString() + "->" + followers.Values.First().ToString();
             else
             {
                 var f = followers.Values.ToList();
@@ -43,7 +47,7 @@ namespace NLDB
                     ending = "...";
                 }
                 string followers_str = f.Aggregate("", (c, n) => c + (c != "" ? "|" : "") + n.ToString());
-                return id.ToString() + "->" + "(" + followers_str + ending + ")";
+                return word_id.ToString() + "->" + "(" + followers_str + ending + ")";
             }
         }
 
@@ -56,7 +60,7 @@ namespace NLDB
     /// </summary>
     public class Grammar
     {
-        private Node root = new Node(0);
+        private Node root = new Node(0, 0); // корневой узел имеет идент-р 0 и соответствует слову с id=0
         /// <summary>
         /// Корневоей элемент грамматики. Имеет идентификатор 0
         /// </summary>
@@ -67,9 +71,10 @@ namespace NLDB
                 return root;
             }
         }
+
         private List<Node> _path;
         private readonly int _max_search_depth; //глубина поиска при возвратном поиске узла
-        private int count = 0;
+        private int count = 1;  // изначально в грамматике только источник root с id = 0
         /// <summary>
         /// Число элементов в грамматике
         /// </summary>
@@ -113,8 +118,8 @@ namespace NLDB
             };
             for (int i = 0; i < word.Length; i++)
             {
-                int _id = word[i];
-                if (_cur_node.Followers.TryGetValue(_id, out Node _next))
+                int _word_id = word[i];
+                if (_cur_node.Followers.TryGetValue(_word_id, out Node _next))
                 {
                     _path.Add(_next);
                     _cur_node = _next;
@@ -130,12 +135,12 @@ namespace NLDB
         /// Найти элемент грамматики с идент-м id на глубине depth. Т.о. путь до эл-та должен быть длины depth+1,
         /// включая начальный эл-т Root
         /// </summary>
-        /// <param name="id"></param>
+        /// <param name="_word_id"></param>
         /// <param name="depth"></param>
         /// <returns></returns>
-        public Node FindNode(int id, int depth = 64)
+        public Node FindNode(int _word_id, int depth = 64)
         {
-            return FindNode(root, depth, id);
+            return FindNode(root, depth, _word_id);
         }
 
         /// <summary>
@@ -143,27 +148,27 @@ namespace NLDB
         /// </summary>
         /// <param name="search_root"></param>
         /// <param name="depth"></param>
-        /// <param name="i"></param>
+        /// <param name="_word_id"></param>
         /// <returns></returns>
-        private Node FindNode(Node search_root, int depth, int i)
+        private Node FindNode(Node search_root, int depth, int _word_id)
         {
             if (depth < 0)
                 throw new ArgumentOutOfRangeException("Аргумент depth не должен быть отрицательным");
             else if (depth == 0)
             {
-                if (search_root.id == i)
+                if (search_root.word_id == _word_id)
                     return search_root;
                 else
                     return null;
             }
             else
             {
-                if (search_root.Followers.TryGetValue(i, out Node _next))
+                if (search_root.Followers.TryGetValue(_word_id, out Node _next))
                     return _next;
                 else
                     foreach (var _node in search_root.Followers.Values)
                     {
-                        _next = FindNode(_node, depth - 1, i);
+                        _next = FindNode(_node, depth - 1, _word_id);
                         if (_next != null) return _next;
                     }
             }
@@ -186,9 +191,9 @@ namespace NLDB
             //Ищем путь из источника Root, совпадающий (по id в вершинах) со словом word
             for (int i = 0; i < word.Length; i++)
             {
-                int _id = word[i];  //для удобства
+                int _word_id = word[i];  //для удобства
                 //Если следующий узел определен, двигаемся в него и продолжаем обработку слова со следующего символа
-                if (_cur_node.Followers.TryGetValue(_id, out Node _next))
+                if (_cur_node.Followers.TryGetValue(_word_id, out Node _next))
                 {
                     _path.Add(_next);
                     _cur_node = _next;
@@ -216,7 +221,7 @@ namespace NLDB
                         //т.е. для цепочки _path[0]->_path[1]->...->_path[i-1]->_path[i] , поиск начинается 
                         //с узла _path[i-1], и продолжается до _path[i-_max_depth]
                         Node _search_root = _path[(_path.Count - 1) - _depth];
-                        _next = FindNodeOnDepth(_search_root, _depth + 1, _id);
+                        _next = FindNodeOnDepth(_search_root, _depth + 1, _word_id);
                         if (_next == null) // не нашли
                         {
                             _depth++;
@@ -224,7 +229,7 @@ namespace NLDB
                         }
                         else
                         {
-                            _cur_node.Followers.Add(_id, _next);    //Добавим пермычку между _cur_node и _next
+                            _cur_node.Followers.Add(_word_id, _next);    //Добавим пермычку между _cur_node и _next
                             _path.Add(_next);   // добавим очередной пройденный узел в путь
                             _cur_node = _next;  // установим текущим узлом _next
                             links_count++;
@@ -235,11 +240,12 @@ namespace NLDB
                     //и связываем его с i-1 узлом в пути
                     if (_next == null)
                     {
-                        _next = new Node(_id);
-                        _cur_node.Followers.Add(_id, _next);
-                        links_count++;
+                        // создаем элемент с id=count+1, хотя подойдет любое уникальное число из диапазона int32
+                        _next = new Node(count + 1, _word_id);
+                        _cur_node.Followers.Add(_word_id, _next);
                         _path.Add(_next);
                         _cur_node = _next;
+                        links_count++;
                         count++;
                     }
                 }
@@ -252,22 +258,22 @@ namespace NLDB
         /// </summary>
         /// <param name="search_root"></param>
         /// <param name="depth"></param>
-        /// <param name="i"></param>
+        /// <param name="_word_id"></param>
         /// <returns></returns>
-        private Node FindNodeOnDepth(Node search_root, int depth, int i)
+        private Node FindNodeOnDepth(Node search_root, int depth, int _word_id)
         {
             if (depth < 0)
                 throw new ArgumentOutOfRangeException("Аргумент depth не должен быть отрицательным");
             else if (depth == 0)
             {
-                if (search_root.id == i)
+                if (search_root.word_id == _word_id)
                     return search_root;
                 else
                     return null;
             }
             else if (depth == 1)
             {
-                if (search_root.Followers.TryGetValue(i, out Node _next))
+                if (search_root.Followers.TryGetValue(_word_id, out Node _next))
                     return _next;
                 else
                     return null;
@@ -275,10 +281,82 @@ namespace NLDB
             else
                 foreach (var _node in search_root.Followers.Values)
                 {
-                    Node _next = FindNodeOnDepth(_node, depth - 1, i);
+                    Node _next = FindNodeOnDepth(_node, depth - 1, _word_id);
                     if (_next != null) return _next;
                 }
             return null;
+        }
+
+        /// <summary>
+        /// Сохраняет грамматику в БД 
+        /// </summary>
+        /// <param name="dbpath"></param>
+        /// <returns></returns>
+        public int SaveToDB(string dbpath)
+        {
+            var saved_links = 0;
+            using (var db = new SQLiteConnection($"Data Source={dbpath}; Version=3;"))
+            {
+                db.Open();
+
+                // Создаем таблицу
+                var cmd = db.CreateCommand();
+                cmd.CommandText =
+                    "DROP TABLE IF EXISTS Grammar; " +
+                    "CREATE TABLE Grammar(id INTEGER PRIMARY KEY, follower INTEGER NOT NULL, word_id INTEGER NOT NULL); " +
+                    "CREATE INDEX IGrammar_followers ON Grammar(follower); " +
+                    "CREATE INDEX IGrammar_word_id ON Grammar(word_id); ";
+                cmd.ExecuteNonQuery();
+
+                //Записываем данные
+                var transaction = db.BeginTransaction();
+                var nodes = getAllNodesFrom(Root);
+                saved_links = AddNodesToDB(db, nodes);
+                transaction.Commit();
+            }
+            return saved_links;
+        }
+
+        /// <summary>
+        /// Возвращает перечисление всех элементов грамматики, начиная с n и далее все, последующие
+        /// </summary>
+        /// <param name="n"></param>
+        /// <returns></returns>
+        private IEnumerable<Node> getAllNodesFrom(Node n)
+        {
+            return new Node[1] { n }.
+                Union(n.Followers.Values.
+                Union(n.Followers.Values.
+                SelectMany(f => getAllNodesFrom(f))));
+        }
+
+        /// <summary>
+        /// Записывает коллекцию узлов nodes в БД db
+        /// </summary>
+        /// <param name="db"></param>
+        /// <param name="nodes"></param>
+        /// <returns></returns>
+        private int AddNodesToDB(SQLiteConnection db, IEnumerable<Node> nodes)
+        {
+            int saved_links = 0;
+            string text = $"INSERT OR REPLACE INTO Grammar(id, follower, word_id) VALUES (@i, @f, @w);";
+            using (SQLiteCommand cmd = new SQLiteCommand(text, db))
+            {
+                cmd.Parameters.Add("@i", System.Data.DbType.Int32);
+                cmd.Parameters.Add("@f", System.Data.DbType.Int32);
+                cmd.Parameters.Add("@w", System.Data.DbType.Int32);
+                foreach (var n in nodes)
+                {
+                    cmd.Parameters["@i"].Value = n.id;
+                    cmd.Parameters["@w"].Value = n.word_id;
+                    n.Followers.Values.ToList().ForEach(f =>
+                    {
+                        cmd.Parameters["@f"].Value = f.id;
+                        saved_links += cmd.ExecuteNonQuery();
+                    });
+                };
+            }
+            return saved_links;
         }
     }
 }

@@ -25,10 +25,11 @@ namespace NLDB
 
         public object Data { get; private set; }
 
-        public IEnumerable<Word> Words(int rank = 0, int count = 0)
+        public IEnumerable<Word> Words(int rank = -1, int count = 0)
         {
             string limit = count == 0 ? "" : $"LIMIT {count}";
-            return DB.Words($"Rank={rank} {limit}");
+            string rank_rank_expr = rank == -1 ? "" : $"WHERE Rank={rank}";
+            return DB.Words($"{rank_rank_expr} {limit}".Trim());
         }
 
         public Engine(string dbpath, ExecuteMode mode = ExecuteMode.Verbose)
@@ -84,7 +85,7 @@ namespace NLDB
                 case OperationType.SimilarityCalculation:
                     CalculationResult = CalculateSimilarity((int)parameters[0]/*rank*/, (int)parameters[1]/*start from word*/); break;
                 case OperationType.GrammarCreating:
-                    CalculationResult = BuidGrammar((int)parameters[0]/*rank*/); break;
+                    CalculationResult = BuidGrammar(-1/*rank*/); break;
                 default:
                     throw new NotImplementedException();
             }
@@ -95,7 +96,7 @@ namespace NLDB
         /// <summary>
         /// Построение грамматики для слов ранга rank
         /// </summary>
-        /// <param name="rank"></param>
+        /// <param name="rank">если rank=-1, то грамматика строится для всех слов</param>
         /// <returns></returns>
         private CalculationResult BuidGrammar(int rank)
         {
@@ -104,10 +105,14 @@ namespace NLDB
             Logger.WriteLine($"Построение грамматики текста слов ранга {rank}");
             Stopwatch stopwatch = new Stopwatch();
             // перебор идет дочерних слов, поэтому получаем список слов ранга rank+1
-            List<Word> words = Words(rank + 1).ToList();
-            words.ForEach(w => grammar.Add(w.ChildsId));
+            List<Word> words = rank == -1 ? Words().ToList() : Words(rank + 1).ToList();
+            words.ForEach(w => { if (w.ChildsId.Length > 0) grammar.Add(w.ChildsId); });
             stopwatch.Stop();
             Logger.WriteLine($"Затрачено: {stopwatch.Elapsed.TotalSeconds} сек., элементов: {grammar.Count}, связей: {grammar.LinksCount}");
+            Logger.WriteLine($"Запись в БД");
+            stopwatch.Restart();
+            grammar.SaveToDB(DB.DBPath);
+            Logger.WriteLine($"Затрачено: {stopwatch.Elapsed.TotalSeconds} сек.");
             return new CalculationResult(this, OperationType.GrammarCreating, ResultType.Success, grammar);
         }
 

@@ -18,17 +18,17 @@ namespace NLDB
             string dbpath = @"D:\Data\Result\CS\" + Path.ChangeExtension(filename, "db");
             Engine engine = new Engine(path, ExecuteMode.Verbose);
 
-            //engine.Create();
-            ////engine.Insert(new Splitter(0, ""));
-            //engine.Insert(new Splitter(0, @"[^а-яё\{\}\-]+"));
-            //engine.Insert(new Splitter(1, @"[\n\r\?\!\:\;]+"));
-            //engine.Insert(new Splitter(2, @"\[\[{число}\]\]"));
-            //engine
-            //   .Execute(OperationType.FileReading, trainfile)
-            //   .Then(OperationType.TextNormalization, engine.Data)
-            //   .Then(OperationType.FileWriting, Path.ChangeExtension(dbpath, "norm"))
-            //   .Then(OperationType.TextSplitting, engine.Data)
-            //   .Then(OperationType.WordsExtraction, engine.Data);
+            engine.Create();
+            //engine.Insert(new Splitter(0, ""));
+            engine.Insert(new Splitter(0, @"[^а-яё\{\}\-]+"));
+            engine.Insert(new Splitter(1, @"[\n\r\?\!\:\;]+"));
+            engine.Insert(new Splitter(2, @"\[\[{число}\]\]"));
+            engine
+               .Execute(OperationType.FileReading, trainfile)
+               .Then(OperationType.TextNormalization, engine.Data)
+               ////.Then(OperationType.FileWriting, Path.ChangeExtension(dbpath, "norm"))
+               .Then(OperationType.TextSplitting, engine.Data)
+               .Then(OperationType.WordsExtraction, engine.Data);
             //engine.Clear("MatrixA");
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(1));
             //engine.Execute(OperationType.DistancesCalculation, engine.Words(2));
@@ -39,8 +39,9 @@ namespace NLDB
             //engine.Execute(OperationType.SimilarityCalculation, 2, 0);
             //engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath, "words"));
 
-            var result = engine.Execute(OperationType.GrammarCreating, 1);
+            var result = engine.Execute(OperationType.GrammarCreating);
             Grammar grammar = (result.Data as Grammar);
+
             Console.WriteLine($"Количество элементов грамматики: {grammar.Count}");
             Console.WriteLine($"Количество связей грамматики: {grammar.LinksCount}");
 
