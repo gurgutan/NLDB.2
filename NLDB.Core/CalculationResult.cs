@@ -14,7 +14,8 @@ namespace NLDB
         WordsExtraction,
         DistancesCalculation,
         SimilarityCalculation,
-        GrammarCreating
+        GrammarCreating,
+        GrammarLoading
     };
 
     public enum ExecuteMode

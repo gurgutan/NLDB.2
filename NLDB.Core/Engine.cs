@@ -85,7 +85,9 @@ namespace NLDB
                 case OperationType.SimilarityCalculation:
                     CalculationResult = CalculateSimilarity((int)parameters[0]/*rank*/, (int)parameters[1]/*start from word*/); break;
                 case OperationType.GrammarCreating:
-                    CalculationResult = BuidGrammar(-1/*rank*/); break;
+                    CalculationResult = BuidGrammar(); break;
+                case OperationType.GrammarLoading:
+                    CalculationResult = LoadGrammar(); break;
                 default:
                     throw new NotImplementedException();
             }
@@ -93,18 +95,31 @@ namespace NLDB
             return CalculationResult;
         }
 
+        private CalculationResult LoadGrammar()
+        {
+            Logger.WriteLine($"Считывание грамматики из БД");
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+            grammar.LoadFromDB(DB.DBPath);
+            Data = grammar;
+            stopwatch.Stop();
+            Logger.WriteLine($"Затрачено: {stopwatch.Elapsed.TotalSeconds} сек., элементов: {grammar.Count}, связей: {grammar.LinksCount}");
+            return new CalculationResult(this, OperationType.GrammarLoading, ResultType.Success, grammar);
+        }
+
         /// <summary>
         /// Построение грамматики для слов ранга rank
         /// </summary>
         /// <param name="rank">если rank=-1, то грамматика строится для всех слов</param>
         /// <returns></returns>
-        private CalculationResult BuidGrammar(int rank)
+        private CalculationResult BuidGrammar(int rank = -1)
         {
             if (rank + 1 > DB.MaxRank)
                 throw new ArgumentOutOfRangeException($"Максимально допустимый ранг слов:{DB.MaxRank - 1}");
             Logger.WriteLine($"Построение грамматики текста слов ранга {rank}");
             Stopwatch stopwatch = new Stopwatch();
-            // перебор идет дочерних слов, поэтому получаем список слов ранга rank+1
+            stopwatch.Start();
+            // перебор идет по дочерним словам, поэтому получаем список слов ранга rank+1
             List<Word> words = rank == -1 ? Words().ToList() : Words(rank + 1).ToList();
             words.ForEach(w => { if (w.ChildsId.Length > 0) grammar.Add(w.ChildsId); });
             stopwatch.Stop();
@@ -112,6 +127,7 @@ namespace NLDB
             Logger.WriteLine($"Запись в БД");
             stopwatch.Restart();
             grammar.SaveToDB(DB.DBPath);
+            Data = grammar;
             Logger.WriteLine($"Затрачено: {stopwatch.Elapsed.TotalSeconds} сек.");
             return new CalculationResult(this, OperationType.GrammarCreating, ResultType.Success, grammar);
         }

@@ -287,6 +287,72 @@ namespace NLDB
             return null;
         }
 
+        public void LoadFromDB(string dbpath)
+        {
+            using (var _db = new SQLiteConnection($"Data Source={dbpath}; Version=3;"))
+            {
+                _db.Open();
+                // Зачистим существующую грамматику
+                root.Followers.Clear();
+                GC.Collect();
+                // Загрузим новую из БД
+                (count, links_count) = GetNodeFromDB(_db, root);
+                _db.Close();
+            }
+        }
+
+        /// <summary>
+        /// Считывает из БД _db элементы грамматики. Реализовано нерекурсивно для экономии на парсинге текста команды.
+        /// </summary>
+        /// <param name="_db">открытое соединение</param>
+        /// <param name="root">корневой элемент, с которого начнется считывание</param>
+        /// <returns></returns>
+        private (int, int) GetNodeFromDB(SQLiteConnection _db, Node root)
+        {
+            string text = $"SELECT follower, word_id FROM Grammar WHERE id=@i";
+            // Вспомогательный словарь для хранения всех элементов грамматики
+            Dictionary<int, Node> _all_nodes = new Dictionary<int, Node>();
+            int c = 1;  //число элементов
+            int l = 0;  //число связей
+            Queue<Node> queue = new Queue<Node>();
+            queue.Enqueue(root);
+            using (SQLiteCommand cmd = new SQLiteCommand(text, _db))
+            {
+                cmd.Parameters.Add("@i", System.Data.DbType.Int32);
+                // Обход всего графа грамматики в БД организуем с помощью очереди queue
+                while (queue.Count > 0)
+                {
+                    var node = queue.Dequeue();
+                    cmd.Parameters["@i"].Value = node.id;
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (!reader.HasRows) continue;
+                        while (reader.Read())
+                        {
+                            int _f = reader.GetInt32(0);
+                            int _f_id = reader.GetInt32(1);
+                            // если элемент был загружен ранее
+                            if (_all_nodes.TryGetValue(_f, out Node follower))
+                                // добавляем связь с сущемтвующим элементов
+                                root.Followers.Add(_f, follower);
+                            else
+                            {
+                                // создаем и добавляем новый элемент и связь
+                                follower = new Node(_f, _f_id);
+                                _all_nodes[_f] = follower;
+                                root.Followers.Add(_f_id, follower);
+                                c++;    // элементы
+                            }
+                            // Добавляем в очередь очередной узел
+                            queue.Enqueue(follower);
+                            l++;    // связи
+                        }
+                    }
+                }
+            }
+            return (c, l);
+        }
+
         /// <summary>
         /// Сохраняет грамматику в БД 
         /// </summary>
@@ -310,7 +376,7 @@ namespace NLDB
 
                 //Записываем данные
                 var transaction = db.BeginTransaction();
-                var nodes = getAllNodesFrom(Root);
+                var nodes = GetAllNodesFrom(Root);
                 saved_links = AddNodesToDB(db, nodes);
                 transaction.Commit();
             }
@@ -322,12 +388,12 @@ namespace NLDB
         /// </summary>
         /// <param name="n"></param>
         /// <returns></returns>
-        private IEnumerable<Node> getAllNodesFrom(Node n)
+        private IEnumerable<Node> GetAllNodesFrom(Node n)
         {
             return new Node[1] { n }.
                 Union(n.Followers.Values.
                 Union(n.Followers.Values.
-                SelectMany(f => getAllNodesFrom(f))));
+                SelectMany(f => GetAllNodesFrom(f))));
         }
 
         /// <summary>
@@ -348,15 +414,17 @@ namespace NLDB
                 foreach (var n in nodes)
                 {
                     cmd.Parameters["@i"].Value = n.id;
-                    cmd.Parameters["@w"].Value = n.word_id;
                     n.Followers.Values.ToList().ForEach(f =>
                     {
                         cmd.Parameters["@f"].Value = f.id;
+                        cmd.Parameters["@w"].Value = f.word_id;
                         saved_links += cmd.ExecuteNonQuery();
                     });
                 };
             }
             return saved_links;
         }
+
+        //===================================================================================================
     }
 }
