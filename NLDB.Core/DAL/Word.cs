@@ -14,6 +14,11 @@ namespace NLDB.DAL
 
         public int[] ChildsId => string.IsNullOrEmpty(Childs) ? new int[0] : Childs.Split(',').Select(s => int.Parse(s)).ToArray();
 
+        public bool HasChilds
+        {
+            get { return !string.IsNullOrEmpty(Childs); }
+        }
+
         public Word()
         {
         }

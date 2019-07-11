@@ -26,7 +26,6 @@ namespace NLDB
             //engine
             //   .Execute(OperationType.FileReading, trainfile)
             //   .Then(OperationType.TextNormalization, engine.Data)
-            //   ////.Then(OperationType.FileWriting, Path.ChangeExtension(dbpath, "norm"))
             //   .Then(OperationType.TextSplitting, engine.Data)
             //   .Then(OperationType.WordsExtraction, engine.Data);
             //engine.Clear("MatrixA");
@@ -39,13 +38,13 @@ namespace NLDB
             //engine.Execute(OperationType.SimilarityCalculation, 2, 0);
             //engine.Execute(OperationType.FileWriting, Path.ChangeExtension(dbpath, "words"));
 
-            Console.WriteLine($"Создание грамматики");
-            engine.Execute(OperationType.GrammarCreating);
+            //Console.WriteLine($"Создание грамматики");
+            //engine.Execute(OperationType.GrammarCreating);
             Console.WriteLine($"Загрузка грамматики из БД");
             var result = engine.Execute(OperationType.GrammarLoading);
             Grammar grammar = (result.Data as Grammar);
 
-            Console.WriteLine($"Количество элементов грамматики: {grammar.Count}");
+            Console.WriteLine($"Количество элементов грамматики: {grammar.NodesCount}");
             Console.WriteLine($"Количество связей грамматики: {grammar.LinksCount}");
 
             //Теперь будем использовать полученные данные
@@ -59,10 +58,10 @@ namespace NLDB
                 var terms = engine.Similars(line, 1, 8);
                 if (terms.Count == 0) continue;
                 Console.WriteLine(string.Join("\n", terms.Select(t => "[" + t.confidence.ToString("F4") + "] " + t.ToString())));
-                var node = engine.grammar.FindNode(terms.First().id, 1024);
-                if (node == null) continue;
+                var nodes = engine.grammar.FindNodesByWordId(terms.First().id);
+                if (nodes.Count == 0) continue;
                 Console.WriteLine("Продолжение");
-                var next = node.Followers.Keys;
+                var next = nodes.First().Followers.Keys;
                 Console.WriteLine(string.Join("\n", next.Select(t => engine.ToTerm(t))));
                 //var nearest = terms.SelectMany(t => engine.Nearest(terms.First(), 4)).Distinct().ToList();
                 //Console.WriteLine("\nСовместные:\n" + nearest.Aggregate("", (c, n) => c + $"\n" + "[" + n.confidence.ToString("F4") + "] " + n.ToString()));

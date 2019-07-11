@@ -23,14 +23,15 @@ namespace NLDB
         //TODO: Потом можно сделать настраиваемый размер буфера для чтения текста
         public int TextBufferSize => TEXT_BUFFER_SIZE;
 
+        /// <summary>
+        /// Свойство хранит ссылку на данные, являющиеся результатом последней выполненной операции. 
+        /// Может быть использовано для выполнения цепочки операций при помощи метода Then
+        /// </summary>
         public object Data { get; private set; }
 
-        public IEnumerable<Word> Words(int rank = -1, int count = 0)
-        {
-            string limit = count == 0 ? "" : $"LIMIT {count}";
-            string rank_rank_expr = rank == -1 ? "" : $"WHERE Rank={rank}";
-            return DB.Words($"{rank_rank_expr} {limit}".Trim());
-        }
+        public Grammar grammar = new Grammar(3);
+
+
 
         public Engine(string dbpath, ExecuteMode mode = ExecuteMode.Verbose)
         {
@@ -65,6 +66,28 @@ namespace NLDB
                 }
         }
 
+        /// <summary>
+        /// Возвращает перечисление слов, полученное запросом к БД
+        /// </summary>
+        /// <param name="rank">ранг возвращаемых слов</param>
+        /// <param name="count">количество слов к возврату (используется для директивы LIMIT в SQL-запросе)</param>
+        /// <returns></returns>
+        public IEnumerable<Word> Words(int rank = -1, int count = 0)
+        {
+            string limit = count == 0 ? "" : $"LIMIT {count}";
+            string rank_rank_expr = rank == -1 ? "" : $"WHERE Rank={rank}";
+            return DB.Words($"{rank_rank_expr} {limit}".Trim());
+        }
+
+        /// <summary>
+        /// Метод выполняет операцию верхнего уровня ptype с данными, переданныи в параметре parameters.
+        /// Данный метод является связующим между заказчиком вне класса Engine и исполнителем внутри класса Engine. 
+        /// Метод можно рассматривать как элемент API данной сборки для выполнения некоторых базовых алгоритмов 
+        /// построения, изменения, использования ЯБД (NLDB). Предполагается использование данного метода в CLI.
+        /// </summary>
+        /// <param name="ptype"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
         public CalculationResult Execute(OperationType ptype, params object[] parameters)
         {
             Logger.WriteLine($"Операция {ptype}");
@@ -103,7 +126,7 @@ namespace NLDB
             grammar.LoadFromDB(DB.DBPath);
             Data = grammar;
             stopwatch.Stop();
-            Logger.WriteLine($"Затрачено: {stopwatch.Elapsed.TotalSeconds} сек., элементов: {grammar.Count}, связей: {grammar.LinksCount}");
+            Logger.WriteLine($"Затрачено: {stopwatch.Elapsed.TotalSeconds} сек., элементов: {grammar.NodesCount}, связей: {grammar.LinksCount}");
             return new CalculationResult(this, OperationType.GrammarLoading, ResultType.Success, grammar);
         }
 
@@ -114,19 +137,26 @@ namespace NLDB
         /// <returns></returns>
         private CalculationResult BuidGrammar(int rank = -1)
         {
-            if (rank + 1 > DB.MaxRank)
-                throw new ArgumentOutOfRangeException($"Максимально допустимый ранг слов:{DB.MaxRank - 1}");
+            // параметр rank, превосходящий максимально возможный трактуем как "слова всех рангов"
+            if (rank + 1 > DB.MaxRank) rank = -1;
             Logger.WriteLine($"Построение грамматики текста слов ранга {rank}");
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
-            // перебор идет по дочерним словам, поэтому получаем список слов ранга rank+1
-            List<Word> words = rank == -1 ? Words().ToList() : Words(rank + 1).ToList();
-            words.ForEach(w => { if (w.ChildsId.Length > 0) grammar.Add(w.ChildsId); });
+            // Получим список слов. Т.к. слово w=c1..cn добавляется в грамматику как путь, образованный упорядоченный последовательностью 
+            // дочерних слов c1...cn, получаем из БД список слов w ранга rank+1, чтобы получить грамматику слов ранга rank
+            var words = (rank == -1 ?
+                Words() : Words(rank + 1))
+                .Where(w => w.HasChilds)
+                .Select(w => w.ChildsId)
+                .ToList();
+            // построение грамматики
+            grammar = new Grammar(words);
             stopwatch.Stop();
-            Logger.WriteLine($"Затрачено: {stopwatch.Elapsed.TotalSeconds} сек., элементов: {grammar.Count}, связей: {grammar.LinksCount}");
+            Logger.WriteLine($"Затрачено: {stopwatch.Elapsed.TotalSeconds} сек., элементов: {grammar.NodesCount}, связей: {grammar.LinksCount}");
             Logger.WriteLine($"Запись в БД");
             stopwatch.Restart();
             grammar.SaveToDB(DB.DBPath);
+            // Сохраняем ссылку на грамматику в Data для возможности использования цепной операции Then
             Data = grammar;
             Logger.WriteLine($"Затрачено: {stopwatch.Elapsed.TotalSeconds} сек.");
             return new CalculationResult(this, OperationType.GrammarCreating, ResultType.Success, grammar);
@@ -253,42 +283,6 @@ namespace NLDB
             return new CalculationResult(this, OperationType.DistancesCalculation, ResultType.Success);
         }
 
-        ////Вычисляет матожидание вектора расстояний для каждого из слов words
-        //private int PositionsMean(IEnumerable<Word> words)
-        //{
-        //    int wordsCount = words.Count();
-        //    ConcurrentDictionary<int, Dictionary<int, AValue>> result = new ConcurrentDictionary<int, Dictionary<int, AValue>>(4, wordsCount);
-        //    foreach (var w in words)
-        //    {
-        //        int[] childs = w.ChildsId;
-        //        Enumerable.Range(0, childs.Length - 1).AsParallel().ForAll((i) =>
-        //        {
-        //            Dictionary<int, AValue> row = new Dictionary<int, AValue>(childs.Length - 1);
-        //            for (int j = 0; j < childs.Length; j++)
-        //            {
-        //                if (childs[i] == childs[j]) continue;
-        //                if (!row.TryGetValue(j, out var value))
-        //                {
-        //                    row[j] = new AValue(w.Rank - 1, childs[i], childs[j], j - i, 1);
-        //                }
-        //                else
-        //                {
-        //                    value.Count++;
-        //                    value.Sum += j - i;
-        //                    row[j] = value;
-        //                }
-        //            }
-        //            //Вставляем вектор-строку, только если он не пустой
-        //            if (row.Count > 0) while (!result.TryAdd(i, row)) ;
-        //        });
-        //    }
-        //    if (result.Count == 0) return 0;
-        //    //Сброс данных в БД
-        //    Debug.WriteLine(result.Count);
-        //    List<ulong> c = result.Values.SelectMany(v => v.Values).Select(v => (ulong)v.R << 32 | (uint)v.C).OrderBy(v => v).ToList();
-        //    result.Values.ToList().ForEach(r => DB.InsertAll(r.Values));
-        //    return result.Count;
-        //}
 
         private int ContextMatrix(IEnumerable<Word> words)
         {
@@ -533,7 +527,6 @@ namespace NLDB
         //Закрытые свойства
         //--------------------------------------------------------------------------------------------
         private DataBase DB { get; }
-        public Grammar grammar = new Grammar(3);
         private readonly string dbpath;
         private const int SIMILARITY_CALC_STEP = 1 << 8;   //Оптимальный шаг для отношения Производительность/Память примерно 262 144
         private const int DISTANCES_CALC_STEP = 1 << 20;    //Оптимальный шаг для вычисления матрицы расстояний примерно 2^10-2^14

@@ -11,7 +11,7 @@ namespace NLDB.DAL
     public class DataBase : IDisposable
     {
         private const int PARALLELIZM = 4;
-        private SQLiteConnection db;
+        private readonly SQLiteConnection db;
         private SQLiteTransaction transaction;
         private Parser[] parsers = null;
         
