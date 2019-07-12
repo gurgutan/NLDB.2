@@ -13,15 +13,15 @@ namespace NLDB
     public class Parser
     {
         //Служебные константы, используемые для подстановки в текст для сокращения общего количества токенов по тексту
-        private const string specSymbolNumber = "{число}";
-        private const string specSymbolRomeNumber = "{число}";
+        private const string specSymbolNumber = "{X}";
+        private const string specSymbolRomeNumber = "{X}";
         private const string specSymbolEnglish = "{англяз}";
         private const string specSymbolShorthand = "{сокращение}";
 
         private readonly string SplitExpr;
         //private string RemoveExpr = "";
         private readonly Regex splitRegex;
-        private static Regex removeRegex = new Regex(@"[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\*\+\-\&\\\/\%\$\^\[\]\{\}\=\<\>\""\']", RegexOptions.Compiled);
+        private static Regex removeRegex = new Regex(@"[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\-\{\}\=\<\>\""]", RegexOptions.Compiled);
         private static Regex replaceNumbersRegex = new Regex(@"\b\d+((\.|\,)\d+)?", RegexOptions.Compiled);
         private static Regex replaceEnglishRegex = new Regex(@"[a-zA-Z]+", RegexOptions.Compiled);
         private static Regex removeShorthands = new Regex(@"\b([а-яА-ЯёЁ]\s*\.)", RegexOptions.Compiled);

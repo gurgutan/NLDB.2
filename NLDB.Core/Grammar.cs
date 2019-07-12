@@ -61,6 +61,8 @@ namespace NLDB
                 }
                 ibar.Set(count, true);
             }
+            _nodes = null;
+            GC.Collect();
         }
 
         public override string ToString()

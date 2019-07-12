@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data.SQLite;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -14,7 +15,7 @@ namespace NLDB.DAL
         private readonly SQLiteConnection db;
         private SQLiteTransaction transaction;
         private Parser[] parsers = null;
-        
+
         private Dictionary<string, MatrixDictionary> sparseMatrixCash = new Dictionary<string, MatrixDictionary>(SPARSEMATRIX_CASH_SIZE);
         private ConcurrentDictionary<long, AValue> matrixACash = new ConcurrentDictionary<long, AValue>(PARALLELIZM, MATRIXA_CASH_SIZE);
         private ConcurrentDictionary<long, BValue> matrixBCash = new ConcurrentDictionary<long, BValue>(PARALLELIZM, MATRIXB_CASH_SIZE);
@@ -33,7 +34,7 @@ namespace NLDB.DAL
 
         public string DBPath
         {
-            get { return db.FileName;  }
+            get { return db.FileName; }
         }
 
         public Parser[] Parsers
@@ -689,10 +690,30 @@ namespace NLDB.DAL
             return t;
         }
 
-        public Term ToTerm(string text, int rank)
+        /// <summary>
+        /// Определяет ранг текста text
+        /// </summary>
+        /// <param name="text"></param>
+        /// <returns></returns>
+        private int DetermineRank(string text)
+        {
+            int rank = MaxRank;
+            var splitted = new string[] { text };
+            // пока разбиение на подслова даёт единичное слово, уменьшаем ранг
+            while (splitted.Length == 1 && rank > 0)
+            {
+                rank--;
+                splitted = Parsers[rank].Split(splitted[0]);
+                if (splitted.Length == 0) return 0;
+            }
+            return rank + 1;
+        }
+
+        public Term ToTerm(string text, int rank = -1)
         {
             text = Parser.Normilize(text);
-            return new DAL.Term(rank, 0, 0, text,
+            if (rank == -1) rank = DetermineRank(text);
+            return new Term(rank, 0, 0, text,
                 rank == 0 ? null :
                 Parsers[rank - 1].
                 Split(text).

@@ -31,8 +31,6 @@ namespace NLDB
 
         public Grammar grammar = new Grammar(3);
 
-
-
         public Engine(string dbpath, ExecuteMode mode = ExecuteMode.Verbose)
         {
             this.dbpath = dbpath;
@@ -397,7 +395,14 @@ namespace NLDB
             return result;
         }
 
-        internal List<Term> Similars(string text, int rank = 1, int count = 1)
+        /// <summary>
+        /// Возвращает термы из БД подобные тексту text
+        /// </summary>
+        /// <param name="text">исходный текст для поиска</param>
+        /// <param name="rank">ранг искомого слова. Если rank=-1, то метод сам определяет ранг text</param>
+        /// <param name="count">количество подобных слов к возврату</param>
+        /// <returns></returns>
+        internal List<Term> Similars(string text, int rank = -1, int count = 1)
         {
             if (count <= 0) throw new ArgumentException("Количество возращаемых значений должно быть положительным");
             List<Term> result = new List<Term>();

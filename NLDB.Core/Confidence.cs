@@ -99,6 +99,21 @@ namespace NLDB
             float count = a.Sum(c => b.Max(bc => Confidence.Compare(bc, c)));
             return count / b.Length;
         }
+
+        private static float SoftOverlapping(DAL.Term a, DAL.Term b)
+        {
+            float count = a.Childs.Sum(c => b.Childs.Max(bc => Confidence.Compare(c, bc)));
+            float denominator = a.Count * a.Count + b.Count * b.Count;
+            return (float)Math.Sqrt(count * count / denominator);
+        }
+
+        private static float SoftOverlapping(int[] a, int[] b)
+        {
+            float count = a.Sum(c => b.Max(bc => Confidence.Compare(bc, c)));
+            double denominator = a.Length* a.Length+ b.Length* b.Length;
+            return (float)Math.Sqrt(count * count / denominator);
+        }
+
         /// <summary>
         /// Косинусная метрика между Термами: сумма совпадающих подслов, делёная на произведение модулей Термов
         /// </summary>
@@ -224,11 +239,11 @@ namespace NLDB
         //Функция применяется к двум скалярным элементам веторов, в соответствующих позициях
         private static Func<DAL.Term, DAL.Term, float>[] MetricsStack = new Func<DAL.Term, DAL.Term, float>[]
         {
-            Confidence.Equality,        //для букв
-            //Confidence.Cosine,          //для слов
-            Confidence.SoftOverlappingRight,   //для предложений
-            Confidence.SoftOverlappingLeft,   //для параграфов
-            Confidence.SoftOverlappingLeft    //зарезервивровано
+            Confidence.Equality,            //для букв
+            Confidence.Cosine,              //для слов
+            Confidence.SoftOverlapping,     //для предложений
+            Confidence.SoftOverlappingLeft, //для параграфов
+            Confidence.SoftOverlappingLeft  //зарезервировано
         };
 
     }
