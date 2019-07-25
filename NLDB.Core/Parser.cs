@@ -13,18 +13,18 @@ namespace NLDB
     public class Parser
     {
         //Служебные константы, используемые для подстановки в текст для сокращения общего количества токенов по тексту
-        private const string specSymbolNumber = "{X}";
-        private const string specSymbolRomeNumber = "{X}";
-        private const string specSymbolEnglish = "{англяз}";
-        private const string specSymbolShorthand = "{сокращение}";
+        private const string specSymbolNumber = "{ХХХ}";
+        private const string specSymbolRomeNumber = "{ХХХ}";
+        private const string specSymbolEnglish = "{англ}";
+        private const string specSymbolShorthand = "";
 
         private readonly string SplitExpr;
         //private string RemoveExpr = "";
         private readonly Regex splitRegex;
-        private static Regex removeRegex = new Regex(@"[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\-\{\}\=\<\>\""]", RegexOptions.Compiled);
+        private static Regex removeRegex = new Regex(@"[^а-яА-ЯёЁ\d\s\n\!\.\,\;\:\-\{\}\=\<\>\""\p{Pd}]", RegexOptions.Compiled);
         private static Regex replaceNumbersRegex = new Regex(@"\b\d+((\.|\,)\d+)?", RegexOptions.Compiled);
         private static Regex replaceEnglishRegex = new Regex(@"[a-zA-Z]+", RegexOptions.Compiled);
-        private static Regex removeShorthands = new Regex(@"\b([а-яА-ЯёЁ]\s*\.)", RegexOptions.Compiled);
+        private static Regex removeShorthands = new Regex(@"\b[а-яА-ЯёЁ]\s?\.", RegexOptions.Compiled);
 
         public Parser(string splitExpr)
         {
@@ -46,9 +46,9 @@ namespace NLDB
         public static string Normilize(string text)
         {
             text = removeRegex.Replace(text.ToLower().Trim(), "");
+            text = removeShorthands.Replace(text, specSymbolShorthand);
             text = replaceNumbersRegex.Replace(text, specSymbolNumber);
             text = replaceEnglishRegex.Replace(text, specSymbolEnglish);
-            text = removeShorthands.Replace(text, specSymbolShorthand);
             return text;
         }
 

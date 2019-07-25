@@ -99,7 +99,7 @@ namespace NLDB
             return new List<GrammarNode>(_path);
         }
 
-        /// <summary>
+        /// <summary> 
         /// Поиск элементов грамматики по идентификатору слова
         /// </summary>
         /// <param name="_word_id"></param>

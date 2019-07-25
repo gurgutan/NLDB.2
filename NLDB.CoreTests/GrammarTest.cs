@@ -42,7 +42,7 @@ namespace NLDBCoreTests
             Assert.IsNotNull(g.Origin.Followers[1].Followers[2].Followers[3]);
             g.Add(new int[] { 1, 2, 4 });
             Assert.IsNotNull(g.Origin.Followers[1].Followers[2].Followers[4]);
-            var node = g.FindNode(4);
+            var node = g.FindNodesByWordId(4);
             Assert.AreEqual(g.Origin.Followers[1].Followers[2].Followers[4], node);
         }
         [TestMethod]

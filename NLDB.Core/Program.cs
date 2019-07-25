@@ -12,22 +12,22 @@ namespace NLDB
         {
             //string path = "/mnt/1C82D43582D414DC/Data/Result/5mb.db";
 
-            string filename = "884mb.txt";
+            string filename = "5mb.txt";
             string trainfile = @"D:\Data\Wiki\ru\" + filename;
             string dbpath = @"D:\Data\Result\CS\" + Path.ChangeExtension(filename, "db");
             Engine engine = new Engine(dbpath, ExecuteMode.Verbose);
 
-            //engine.Create();
-            //engine.Insert(new Splitter(0, ""));
-            //engine.Insert(new Splitter(1, @"[^а-яё\{\}\-]+"));
-            //engine.Insert(new Splitter(2, @"[\n\r\?\!\:\;]+"));
-            //engine.Insert(new Splitter(3, @"\[\[{X}\]\]"));
-            //engine
-            //   .Execute(OperationType.FileReading, trainfile)
-            //   .Then(OperationType.TextNormalization, engine.Data)
-            //   //.Then(OperationType.FileWriting, dbpath.Replace(".db", ".norm"))
-            //   .Then(OperationType.TextSplitting, engine.Data)
-            //   .Then(OperationType.WordsExtraction, engine.Data);
+            engine.Create();
+            engine.Insert(new Splitter(0, ""));
+            engine.Insert(new Splitter(1, @"[^а-яё\{\}\-\p{Pd}]+"));
+            engine.Insert(new Splitter(2, @"[\n\r\?\!\:\;\p{Pd}]+"));
+            engine.Insert(new Splitter(3, @"\[\[{ХХХ}\]\]"));
+            engine
+               .Execute(OperationType.FileReading, trainfile)
+               .Then(OperationType.TextNormalization, engine.Data)
+               .Then(OperationType.FileWriting, dbpath.Replace(".db", ".norm"))
+               .Then(OperationType.TextSplitting, engine.Data)
+               .Then(OperationType.WordsExtraction, engine.Data);
 
 
             //// Вычисления метрик

@@ -59,10 +59,12 @@ namespace NLDB.DAL
 
         public override string ToString()
         {
-            if (rank == 0)
+            if (rank == 0)      // буквы
                 return text;
+            else if (rank == 1) // слова
+                return childs.Aggregate("", (c, n) => c == "" ? n.ToString() : c + n.ToString());
             else
-                return "{" + childs.Aggregate("", (c, n) => c == "" ? n.ToString() : c + "" + n.ToString()) + "}";
+                return "{" + childs.Aggregate("", (c, n) => c == "" ? n.ToString() : c + " " + n.ToString()) + "}";
         }
 
         /// <summary>

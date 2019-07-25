@@ -321,7 +321,7 @@ namespace NLDB
 
         private int[] ExtractWordsFromString(string text, int rank)
         {
-            var strings = DB.Split(text, rank).Where(s => !string.IsNullOrEmpty(s));
+            var strings = DB.Split(text, rank).Where(s => !string.IsNullOrEmpty(s.Trim()));
             return strings.Select(s =>
             {
                 int id;

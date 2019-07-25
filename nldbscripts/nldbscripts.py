@@ -14,8 +14,8 @@ import tensorflow as tf
 import generator
 
 
-textname = '100mb.txt'
-dbname = '100mb.db'
+textname = '5mb.txt'
+dbname = '5mb.db'
 
 if system() == 'Linux':
     dbpath = '/home/ivan/dev/Data/Result/'+dbname
@@ -26,25 +26,25 @@ else:
 
 
 s = splitter.Splitter()
-# print('Разбиение текста "%s" на слова' % text)
-# text_tree = s.split_file(text)
-# print('Векторизация текста "%s"' % text)
-# v = tokenizer.Vectorizer(dbpath, max_rank=3)
-# v.vectorize(text_tree)
+print('Разбиение текста "%s" на слова' % text)
+text_tree = s.split_file(text)
+print('Векторизация текста "%s"' % text)
+v = tokenizer.Vectorizer(dbpath, max_rank=3)
+v.vectorize(text_tree)
 
 engine = calc.Calculations(dbpath)
 
-# print('Вычисление memebership_matrix')
-# engine.memebership_matrix()
+print('Вычисление memebership_matrix')
+engine.memebership_matrix()
 
-# print('Вычисление context_mean_matrix')
-# engine.context_mean_matrix()
+print('Вычисление context_mean_matrix')
+engine.context_mean_matrix()
 
-# print('Вычисление context_similarity_matrix')
-# engine.context_similarity_matrix()
+print('Вычисление context_similarity_matrix')
+engine.context_similarity_matrix()
 
-# print('Вычисление membeship_similarity_matrix')
-# engine.membeship_similarity_matrix()
+print('Вычисление membeship_similarity_matrix')
+engine.membeship_similarity_matrix()
 
 print("Загрузка данных...")
 cm = sparse.load_npz(names.fname_context_mean(dbpath))
@@ -54,9 +54,9 @@ cs = sparse.load_npz(names.fname_context_similarity(dbpath))
 
 # start_time = timeit.default_timer()
 
-# transformer = shrinker.Shrinker(in_size=cm.shape[0], out_size=16)
-# print("Обучение")
-# transformer.train(cm)
+transformer = shrinker.Shrinker(in_size=cm.shape[0], out_size=16)
+print("Обучение")
+transformer.train(cm)
 
 # print("Сохранение модели")
 # transformer.save('p5mb_model.h5')
