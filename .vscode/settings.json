@@ -2,7 +2,7 @@
     "python.linting.pylintEnabled": false,
     "python.pythonPath": "D:\\Anaconda\\Miniconda3\\envs\\ml\\python.exe",
     "python.linting.pep8Enabled": true,
-    "python.linting.enabled": true,
+    "python.linting.enabled": false,
     "python.linting.banditEnabled": false,
     "python.linting.flake8Enabled": false
 }

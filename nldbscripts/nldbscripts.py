@@ -1,3 +1,10 @@
+# #############################################################################
+# В рамках проекта NLDB. Слеповичев И.И. 26.07.2019.
+# -----------------------------------------------------------------------------
+# Основной модуль для выполнения расчетов
+# #############################################################################
+
+
 import dbtransform
 import calc
 import splitter
@@ -34,22 +41,22 @@ v.vectorize(text_tree)
 
 engine = calc.Calculations(dbpath)
 
-print('Вычисление memebership_matrix')
-engine.memebership_matrix()
+# print('Вычисление memebership_matrix')
+# engine.memebership_matrix()
 
-print('Вычисление context_mean_matrix')
-engine.context_mean_matrix()
+# print('Вычисление context_mean_matrix')
+# engine.context_mean_matrix()
 
-print('Вычисление context_similarity_matrix')
-engine.context_similarity_matrix()
+# print('Вычисление context_similarity_matrix')
+# engine.context_similarity_matrix()
 
-print('Вычисление membeship_similarity_matrix')
-engine.membeship_similarity_matrix()
+# print('Вычисление membeship_similarity_matrix')
+# engine.membeship_similarity_matrix()
 
-print("Загрузка данных...")
-cm = sparse.load_npz(names.fname_context_mean(dbpath))
-wm = sparse.load_npz(names.fname_membership(dbpath))
-cs = sparse.load_npz(names.fname_context_similarity(dbpath))
+# print("Загрузка данных...")
+# cm = sparse.load_npz(names.fname_context_mean(dbpath))
+# wm = sparse.load_npz(names.fname_membership(dbpath))
+# cs = sparse.load_npz(names.fname_context_similarity(dbpath))
 # ms = sparse.load_npz(names.fname_member_similarity(dbpath))
 
 # start_time = timeit.default_timer()

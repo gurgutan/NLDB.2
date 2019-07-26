@@ -12,14 +12,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NLDB.Core", "NLDB.Core\NLDB.Core.csproj", "{58AA6313-E922-46B9-803D-20EAB977867E}"
 EndProject
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "nldbscripts", "nldbscripts\nldbscripts.pyproj", "{D24DF220-CC64-4AE8-8A27-5F5F2EE04E1E}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "NLDB.python", "nldbscripts\NLDB.python.pyproj", "{D24DF220-CC64-4AE8-8A27-5F5F2EE04E1E}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NLDB.CoreTests", "NLDB.CoreTests\NLDB.CoreTests.csproj", "{7F8A01D2-7A47-4A7B-8A72-13FDC5E983C2}"
 EndProject
 Global
-	GlobalSection(Performance) = preSolution
-		HasPerformanceSessions = true
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|x64 = Debug|x64
@@ -77,6 +74,9 @@ Global
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {C8186610-3EEA-450D-B71E-9C0539A42223}
+	EndGlobalSection
+	GlobalSection(Performance) = preSolution
+		HasPerformanceSessions = true
 	EndGlobalSection
 	GlobalSection(Performance) = preSolution
 		HasPerformanceSessions = true

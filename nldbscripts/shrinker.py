@@ -1,3 +1,11 @@
+# #############################################################################
+# В рамках проекта NLDB. Слеповичев И.И. 26.07.2019.
+# -----------------------------------------------------------------------------
+# Модуль содержит единственный класс Shrinker, реализующий механизм кодирования
+# слов короткими числовыми векторами. По сути, Shrinker является аналогом 
+# методов word2vec, но выполненных принципиально другим способом.
+# #############################################################################
+
 from tensorflow.keras.layers import Input, Layer, Dense, Concatenate, Dot, Subtract
 from tensorflow.keras.initializers import *
 from tensorflow.keras.optimizers import Adam, Adagrad, RMSprop
@@ -68,10 +76,10 @@ class Shrinker(object):
         Обучение модели на данных из разреженной матрицы m. В m каждая строка - 'длинный' вектор области определения искомого оператора.
         """
         self.model.fit_generator(
-            self._generate_from_sparse(m), steps_per_epoch=256, epochs=8)
+            self._generate_batch(m), steps_per_epoch=256, epochs=8)
         return self.model
-
-    def _generate_from_sparse(self, m: sparse.csr_matrix):
+ 
+    def _generate_batch(self, m: sparse.csr_matrix):
         """
         Генератор пакетов обучающей выборки
         """
