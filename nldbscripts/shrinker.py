@@ -2,7 +2,7 @@
 # В рамках проекта NLDB. Слеповичев И.И. 26.07.2019.
 # -----------------------------------------------------------------------------
 # Модуль содержит единственный класс Shrinker, реализующий механизм кодирования
-# слов короткими числовыми векторами. По сути, Shrinker является аналогом 
+# слов короткими числовыми векторами. По сути, Shrinker является аналогом
 # методов word2vec, но выполненных принципиально другим способом.
 # #############################################################################
 
@@ -49,7 +49,8 @@ class Shrinker(object):
         dot_XY = Dot(axes=-1, normalize=True)([X, Y])
         # Следующие два слоя - то преобразование, которое из вектора длины in_size, делает вектор out_size
         # первый сжимающий слой получает раздельно два вектора и сжимает длинный вектор до размера out_size*2
-        shared_dense = Dense(out_size*2, activation='softsign', name="shared_dense")
+        shared_dense = Dense(
+            out_size*2, activation='softsign', name="shared_dense")
         # второй сжимающий слой преобразует вектор длины out_size*2 до длины out_size
         encoding = Dense(out_size, activation="softsign", name="encoding")
         # Каждый из входных векторов преобразуем к размеру out_size
@@ -76,9 +77,9 @@ class Shrinker(object):
         Обучение модели на данных из разреженной матрицы m. В m каждая строка - 'длинный' вектор области определения искомого оператора.
         """
         self.model.fit_generator(
-            self._generate_batch(m), steps_per_epoch=256, epochs=8)
+            self._generate_batch(m), steps_per_epoch=256, epochs=4)
         return self.model
- 
+
     def _generate_batch(self, m: sparse.csr_matrix):
         """
         Генератор пакетов обучающей выборки
@@ -108,7 +109,7 @@ class Shrinker(object):
         input = Input(shape=(self.input_size,))
         # Линейный оператор - один из обучаемых слоёв модели
         encode_model = Model(
-            inputs=input, outputs=model.get_layer('encoding').output)
+            inputs=input, outputs=self.model.get_layer('encoding').output)
         return encode_model.predict(x)
 
     def save(self, filename):

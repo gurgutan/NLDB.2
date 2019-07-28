@@ -13,7 +13,11 @@ import alphabet
 
 
 class Vectorizer(object):
-    """Класс с методами для преобразования дерева строк в дерево токенов"""
+    '''
+    Класс с методами для преобразования дерева строк в дерево идентификаторов.
+    Ключевое отличие от обычных векторизаторов в том что на входе и на выходе 
+    основного метода - дерево, а не вектор.
+    '''
 
     def __init__(self, dbpath='', max_rank=1, word_min_len=2):
         self._max_rank = max_rank
@@ -35,6 +39,10 @@ class Vectorizer(object):
                 self._create_db(dbpath)
 
     def vectorize(self, text_tree):
+        '''
+        Метод получает дерево букв и возвращает соответствующее дерево идентификаторов.
+        Результат также записывается в БД dbpath.
+        '''
         with tqdm(total=len(text_tree), ncols=120, mininterval=0.5) as self._progress:
             ids = self.transform(text_tree, self._max_rank)
 
@@ -93,6 +101,7 @@ class Vectorizer(object):
         self.db.close()
 
 
+# проверка векторизации
 MODE_TEST = False
 
 if(MODE_TEST):
