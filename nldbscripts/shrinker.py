@@ -6,7 +6,7 @@
 # методов word2vec, но выполненных принципиально другим способом.
 # #############################################################################
 
-from tensorflow.keras.layers import Input, Layer, Dense, Concatenate, Dot, Subtract
+from tensorflow.keras.layers import Input, Layer, Dense, Concatenate, Dot, Subtract, Embedding
 from tensorflow.keras.initializers import *
 from tensorflow.keras.optimizers import Adam, Adagrad, RMSprop
 from tensorflow.keras.models import Model
@@ -49,15 +49,15 @@ class Shrinker(object):
         dot_XY = Dot(axes=-1, normalize=True)([X, Y])
         # Следующие два слоя - то преобразование, которое из вектора длины in_size, делает вектор out_size
         # первый сжимающий слой получает раздельно два вектора и сжимает длинный вектор до размера out_size*2
-        shared_dense = Dense(
-            out_size*2, activation='softsign', name="shared_dense")
+        # shared_dense = Dense(
+        #     max([out_size, in_size//256]), name="shared_dense")
         # второй сжимающий слой преобразует вектор длины out_size*2 до длины out_size
-        encoding = Dense(out_size, activation="softsign", name="encoding")
+        encoding = Dense(out_size, activation='softsign', name="encoding")
         # Каждый из входных векторов преобразуем к размеру out_size
-        s_x = shared_dense(X)
-        s_y = shared_dense(Y)
-        e_x = encoding(s_x)
-        e_y = encoding(s_y)
+        # s_x = shared_dense(X)
+        # s_y = shared_dense(Y)
+        e_x = encoding(X)
+        e_y = encoding(Y)
         # получаем скаляр - меру близости сжатых - коротких векторов
         # мера близости коротких векторов - косинусное расстояние
         dot_xy = Dot(axes=-1, normalize=True)([e_x, e_y])
@@ -67,9 +67,9 @@ class Shrinker(object):
         output = Dot(axes=-1, normalize=True, name="output")([delta, delta])
 
         self.model = Model(inputs=[X, Y], outputs=[output])
-        self.model.compile(loss='mean_squared_error',
-                           optimizer='sgd',
-                           metrics=['mae'])
+        self.model.compile(loss='mean_absolute_error',
+                           optimizer='adam',
+                           metrics=['mse', 'acc'])
         return self.model
 
     def train(self, m: sparse.csr_matrix):
@@ -77,7 +77,7 @@ class Shrinker(object):
         Обучение модели на данных из разреженной матрицы m. В m каждая строка - 'длинный' вектор области определения искомого оператора.
         """
         self.model.fit_generator(
-            self._generate_batch(m), steps_per_epoch=256, epochs=4)
+            self._generate_batch(m), steps_per_epoch=16, epochs=4)
         return self.model
 
     def _generate_batch(self, m: sparse.csr_matrix):
@@ -85,7 +85,7 @@ class Shrinker(object):
         Генератор пакетов обучающей выборки
         """
         # Размер пакета (пока фиксирован в коде)
-        batch_size = 2**12
+        batch_size = 2**10
         size = m.shape[0]
         n_x = 0
         while True:
@@ -98,18 +98,18 @@ class Shrinker(object):
                 # Второй вектор выбираем случайно строку из матрицы m
                 n_y = random.randint(0, size-1)
                 input_1 += [m[n_x].toarray()[0]]
-                input_2 += [m[n_x].toarray()[0]]
-                output += [0]
+                input_2 += [m[n_y].toarray()[0]]
+                output += [1]
             yield ({'input_1': np.array(input_1), 'input_2': np.array(input_2)}, {'output': np.array(output)})
 
     def shrink(self, x):
         """
         Преобразует 'длинный' вектор x в 'короткий' вектор y и возвращает y
         """
-        input = Input(shape=(self.input_size,))
+        x_ = Input(shape=(self.input_size,))
         # Линейный оператор - один из обучаемых слоёв модели
         encode_model = Model(
-            inputs=input, outputs=self.model.get_layer('encoding').output)
+            inputs=x_, outputs=self.model.get_layer('encoding').output)
         return encode_model.predict(x)
 
     def save(self, filename):
