@@ -64,7 +64,7 @@ class Shrinker(object):
         # вычисление разницы расстояний: длинного и короткого
         delta = Subtract()([dot_XY, dot_xy])
         # выход сети - квадрат разницы расстояний. именно его мы будем минимизировать прижимая к 0
-        output = Dot(axes=-1, normalize=True, name="output")([delta, delta])
+        output = Dot(axes=-1, normalize=False, name="output")([delta, delta])
 
         self.model = Model(inputs=[X, Y], outputs=[output])
         self.model.compile(loss='mean_absolute_error',
@@ -85,7 +85,7 @@ class Shrinker(object):
         Генератор пакетов обучающей выборки
         """
         # Размер пакета (пока фиксирован в коде)
-        batch_size = 2**10
+        batch_size = 2**6
         size = m.shape[0]
         n_x = 0
         while True:
@@ -99,18 +99,17 @@ class Shrinker(object):
                 n_y = random.randint(0, size-1)
                 input_1 += [m[n_x].toarray()[0]]
                 input_2 += [m[n_y].toarray()[0]]
-                output += [1]
+                output += [0]
             yield ({'input_1': np.array(input_1), 'input_2': np.array(input_2)}, {'output': np.array(output)})
 
     def shrink(self, x):
         """
         Преобразует 'длинный' вектор x в 'короткий' вектор y и возвращает y
         """
-        x_ = Input(shape=(self.input_size,))
         # Линейный оператор - один из обучаемых слоёв модели
         encode_model = Model(
-            inputs=x_, outputs=self.model.get_layer('encoding').output)
-        return encode_model.predict(x)
+            inputs=self.model.input, outputs=self.model.get_layer('encoding').output)
+        return encode_model.predict([x, x])
 
     def save(self, filename):
         self.model.save(filename)

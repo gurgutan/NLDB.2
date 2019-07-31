@@ -61,12 +61,13 @@ cs = sparse.load_npz(names.fname_context_similarity(dbpath))
 
 # start_time = timeit.default_timer()
 
-transformer = shrinker.Shrinker(in_size=cm.shape[1], out_size=16)
+transformer = shrinker.Shrinker(in_size=cm.shape[1], out_size=256)
 print("Обучение")
 transformer.train(cm)
 
 print("Сохранение модели")
 transformer.save('p5mb_model.h5')
+transformer.load('p5mb_model.h5')
 
 text = 'причина гражданская война'
 words_to_find_count = 8
