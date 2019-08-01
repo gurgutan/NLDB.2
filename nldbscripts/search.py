@@ -20,7 +20,7 @@
 import scipy.sparse as sparse
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from const import WORD_SIZES
+from constants import WORD_SIZES
 from scipy.spatial.distance import cdist
 import alphabet
 

@@ -12,9 +12,11 @@ from tensorflow.keras.optimizers import Adam, Adagrad, RMSprop
 from tensorflow.keras.models import Model
 from tensorflow.keras import backend as backend
 from tensorflow.keras.models import load_model
+from tensorflow.keras import regularizers
 import scipy.sparse as sparse
 import random
 import numpy as np
+import constants
 
 
 class Shrinker(object):
@@ -28,11 +30,12 @@ class Shrinker(object):
     """
     # TODO: Линейный оператор можно сделать нелинейным, усложнив обучаемую часть модели
 
-    def __init__(self, in_size=256, out_size=64):
+    def __init__(self, in_size=256, out_size=64, batch_size=256):
         """
         in_size - размерность пространства 'длинных' векторов
         out_size - размерность пространства 'коротких' векторов
         """
+        self.batch_size = batch_size
         self.input_size = in_size
         self.output_size = out_size
         self.model = self._get_model(in_size, out_size)
@@ -49,15 +52,15 @@ class Shrinker(object):
         dot_XY = Dot(axes=-1, normalize=True)([X, Y])
         # Следующие два слоя - то преобразование, которое из вектора длины in_size, делает вектор out_size
         # первый сжимающий слой получает раздельно два вектора и сжимает длинный вектор до размера out_size*2
-        # shared_dense = Dense(
-        #     max([out_size, in_size//256]), name="shared_dense")
-        # второй сжимающий слой преобразует вектор длины out_size*2 до длины out_size
-        encoding = Dense(out_size, activation='softsign', name="encoding")
-        # Каждый из входных векторов преобразуем к размеру out_size
-        # s_x = shared_dense(X)
-        # s_y = shared_dense(Y)
-        e_x = encoding(X)
-        e_y = encoding(Y)
+        shared = Dense(max([out_size, in_size//256]), activation='relu', name="shared_dense")
+        s_x = shared(X)
+        s_y = shared(Y)
+
+        # второй сжимающий слой преобразует вектор к длине out_size
+        encoding = Dense(out_size, kernel_regularizer=regularizers.l2(0.01), name="encoding")
+        e_x = encoding(s_x)
+        e_y = encoding(s_y)
+
         # получаем скаляр - меру близости сжатых - коротких векторов
         # мера близости коротких векторов - косинусное расстояние
         dot_xy = Dot(axes=-1, normalize=True)([e_x, e_y])
@@ -69,15 +72,16 @@ class Shrinker(object):
         self.model = Model(inputs=[X, Y], outputs=[output])
         self.model.compile(loss='mean_absolute_error',
                            optimizer='adam',
-                           metrics=['mse', 'acc'])
+                           metrics=['mse'])
         return self.model
 
     def train(self, m: sparse.csr_matrix):
         """
         Обучение модели на данных из разреженной матрицы m. В m каждая строка - 'длинный' вектор области определения искомого оператора.
         """
+        steps = m.shape[0]//self.batch_size
         self.model.fit_generator(
-            self._generate_batch(m), steps_per_epoch=16, epochs=4)
+            self._generate_batch(m), steps_per_epoch=steps, epochs=8)
         return self.model
 
     def _generate_batch(self, m: sparse.csr_matrix):
@@ -85,14 +89,13 @@ class Shrinker(object):
         Генератор пакетов обучающей выборки
         """
         # Размер пакета (пока фиксирован в коде)
-        batch_size = 2**6
         size = m.shape[0]
         n_x = 0
         while True:
             input_1 = []
             input_2 = []
             output = []
-            for i in range(batch_size):
+            for i in range(self.batch_size):
                 # Один из выбираемых векторов циклически пробегает весь диапазон
                 n_x = (n_x + 1) % size  # random.randint(0, size-1)
                 # Второй вектор выбираем случайно строку из матрицы m

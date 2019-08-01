@@ -19,6 +19,7 @@ from platform import system
 import shrinker
 import tensorflow as tf
 import generator
+import constants
 
 
 textname = '5mb.txt'
@@ -61,13 +62,14 @@ cs = sparse.load_npz(names.fname_context_similarity(dbpath))
 
 # start_time = timeit.default_timer()
 
-transformer = shrinker.Shrinker(in_size=cm.shape[1], out_size=256)
-print("Обучение")
+transformer = shrinker.Shrinker(in_size=cm.shape[1], out_size=64, batch_size=constants.SHRINKER_BATCH_SIZE)
+print("Обучение кодера слов")
 transformer.train(cm)
 
 print("Сохранение модели")
-transformer.save('p5mb_model.h5')
-transformer.load('p5mb_model.h5')
+transformer.save('D:\Data\Result\p5mb_model.h5')
+print("Загрузка модели")
+transformer.load('D:\Data\Result\p5mb_model.h5')
 
 text = 'причина гражданская война'
 words_to_find_count = 8

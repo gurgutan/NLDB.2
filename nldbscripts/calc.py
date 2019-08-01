@@ -13,7 +13,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import timeit
 import os
 import names
-from const import *
+from constants import *
 from tqdm import tqdm
 import alphabet
 

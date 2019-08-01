@@ -8,7 +8,7 @@
             "name": "Python: Terminal (integrated)",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/nldbscripts/nldbscripts.py",
             "console": "integratedTerminal"
         },
         {
