@@ -6,7 +6,7 @@
 # методов word2vec, но выполненных принципиально другим способом.
 # #############################################################################
 
-from tensorflow.keras.layers import Input, Layer, Dense, Concatenate, Dot, Subtract, Embedding
+from tensorflow.keras.layers import Input, Layer, Dense, Concatenate, Dot, Subtract, Conv1D
 from tensorflow.keras.initializers import *
 from tensorflow.keras.optimizers import Adam, Adagrad, RMSprop
 from tensorflow.keras.models import Model
@@ -52,12 +52,14 @@ class Shrinker(object):
         dot_XY = Dot(axes=-1, normalize=True)([X, Y])
         # Следующие два слоя - то преобразование, которое из вектора длины in_size, делает вектор out_size
         # первый сжимающий слой получает раздельно два вектора и сжимает длинный вектор до размера out_size*2
-        shared = Dense(max([out_size, in_size//256]), activation='relu', name="shared_dense")
+        shared = Dense(max([out_size, in_size//256]),
+                       activation='relu', name="shared_dense")
         s_x = shared(X)
         s_y = shared(Y)
 
         # второй сжимающий слой преобразует вектор к длине out_size
-        encoding = Dense(out_size, kernel_regularizer=regularizers.l2(0.01), name="encoding")
+        encoding = Dense(out_size, activation='softsign',
+                         kernel_regularizer=regularizers.l2(0.01), name="encoding")
         e_x = encoding(s_x)
         e_y = encoding(s_y)
 
@@ -70,8 +72,8 @@ class Shrinker(object):
         output = Dot(axes=-1, normalize=False, name="output")([delta, delta])
 
         self.model = Model(inputs=[X, Y], outputs=[output])
-        self.model.compile(loss='mean_absolute_error',
-                           optimizer='adam',
+        self.model.compile(loss='mean_squared_error',
+                           optimizer=Adam(lr=0.01),
                            metrics=['mse'])
         return self.model
 
@@ -80,13 +82,12 @@ class Shrinker(object):
         Обучение модели на данных из разреженной матрицы m. В m каждая строка - 'длинный' вектор области определения искомого оператора.
         """
         steps = m.shape[0]//self.batch_size
-        self.model.fit_generator(
-            self._generate_batch(m), steps_per_epoch=steps, epochs=8)
+        self.model.fit_generator(self._generate_batch(m), steps_per_epoch=steps, epochs=4)
         return self.model
 
     def _generate_batch(self, m: sparse.csr_matrix):
         """
-        Генератор пакетов обучающей выборки
+        Генератор пакетов обучающей выборки {(X,Y)}. При этом X=(row_x, row_y), а Y=[0].
         """
         # Размер пакета (пока фиксирован в коде)
         size = m.shape[0]
@@ -98,12 +99,18 @@ class Shrinker(object):
             for i in range(self.batch_size):
                 # Один из выбираемых векторов циклически пробегает весь диапазон
                 n_x = (n_x + 1) % size  # random.randint(0, size-1)
-                # Второй вектор выбираем случайно строку из матрицы m
+                # Второй вектор выбираем случайно - строку из матрицы m
                 n_y = random.randint(0, size-1)
-                input_1 += [m[n_x].toarray()[0]]
-                input_2 += [m[n_y].toarray()[0]]
+                input_1 += [self.to_dense(m[n_x])]
+                input_2 += [self.to_dense(m[n_y])]
                 output += [0]
             yield ({'input_1': np.array(input_1), 'input_2': np.array(input_2)}, {'output': np.array(output)})
+
+    def to_dense(self, x: sparse.csr_matrix):
+        """
+        По разреженной csr матрице x размерности 1xN возвращает вектор типа ndarray размерности N 
+        """
+        return x.toarray()[0]
 
     def shrink(self, x):
         """

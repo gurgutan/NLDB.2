@@ -62,7 +62,7 @@ cs = sparse.load_npz(names.fname_context_similarity(dbpath))
 
 # start_time = timeit.default_timer()
 
-transformer = shrinker.Shrinker(in_size=cm.shape[1], out_size=64, batch_size=constants.SHRINKER_BATCH_SIZE)
+transformer = shrinker.Shrinker(in_size=cm.shape[1], out_size=256, batch_size=constants.SHRINKER_BATCH_SIZE)
 print("Обучение кодера слов")
 transformer.train(cm)
 
