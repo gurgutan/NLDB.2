@@ -12,7 +12,7 @@ namespace NLDB
         {
             //string path = "/mnt/1C82D43582D414DC/Data/Result/5mb.db";
 
-            string filename = "5mb.txt";
+            string filename = "884mb.txt";
             string trainfile = @"D:\Data\Wiki\ru\" + filename;
             string dbpath = @"D:\Data\Result\CS\" + Path.ChangeExtension(filename, "db");
             Engine engine = new Engine(dbpath, ExecuteMode.Verbose);
@@ -28,7 +28,6 @@ namespace NLDB
                .Then(OperationType.FileWriting, dbpath.Replace(".db", ".norm"))
                .Then(OperationType.TextSplitting, engine.Data)
                .Then(OperationType.WordsExtraction, engine.Data);
-
 
             //// Вычисления метрик
             //engine.Clear("MatrixA");
@@ -73,39 +72,6 @@ namespace NLDB
             //Отключаемся от хранилища
             //l.Disconnect();
         }
-
-        //private static void TestLangConsole(Language l)
-        //{
-        //    int rank = 2;
-        //    if (!l.IsConnected()) l.Connect();
-        //    Queue<string> lines = new Queue<string>();
-        //    int que_size = 1;
-        //    string line = ">>";
-        //    Console.WriteLine();
-        //    while (line != "")
-        //    {
-        //        Console.WriteLine();
-        //        Console.Write($"{rank}>>");
-        //        line = Console.ReadLine();
-        //        if (line == "") continue;
-        //        lines.Enqueue(line);
-        //        if (lines.Count > que_size) lines.Dequeue();
-        //        string text = lines.Aggregate("", (c, n) => c == "" ? n : c + "\n" + n);
-        //        Stopwatch sw = new Stopwatch();
-        //        Console.WriteLine("\nПостроение цепочки");
-        //        sw.Restart();
-        //        IEnumerable<Term_old> core = l.GetCore(text, rank: 2);
-        //        //List<Term> next = l.Next(text, rank);
-        //        sw.Stop();
-        //        Console.WriteLine(sw.Elapsed.TotalSeconds + " sec");
-        //        if (core.Count() != 0)
-        //            Console.WriteLine(core.Aggregate("", (c, n) => c + $"\n" + n.ToString()));
-        //        //if (next.Count != 0)
-        //        //    Console.WriteLine(next.Aggregate("", (c, n) => c + $" " + n.ToString()));
-        //        //l.FreeMemory();
-        //    }
-        //    l.Disconnect();
-        //}
 
         private static void NormilizeTest()
         {

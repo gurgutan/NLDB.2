@@ -6,10 +6,8 @@
 from tensorflow.keras import backend as be
 
 # размер пакета слов для вычислений (обучения)
-BATCH_SIZE = 1 << 15        
+BATCH_SIZE = 1 << 15
 # Размеры слов различных рангов: 1-го, 2-го и т.д. (нумерация с 1-го, а не с 0-го ранга)
 WORD_SIZES = [16, 1, 1]
 # Размер обучающей выборки для Shrinker
-SHRINKER_BATCH_SIZE = 1<<10
-
-print("Тип данных по умолчанию: ", be.floatx())
+SHRINKER_BATCH_SIZE = 1 << 8

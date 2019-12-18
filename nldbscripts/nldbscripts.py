@@ -22,8 +22,8 @@ import generator
 import constants
 
 
-textname = '5mb.txt'
-dbname = '5mb.db'
+textname = '884mb.txt'
+dbname = '884mb.db'
 
 if system() == 'Linux':
     dbpath = '/home/ivan/dev/Data/Result/'+dbname
@@ -32,24 +32,23 @@ else:
     dbpath = 'D:/Data/Result/'+dbname
     text = 'D:/Data/Wiki/ru/'+textname
 
-
 s = splitter.Splitter()
-# print('Разбиение текста "%s" на слова' % text)
-# text_tree = s.split_file(text)
-# print('Векторизация текста "%s"' % text)
-# v = tokenizer.Vectorizer(dbpath, max_rank=3)
-# v.vectorize(text_tree)
+print('Разбиение текста "%s" на слова' % text)
+text_tree = s.split_file(text)
+print('Векторизация текста "%s"' % text)
+v = tokenizer.Vectorizer(dbpath, max_rank=3)
+v.vectorize(text_tree)
 
 engine = calc.Calculations(dbpath)
 
-# print('Вычисление memebership_matrix')
-# engine.memebership_matrix()
+print('Вычисление memebership_matrix')
+engine.memebership_matrix()
 
-# print('Вычисление context_mean_matrix')
-# engine.context_mean_matrix()
+print('Вычисление context_mean_matrix')
+engine.context_mean_matrix()
 
-# print('Вычисление context_similarity_matrix')
-# engine.context_similarity_matrix()
+print('Вычисление context_similarity_matrix')
+engine.context_similarity_matrix()
 
 # print('Вычисление membeship_similarity_matrix')
 # engine.membeship_similarity_matrix()
@@ -62,9 +61,10 @@ cs = sparse.load_npz(names.fname_context_similarity(dbpath))
 
 # start_time = timeit.default_timer()
 
-transformer = shrinker.Shrinker(in_size=cm.shape[1], out_size=256, batch_size=constants.SHRINKER_BATCH_SIZE)
+transformer = shrinker.Shrinker(
+    in_size=cm.shape[1], out_size=64, batch_size=constants.SHRINKER_BATCH_SIZE)
 print("Обучение кодера слов")
-transformer.train(cm)
+transformer.train(cs)
 
 print("Сохранение модели")
 transformer.save('D:\Data\Result\p5mb_model.h5')

@@ -62,6 +62,8 @@ def build_term(words, M, size=8):
                 min_dist = d/bag[w]
                 word = w
         # Добавляем оптимальное слово к терму
+        if word is None:
+            return term
         bag.pop(word)
         term.append(word)
         print(word, end=' ')  # !!!

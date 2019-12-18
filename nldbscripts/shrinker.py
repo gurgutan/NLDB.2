@@ -47,13 +47,13 @@ class Shrinker(object):
         # длинные вектора подаются на вход
         X = Input(shape=(in_size,))
         Y = Input(shape=(in_size,))
-        # получаем скаляр - мару близости двух длинных векторов
+        # получаем скаляр - меру близости двух длинных векторов
         # в качестве меры близости длинных векторов выбрано косинусное расстояние
         dot_XY = Dot(axes=-1, normalize=True)([X, Y])
         # Следующие два слоя - то преобразование, которое из вектора длины in_size, делает вектор out_size
         # первый сжимающий слой получает раздельно два вектора и сжимает длинный вектор до размера out_size*2
         shared = Dense(max([out_size, in_size//256]),
-                       activation='relu', name="shared_dense")
+                       name="shared_dense")
         s_x = shared(X)
         s_y = shared(Y)
 
@@ -73,7 +73,7 @@ class Shrinker(object):
 
         self.model = Model(inputs=[X, Y], outputs=[output])
         self.model.compile(loss='mean_squared_error',
-                           optimizer=Adam(lr=0.01),
+                           optimizer=Adam(lr=0.001),
                            metrics=['mse'])
         return self.model
 
@@ -82,7 +82,8 @@ class Shrinker(object):
         Обучение модели на данных из разреженной матрицы m. В m каждая строка - 'длинный' вектор области определения искомого оператора.
         """
         steps = m.shape[0]//self.batch_size
-        self.model.fit_generator(self._generate_batch(m), steps_per_epoch=steps, epochs=4)
+        self.model.fit_generator(self._generate_batch(
+            m), steps_per_epoch=steps, epochs=8)
         return self.model
 
     def _generate_batch(self, m: sparse.csr_matrix):
